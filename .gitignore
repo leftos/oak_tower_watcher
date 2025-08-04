@@ -4,3 +4,7 @@ vatsim_monitor.log
 config.json
 __pycache__/*
 *.pyc
+
+# Release packaging
+releases/
+*.zip
