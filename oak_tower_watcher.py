@@ -12,6 +12,12 @@ from datetime import datetime
 import sys
 import signal
 import logging
+import os
+import atexit
+
+# fcntl is only available on Unix-like systems
+if sys.platform != "win32":
+    import fcntl
 from PyQt6.QtWidgets import (
     QApplication,
     QSystemTrayIcon,
@@ -34,6 +40,74 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.FileHandler("vatsim_monitor.log"), logging.StreamHandler()],
 )
+
+# Global variable to store lock file handle
+_lock_file = None
+
+
+def acquire_instance_lock():
+    """
+    Acquire an exclusive lock to prevent multiple instances.
+    Returns True if lock acquired successfully, False if another instance is running.
+    """
+    global _lock_file
+    lock_file_path = os.path.join(os.path.expanduser("~"), ".vatsim_monitor.lock")
+
+    try:
+        _lock_file = open(lock_file_path, "w")
+
+        # Try to acquire exclusive lock
+        if sys.platform == "win32":
+            # Windows implementation using msvcrt
+            import msvcrt
+
+            try:
+                msvcrt.locking(_lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+                # Write PID to lock file
+                _lock_file.write(str(os.getpid()))
+                _lock_file.flush()
+                return True
+            except IOError:
+                _lock_file.close()
+                return False
+        else:
+            # Unix/Linux implementation using fcntl
+            try:
+                fcntl.flock(_lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                # Write PID to lock file
+                _lock_file.write(str(os.getpid()))
+                _lock_file.flush()
+                return True
+            except IOError:
+                _lock_file.close()
+                return False
+
+    except Exception as e:
+        logging.error(f"Error acquiring instance lock: {e}")
+        if _lock_file:
+            _lock_file.close()
+        return False
+
+
+def release_instance_lock():
+    """Release the instance lock."""
+    global _lock_file
+    if _lock_file:
+        try:
+            if sys.platform != "win32":
+                fcntl.flock(_lock_file.fileno(), fcntl.LOCK_UN)
+            _lock_file.close()
+
+            # Remove lock file
+            lock_file_path = os.path.join(
+                os.path.expanduser("~"), ".vatsim_monitor.lock"
+            )
+            if os.path.exists(lock_file_path):
+                os.remove(lock_file_path)
+        except Exception as e:
+            logging.error(f"Error releasing instance lock: {e}")
+        finally:
+            _lock_file = None
 
 
 class VATSIMWorker(QThread):
@@ -115,17 +189,35 @@ class VATSIMWorker(QThread):
         while self.running:
             try:
                 self.check_tower_status()
-                self.msleep(self.check_interval * 1000)  # Convert to milliseconds
+
+                # Sleep in small intervals to allow quick response to stop signals
+                sleep_time = self.check_interval * 1000  # Convert to milliseconds
+                sleep_chunk = 500  # Sleep in 500ms chunks
+
+                while sleep_time > 0 and self.running:
+                    chunk_size = min(sleep_chunk, sleep_time)
+                    self.msleep(chunk_size)
+                    sleep_time -= chunk_size
+
             except Exception as e:
                 logging.error(f"Error in monitoring loop: {e}")
                 self.error_occurred.emit(f"Monitoring Error: {str(e)}")
-                self.msleep(self.check_interval * 1000)
+
+                # Also sleep in chunks during error recovery
+                sleep_time = self.check_interval * 1000
+                sleep_chunk = 500
+
+                while sleep_time > 0 and self.running:
+                    chunk_size = min(sleep_chunk, sleep_time)
+                    self.msleep(chunk_size)
+                    sleep_time -= chunk_size
 
     def stop(self):
         """Stop the worker thread"""
         self.running = False
         self.quit()
-        self.wait()
+        # Wait for thread to finish - should be quick now with chunked sleep
+        self.wait(2000)  # 2 second timeout should be plenty
 
 
 class StatusDialog(QDialog):
@@ -245,6 +337,7 @@ class VATSIMMonitor(QApplication):
         self.controller_info = {}
         self.last_check = None
         self.monitoring = False
+        self._shutting_down = False
 
         # Setup components
         self.setup_tray_icon()
@@ -358,13 +451,14 @@ class VATSIMMonitor(QApplication):
         # Show notification if status changed
         if tower_online != previous_status:
             if tower_online:
-                message = (
-                    f"{controller_info.get('callsign', 'Unknown')} is now online!"
-                )
+                message = f"{controller_info.get('callsign', 'Unknown')} is now online!"
                 if controller_info.get("name"):
                     message += f"\nController: {controller_info['name']}"
                 self.tray_icon.showMessage(
-                    "KOAK Tower Online!", message, QSystemTrayIcon.MessageIcon.Information, 3000
+                    "KOAK Tower Online!",
+                    message,
+                    QSystemTrayIcon.MessageIcon.Information,
+                    3000,
                 )
             else:
                 self.tray_icon.showMessage(
@@ -388,12 +482,12 @@ class VATSIMMonitor(QApplication):
             self.start_action.setEnabled(False)
             self.stop_action.setEnabled(True)
 
-            self.tray_icon.showMessage(
-                "VATSIM Monitor Started",
-                "Monitoring KOAK tower status",
-                QSystemTrayIcon.MessageIcon.Information,
-                2000,
-            )
+            # self.tray_icon.showMessage(
+            #     "VATSIM Monitor Started",
+            #     "Monitoring KOAK tower status",
+            #     QSystemTrayIcon.MessageIcon.Information,
+            #     2000,
+            # )
             logging.info("Started VATSIM monitoring")
 
     def stop_monitoring(self):
@@ -456,21 +550,53 @@ class VATSIMMonitor(QApplication):
         """Quit the application"""
         logging.info("Shutting down VATSIM Monitor...")
 
+        # Prevent multiple shutdown attempts
+        if self._shutting_down:
+            return
+        self._shutting_down = True
+
+        # Stop monitoring and wait for worker thread to finish
         if self.monitoring:
             self.worker.stop()
 
-        self.tray_icon.hide()
+        # Hide and clean up tray icon
+        if hasattr(self, "tray_icon"):
+            self.tray_icon.hide()
+            self.tray_icon.deleteLater()
+
+        # Stop the signal timer
+        if hasattr(self, "signal_timer"):
+            self.signal_timer.stop()
+            self.signal_timer.deleteLater()
+
+        # Release instance lock
+        release_instance_lock()
+
+        # Process any remaining events to ensure cleanup
+        self.processEvents()
+
+        # Quit the application gracefully
         self.quit()
 
 
 def signal_handler(sig, frame):
     """Handle Ctrl+C gracefully"""
     logging.info("Received Ctrl+C, shutting down gracefully...")
+    release_instance_lock()
     sys.exit(0)
 
 
 def main():
     """Main entry point"""
+    # Check for existing instance
+    if not acquire_instance_lock():
+        print("Another instance of VATSIM Monitor is already running.")
+        logging.info("Another instance detected, exiting...")
+        sys.exit(0)
+
+    # Register cleanup function to release lock on exit
+    atexit.register(release_instance_lock)
+
     # Set up signal handler for Ctrl+C
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -487,9 +613,11 @@ def main():
 
     except KeyboardInterrupt:
         logging.info("Received keyboard interrupt, shutting down...")
+        release_instance_lock()
         sys.exit(0)
     except Exception as e:
         logging.error(f"Unexpected error: {e}")
+        release_instance_lock()
         sys.exit(1)
 
 
