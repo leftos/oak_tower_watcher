@@ -7,7 +7,6 @@ Uses Qt for cross-platform GUI components.
 
 import requests
 import json
-import threading
 from datetime import datetime
 import sys
 import signal
@@ -114,12 +113,16 @@ class VATSIMWorker(QThread):
     """Worker thread for VATSIM API calls"""
 
     status_updated = pyqtSignal(bool, dict)  # tower_online, controller_info
+    force_check_completed = pyqtSignal(bool, dict)  # tower_online, controller_info (always shows notification)
     error_occurred = pyqtSignal(str)
+    force_check_requested = pyqtSignal()  # Signal to request immediate check
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.running = False
         self.check_interval = 60
+        self.force_check_flag = False
+        self.is_force_check = False
 
         # VATSIM API endpoints
         self.vatsim_api_url = "https://data.vatsim.net/v3/vatsim-data.json"
@@ -129,6 +132,9 @@ class VATSIMWorker(QThread):
             "OAK_TWR",
             "OAK_1_TWR",
         ]
+        
+        # Connect the force check signal to the slot
+        self.force_check_requested.connect(self.request_immediate_check)
 
     def set_interval(self, interval):
         """Set check interval"""
@@ -178,10 +184,23 @@ class VATSIMWorker(QThread):
             logging.info(
                 f"KOAK Tower ONLINE: {controller_info['callsign']} - {controller_info.get('name', 'Unknown')}"
             )
-            self.status_updated.emit(True, controller_info)
+            if self.is_force_check:
+                self.force_check_completed.emit(True, controller_info)
+                self.is_force_check = False
+            else:
+                self.status_updated.emit(True, controller_info)
         else:
             logging.info("KOAK Tower OFFLINE")
-            self.status_updated.emit(False, {})
+            if self.is_force_check:
+                self.force_check_completed.emit(False, {})
+                self.is_force_check = False
+            else:
+                self.status_updated.emit(False, {})
+
+    def request_immediate_check(self):
+        """Slot to handle force check requests"""
+        self.force_check_flag = True
+        self.is_force_check = True
 
     def run(self):
         """Main monitoring loop"""
@@ -190,11 +209,17 @@ class VATSIMWorker(QThread):
             try:
                 self.check_tower_status()
 
-                # Sleep in small intervals to allow quick response to stop signals
+                # Sleep in small intervals to allow quick response to stop signals and force checks
                 sleep_time = self.check_interval * 1000  # Convert to milliseconds
                 sleep_chunk = 500  # Sleep in 500ms chunks
 
                 while sleep_time > 0 and self.running:
+                    # Check if force check was requested
+                    if self.force_check_flag:
+                        self.force_check_flag = False
+                        logging.info("Force check requested, breaking sleep cycle")
+                        break
+                    
                     chunk_size = min(sleep_chunk, sleep_time)
                     self.msleep(chunk_size)
                     sleep_time -= chunk_size
@@ -208,6 +233,12 @@ class VATSIMWorker(QThread):
                 sleep_chunk = 500
 
                 while sleep_time > 0 and self.running:
+                    # Check if force check was requested during error recovery too
+                    if self.force_check_flag:
+                        self.force_check_flag = False
+                        logging.info("Force check requested during error recovery, breaking sleep cycle")
+                        break
+                    
                     chunk_size = min(sleep_chunk, sleep_time)
                     self.msleep(chunk_size)
                     sleep_time -= chunk_size
@@ -430,6 +461,7 @@ class VATSIMMonitor(QApplication):
         """Setup the VATSIM worker thread"""
         self.worker = VATSIMWorker()
         self.worker.status_updated.connect(self.on_status_updated)
+        self.worker.force_check_completed.connect(self.on_force_check_completed)
         self.worker.error_occurred.connect(self.on_error)
 
     def tray_icon_activated(self, reason):
@@ -468,6 +500,36 @@ class VATSIMMonitor(QApplication):
                     3000,
                 )
 
+    def on_force_check_completed(self, tower_online, controller_info):
+        """Handle force check completion - always show notification"""
+        # Update internal state
+        self.tower_online = tower_online
+        self.controller_info = controller_info
+        self.last_check = datetime.now()
+
+        # Update tray icon
+        color = "green" if tower_online else "red"
+        self.tray_icon.setIcon(self.create_icon(color))
+
+        # Always show notification for force checks
+        if tower_online:
+            message = f"{controller_info.get('callsign', 'Unknown')} is online"
+            if controller_info.get("name"):
+                message += f"\nController: {controller_info['name']}"
+            self.tray_icon.showMessage(
+                "KOAK Tower Status",
+                message,
+                QSystemTrayIcon.MessageIcon.Information,
+                3000,
+            )
+        else:
+            self.tray_icon.showMessage(
+                "KOAK Tower Status",
+                "No tower controller found",
+                QSystemTrayIcon.MessageIcon.Information,
+                3000,
+            )
+
     def on_error(self, error_message):
         """Handle error from worker thread"""
         logging.error(error_message)
@@ -500,23 +562,20 @@ class VATSIMMonitor(QApplication):
             self.stop_action.setEnabled(False)
 
             self.tray_icon.setIcon(self.create_icon("gray"))
-            self.tray_icon.showMessage(
-                "VATSIM Monitor Stopped",
-                "No longer monitoring KOAK tower",
-                QSystemTrayIcon.MessageIcon.Information,
-                2000,
-            )
+            # self.tray_icon.showMessage(
+            #     "VATSIM Monitor Stopped",
+            #     "No longer monitoring KOAK tower",
+            #     QSystemTrayIcon.MessageIcon.Information,
+            #     2000,
+            # )
             logging.info("Stopped VATSIM monitoring")
 
     def force_check(self):
         """Force an immediate check"""
         if self.monitoring:
-            # Trigger a check by calling the worker method directly
-            # This runs in a separate thread to avoid blocking the UI
-            check_thread = threading.Thread(
-                target=self.worker.check_tower_status, daemon=True
-            )
-            check_thread.start()
+            # Signal the worker thread to perform an immediate check
+            logging.info("Requesting immediate check...")
+            self.worker.force_check_requested.emit()
         else:
             self.tray_icon.showMessage(
                 "Monitor Not Running",
