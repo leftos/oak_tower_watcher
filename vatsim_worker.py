@@ -2,11 +2,18 @@
 """
 VATSIM API Worker module for VATSIM Tower Monitor
 Handles background monitoring of VATSIM API for controller status.
+
+Regex-based Callsign Matching:
+- Uses regex patterns from configuration to match controller callsigns
+- Supports multiple controllers matching the same pattern (e.g., OAK_TWR, OAK_1_TWR, OAK_2_TWR)
+- Each matched controller is captured as a separate controller instance
+- Patterns are compiled once for performance and use case-insensitive matching
 """
 
 import requests
 import json
 import logging
+import re
 from PyQt6.QtCore import QThread, pyqtSignal
 
 
@@ -36,17 +43,33 @@ class VATSIMWorker(QThread):
             "vatsim_url", "https://data.vatsim.net/v3/vatsim-data.json"
         )
 
-        # Load callsigns from config
+        # Load callsign regex patterns from config
         callsigns = config.get("callsigns", {})
-        self.main_facility_callsigns = callsigns.get(
-            "main_facility", ["OAK_TWR", "OAK_1_TWR"]
+        self.main_facility_patterns = callsigns.get(
+            "main_facility", [r"^OAK_(?:\d+_)?TWR$"]
         )
-        self.supporting_above_callsigns = callsigns.get(
-            "supporting_above", ["NCT_APP", "OAK_36_CTR", "OAK_62_CTR"]
+        self.supporting_above_patterns = callsigns.get(
+            "supporting_above", [r"^NCT_APP$", r"^OAK_\d+_CTR$"]
         )
-        self.supporting_below_callsigns = callsigns.get(
-            "supporting_below", ["OAK_GND", "OAK_1_GND"]
+        self.supporting_below_patterns = callsigns.get(
+            "supporting_below", [r"^OAK_(?:\d+_)?GND$"]
         )
+
+        # Compile regex patterns for better performance (case-insensitive matching)
+        # This allows capturing multiple controllers matching the same pattern
+        # e.g., OAK_TWR, OAK_1_TWR, OAK_2_TWR all match ^OAK_(?:\d+_)?TWR$
+        self.main_facility_regex = [
+            re.compile(pattern, re.IGNORECASE)
+            for pattern in self.main_facility_patterns
+        ]
+        self.supporting_above_regex = [
+            re.compile(pattern, re.IGNORECASE)
+            for pattern in self.supporting_above_patterns
+        ]
+        self.supporting_below_regex = [
+            re.compile(pattern, re.IGNORECASE)
+            for pattern in self.supporting_below_patterns
+        ]
 
         # Connect the force check signal to the slot
         self.force_check_requested.connect(self.request_immediate_check)
@@ -73,24 +96,23 @@ class VATSIMWorker(QThread):
             for controller in controllers:
                 callsign = controller.get("callsign", "")
 
-                # Check for main facility controllers
-                if any(
-                    main_facility_call in callsign.upper()
-                    for main_facility_call in self.main_facility_callsigns
-                ):
+                # Check for main facility controllers using regex patterns
+                # This captures all controllers matching any main facility pattern
+                # e.g., OAK_TWR, OAK_1_TWR, OAK_2_TWR, etc.
+                if any(regex.match(callsign) for regex in self.main_facility_regex):
                     main_facility_controllers.append(controller)
 
-                # Check for supporting above facility controllers
+                # Check for supporting above facility controllers using regex patterns
+                # e.g., NCT_APP, OAK_36_CTR, OAK_62_CTR, etc.
                 elif any(
-                    support_call in callsign.upper()
-                    for support_call in self.supporting_above_callsigns
+                    regex.match(callsign) for regex in self.supporting_above_regex
                 ):
                     supporting_above_controllers.append(controller)
 
-                # Check for supporting below controllers
+                # Check for supporting below controllers using regex patterns
+                # e.g., OAK_GND, OAK_1_GND, OAK_2_GND, etc.
                 elif any(
-                    supporting_below_call in callsign.upper()
-                    for supporting_below_call in self.supporting_below_callsigns
+                    regex.match(callsign) for regex in self.supporting_below_regex
                 ):
                     supporting_below_controllers.append(controller)
 

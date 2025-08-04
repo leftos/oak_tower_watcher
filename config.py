@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
-"""
+r"""
 Configuration management module for VATSIM Tower Monitor
 Handles loading and saving of configuration settings.
+
+Callsign Configuration:
+- Uses regex patterns to match controller callsigns
+- Each category (main_facility, supporting_above, supporting_below) contains a list of regex patterns
+- Patterns are case-insensitive and use full string matching (^ and $ anchors)
+- Examples:
+  - ^OAK_(?:\d+_)?TWR$ matches OAK_TWR, OAK_1_TWR, OAK_2_TWR, etc.
+  - ^OAK_\d+_CTR$ matches OAK_36_CTR, OAK_62_CTR, etc.
 """
 
 import json
@@ -18,11 +26,11 @@ def load_config():
             "name": "Oakland International Airport",
             "display_name": "Oakland Main Facility",
         },
-        "monitoring": {"check_interval": 60},
+        "monitoring": {"check_interval": 30},
         "callsigns": {
-            "main_facility": ["OAK_TWR", "OAK_1_TWR"],
-            "supporting_above": ["NCT_APP", "OAK_36_CTR", "OAK_62_CTR"],
-            "supporting_below": ["OAK_GND", "OAK_1_GND"],
+            "main_facility": [r"^OAK_(?:\d+_)?TWR$"],
+            "supporting_above": [r"^NCT_APP$", r"^OAK_\d+_CTR$"],
+            "supporting_below": [r"^OAK_(?:\d+_)?GND$", r"^OAK_(?:\d+_)?DEL$"],
         },
         "api": {
             "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
