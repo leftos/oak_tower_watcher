@@ -10,12 +10,12 @@ import json
 import threading
 from datetime import datetime
 import sys
+import signal
 import logging
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QApplication,
     QSystemTrayIcon,
     QMenu,
-    QAction,
     QDialog,
     QVBoxLayout,
     QHBoxLayout,
@@ -25,8 +25,8 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QTextEdit,
 )
-from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from PyQt5.QtGui import QIcon, QPixmap, QPainter, QBrush, QPen
+from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer
+from PyQt6.QtGui import QAction, QIcon, QPixmap, QPainter, QBrush, QPen
 
 # Configure logging
 logging.basicConfig(
@@ -145,7 +145,7 @@ class StatusDialog(QDialog):
         status_label = QLabel(f"{color} KOAK Tower: {status}")
         status_label.setStyleSheet("font-size: 16px; font-weight: bold; margin: 10px;")
 
-        status_label.setAlignment(Qt.AlignCenter)
+        status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(status_label)
 
         # Controller details
@@ -253,23 +253,26 @@ class VATSIMMonitor(QApplication):
         # Don't quit when last window closes (for tray apps)
         self.setQuitOnLastWindowClosed(False)
 
+        # Setup signal processing timer for immediate Ctrl+C handling
+        self.setup_signal_timer()
+
     def create_icon(self, color="gray"):
         """Create a colored circle icon"""
         pixmap = QPixmap(64, 64)
-        pixmap.fill(Qt.transparent)
+        pixmap.fill(Qt.GlobalColor.transparent)
 
         painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         if color == "green":
-            brush = QBrush(Qt.green)
+            brush = QBrush(Qt.GlobalColor.green)
         elif color == "red":
-            brush = QBrush(Qt.red)
+            brush = QBrush(Qt.GlobalColor.red)
         else:  # gray
-            brush = QBrush(Qt.gray)
+            brush = QBrush(Qt.GlobalColor.gray)
 
         painter.setBrush(brush)
-        painter.setPen(QPen(Qt.black, 2))
+        painter.setPen(QPen(Qt.GlobalColor.black, 2))
         painter.drawEllipse(8, 8, 48, 48)
         painter.end()
 
@@ -324,6 +327,12 @@ class VATSIMMonitor(QApplication):
         # Connect double-click to show status
         self.tray_icon.activated.connect(self.tray_icon_activated)
 
+    def setup_signal_timer(self):
+        """Setup timer to process signals immediately"""
+        self.signal_timer = QTimer()
+        self.signal_timer.timeout.connect(lambda: None)  # Just process events
+        self.signal_timer.start(100)  # Check every 100ms for signals
+
     def setup_worker(self):
         """Setup the VATSIM worker thread"""
         self.worker = VATSIMWorker()
@@ -332,7 +341,7 @@ class VATSIMMonitor(QApplication):
 
     def tray_icon_activated(self, reason):
         """Handle tray icon activation"""
-        if reason == QSystemTrayIcon.DoubleClick:
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             self.show_status()
 
     def on_status_updated(self, tower_online, controller_info):
@@ -355,13 +364,13 @@ class VATSIMMonitor(QApplication):
                 if controller_info.get("name"):
                     message += f"\nController: {controller_info['name']}"
                 self.tray_icon.showMessage(
-                    "KOAK Tower Online!", message, QSystemTrayIcon.Information, 3000
+                    "KOAK Tower Online!", message, QSystemTrayIcon.MessageIcon.Information, 3000
                 )
             else:
                 self.tray_icon.showMessage(
                     "KOAK Tower Offline",
                     "No tower controller found",
-                    QSystemTrayIcon.Warning,
+                    QSystemTrayIcon.MessageIcon.Warning,
                     3000,
                 )
 
@@ -382,7 +391,7 @@ class VATSIMMonitor(QApplication):
             self.tray_icon.showMessage(
                 "VATSIM Monitor Started",
                 "Monitoring KOAK tower status",
-                QSystemTrayIcon.Information,
+                QSystemTrayIcon.MessageIcon.Information,
                 2000,
             )
             logging.info("Started VATSIM monitoring")
@@ -400,7 +409,7 @@ class VATSIMMonitor(QApplication):
             self.tray_icon.showMessage(
                 "VATSIM Monitor Stopped",
                 "No longer monitoring KOAK tower",
-                QSystemTrayIcon.Information,
+                QSystemTrayIcon.MessageIcon.Information,
                 2000,
             )
             logging.info("Stopped VATSIM monitoring")
@@ -418,7 +427,7 @@ class VATSIMMonitor(QApplication):
             self.tray_icon.showMessage(
                 "Monitor Not Running",
                 "Start monitoring first",
-                QSystemTrayIcon.Warning,
+                QSystemTrayIcon.MessageIcon.Warning,
                 2000,
             )
 
@@ -427,19 +436,19 @@ class VATSIMMonitor(QApplication):
         dialog = StatusDialog(
             self.tower_online, self.controller_info, self.last_check, None
         )
-        dialog.exec_()
+        dialog.exec()
 
     def show_settings(self):
         """Show settings dialog"""
         dialog = SettingsDialog(self.worker.check_interval, None)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.worker.set_interval(dialog.new_interval)
             logging.info(f"Check interval updated to {dialog.new_interval} seconds")
 
             self.tray_icon.showMessage(
                 "Settings Updated",
                 f"Check interval set to {dialog.new_interval} seconds",
-                QSystemTrayIcon.Information,
+                QSystemTrayIcon.MessageIcon.Information,
                 2000,
             )
 
@@ -454,8 +463,17 @@ class VATSIMMonitor(QApplication):
         self.quit()
 
 
+def signal_handler(sig, frame):
+    """Handle Ctrl+C gracefully"""
+    logging.info("Received Ctrl+C, shutting down gracefully...")
+    sys.exit(0)
+
+
 def main():
     """Main entry point"""
+    # Set up signal handler for Ctrl+C
+    signal.signal(signal.SIGINT, signal_handler)
+
     try:
         app = VATSIMMonitor(sys.argv)
 
@@ -465,7 +483,7 @@ def main():
         app.start_monitoring()
 
         # Run the application
-        sys.exit(app.exec_())
+        sys.exit(app.exec())
 
     except KeyboardInterrupt:
         logging.info("Received keyboard interrupt, shutting down...")
