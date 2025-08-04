@@ -5,7 +5,7 @@
     "display_name": "Oakland Tower"
   },
   "monitoring": {
-    "check_interval": 60,
+    "check_interval": 30,
     "comment": "Check interval in seconds (minimum 30)"
   },
   "callsigns": {
@@ -30,6 +30,6 @@
   "notifications": {
     "sound_enabled": true,
     "sound_file": "ding.mp3",
-    "toast_duration": 3000
+    "toast_duration": 5000
   }
 }

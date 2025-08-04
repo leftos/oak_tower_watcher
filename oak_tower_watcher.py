@@ -386,11 +386,12 @@ class CustomToast(QDialog):
     """Custom toast notification widget with multiline support"""
 
     def __init__(
-        self, title, message, toast_type="success", duration=3000, parent=None
+        self, title, message, toast_type="success", duration=3000, bg_color=None, parent=None
     ):
         super().__init__(parent)
         self.duration = duration
         self.toast_type = toast_type
+        self.bg_color = bg_color
 
         # Set window properties
         self.setWindowFlags(
@@ -420,23 +421,28 @@ class CustomToast(QDialog):
 
         # Title label
         title_label = QLabel(title)
-        title_font = QFont()
+        title_font = QFont("Calibri")
         title_font.setBold(True)
         title_font.setPointSize(11)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: black;")
+        title_label.setStyleSheet("color: white;")
         layout.addWidget(title_label)
 
         # Message label (supports multiline)
         message_label = QLabel(message)
+        message_font = QFont("Calibri")
+        message_font.setPointSize(10)
+        message_label.setFont(message_font)
         message_label.setWordWrap(True)
-        message_label.setStyleSheet("color: black; font-size: 10pt;")
+        message_label.setStyleSheet("color: white;")
         layout.addWidget(message_label)
 
         self.setLayout(layout)
 
-        # Set background color based on type
-        if self.toast_type == "success":
+        # Set background color - use provided color or fallback to type-based colors
+        if self.bg_color:
+            bg_color = self.bg_color
+        elif self.toast_type == "success":
             bg_color = "rgb(76, 175, 80)"  # Green
         elif self.toast_type == "warning":
             bg_color = "rgb(255, 152, 0)"  # Orange
@@ -754,6 +760,32 @@ class VATSIMMonitor(QApplication):
         # Setup signal processing timer for immediate Ctrl+C handling
         self.setup_signal_timer()
 
+    def get_status_colors(self, status):
+        """Get both tray icon and notification colors for a given status"""
+        color_map = {
+            "main_facility_and_supporting_above_online": {
+                "tray": "purple",
+                "notification": "rgb(75, 0, 130)"  # Dark purple for readability with white text
+            },
+            "main_facility_online": {
+                "tray": "green",
+                "notification": "rgb(0, 100, 0)"  # Dark green for readability with white text
+            },
+            "supporting_above_online": {
+                "tray": "yellow",
+                "notification": "rgb(184, 134, 11)"  # Dark yellow/gold for readability with white text
+            },
+            "all_offline": {
+                "tray": "red",
+                "notification": "rgb(139, 0, 0)"  # Dark red for readability with white text
+            },
+            "error": {
+                "tray": "gray",
+                "notification": "rgb(64, 64, 64)"  # Dark gray for readability with white text
+            }
+        }
+        return color_map.get(status, color_map["error"])
+
     def create_icon(self, color="gray"):
         """Create a colored circle icon"""
         pixmap = QPixmap(64, 64)
@@ -1053,7 +1085,7 @@ class VATSIMMonitor(QApplication):
             logging.error(f"Error playing notification sound: {e}")
 
     def show_toast_notification(
-        self, title, message, toast_type="success", duration=None
+        self, title, message, toast_type="success", duration=None, status=None
     ):
         """Show a custom toast notification with sound"""
         try:
@@ -1066,8 +1098,14 @@ class VATSIMMonitor(QApplication):
             # Play custom sound
             self.play_notification_sound()
 
+            # Get background color based on status if provided
+            bg_color = None
+            if status:
+                colors = self.get_status_colors(status)
+                bg_color = colors["notification"]
+
             # Show custom toast notification
-            toast = CustomToast(title, message, toast_type, duration)
+            toast = CustomToast(title, message, toast_type, duration, bg_color)
             toast.show_toast()
 
         except Exception as e:
@@ -1241,7 +1279,7 @@ class VATSIMMonitor(QApplication):
                 supporting_info,
                 supporting_below_controllers,
             )
-            self.show_toast_notification(title, message, toast_type, 3000)
+            self.show_toast_notification(title, message, toast_type, 3000, status)
 
     def on_force_check_completed(
         self, status, controller_info, supporting_info, supporting_below_controllers
@@ -1283,7 +1321,7 @@ class VATSIMMonitor(QApplication):
                 f"Supporting Above: {support_callsign} ({support_name}){supporting_below_info}"
             )
             self.show_toast_notification(
-                f"{self.display_name} Status", message, "success", 3000
+                f"{self.display_name} Status", message, "success", 3000, status
             )
         elif status == "main_facility_online":
             callsign = controller_info.get("callsign", "Unknown")
@@ -1292,7 +1330,7 @@ class VATSIMMonitor(QApplication):
                 f"{callsign} is online\nController: {controller_name}{supporting_below_info}"
             )
             self.show_toast_notification(
-                f"{self.display_name} Status", message, "success", 3000
+                f"{self.display_name} Status", message, "success", 3000, status
             )
         elif status == "supporting_above_online":
             callsign = supporting_info.get("callsign", "Unknown")
@@ -1302,12 +1340,12 @@ class VATSIMMonitor(QApplication):
                 f"Controller: {controller_name}{supporting_below_info}"
             )
             self.show_toast_notification(
-                f"{self.display_name} Status", message, "warning", 3000
+                f"{self.display_name} Status", message, "warning", 3000, status
             )
         else:  # all_offline
             message = f"No controllers found{supporting_below_info}"
             self.show_toast_notification(
-                f"{self.display_name} Status", message, "info", 3000
+                f"{self.display_name} Status", message, "info", 3000, status
             )
 
     def on_error(self, error_message):
@@ -1360,7 +1398,7 @@ class VATSIMMonitor(QApplication):
             self.worker.force_check_requested.emit()
         else:
             self.show_toast_notification(
-                "Monitor Not Running", "Start monitoring first", "warning", 2000
+                "Monitor Not Running", "Start monitoring first", "warning", 2000, "error"
             )
 
     def show_status(self):
@@ -1393,6 +1431,7 @@ class VATSIMMonitor(QApplication):
                 f"Check interval set to {dialog.new_interval} seconds",
                 "success",
                 2000,
+                self.current_status
             )
 
     def quit_application(self):
