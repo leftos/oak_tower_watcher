@@ -1075,47 +1075,43 @@ class VATSIMMonitor(QApplication):
                     for row in rows:
                         if isinstance(row, Tag):
                             cells = row.find_all(["td", "th"])
-                        else:
-                            continue
-                else:
-                    continue
-                    if len(cells) >= 2:
-                        # Look for patterns that might be CID (numeric) and name
-                        for i, cell in enumerate(cells):
-                            text = cell.get_text(strip=True)
-                            # Check if this looks like a CID (numeric ID)
-                            if (
-                                text.isdigit() and len(text) >= 6
-                            ):  # CIDs are typically 6+ digits
-                                cid = text
-                                # Look for name in adjacent cells
-                                for j in range(max(0, i - 2), min(len(cells), i + 3)):
-                                    if j != i:
-                                        name_text = cells[j].get_text(strip=True)
-                                        # Skip if it's also numeric or empty
-                                        if (
-                                            name_text
-                                            and not name_text.isdigit()
-                                            and len(name_text) > 2
-                                        ):
-                                            # Clean up the name (remove extra whitespace, etc.)
-                                            clean_name = re.sub(
-                                                r"\s+", " ", name_text
-                                            ).strip()
-                                            if clean_name and not any(
-                                                char.isdigit()
-                                                for char in clean_name[:3]
-                                            ):
-                                                # Convert name format to "firstname lastname"
-                                                formatted_name = (
-                                                    self.format_controller_name(
-                                                        clean_name
-                                                    )
-                                                )
-                                                self.controller_names[cid] = (
-                                                    formatted_name
-                                                )
-                                                break
+                            if len(cells) >= 2:
+                                # Look for patterns that might be CID (numeric) and name
+                                for i, cell in enumerate(cells):
+                                    text = cell.get_text(strip=True)
+                                    # Check if this looks like a CID (numeric ID)
+                                    if (
+                                        text.isdigit() and len(text) >= 6
+                                    ):  # CIDs are typically 6+ digits
+                                        cid = text
+                                        # Look for name in adjacent cells
+                                        for j in range(max(0, i - 2), min(len(cells), i + 3)):
+                                            if j != i:
+                                                name_text = cells[j].get_text(strip=True)
+                                                # Skip if it's also numeric or empty
+                                                if (
+                                                    name_text
+                                                    and not name_text.isdigit()
+                                                    and len(name_text) > 2
+                                                ):
+                                                    # Clean up the name (remove extra whitespace, etc.)
+                                                    clean_name = re.sub(
+                                                        r"\s+", " ", name_text
+                                                    ).strip()
+                                                    if clean_name and not any(
+                                                        char.isdigit()
+                                                        for char in clean_name[:3]
+                                                    ):
+                                                        # Convert name format to "firstname lastname"
+                                                        formatted_name = (
+                                                            self.format_controller_name(
+                                                                clean_name
+                                                            )
+                                                        )
+                                                        self.controller_names[cid] = (
+                                                            formatted_name
+                                                        )
+                                                        break
 
             # Also try to find div elements or other structures with controller info
             # Look for patterns like "John Doe - 1234567" or similar
