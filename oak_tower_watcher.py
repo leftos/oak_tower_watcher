@@ -62,7 +62,7 @@ def load_config():
         "airport": {
             "code": "KOAK",
             "name": "Oakland International Airport",
-            "display_name": "Oakland Tower"
+            "display_name": "Oakland Tower",
         },
         "monitoring": {"check_interval": 60},
         "callsigns": {
@@ -638,7 +638,9 @@ Rating: {supporting_info.get('rating', 'Unknown')}
 Logon Time: {supporting_info.get('logon_time', 'Unknown')}
 Server: {supporting_info.get('server', 'Unknown')}{ground_details}"""
         else:
-            details = f"No tower or supporting controllers currently online.{ground_details}"
+            details = (
+                f"No tower or supporting controllers currently online.{ground_details}"
+            )
 
         if last_check:
             details += f"\n\nLast checked: {last_check.strftime('%Y-%m-%d %H:%M:%S')}"
@@ -718,12 +720,16 @@ class VATSIMMonitor(QApplication):
 
         # Load configuration
         self.config = load_config()
-        
+
         # Get airport configuration
         self.airport_config = self.config.get("airport", {})
         self.airport_code = self.airport_config.get("code", "KOAK")
-        self.airport_name = self.airport_config.get("name", "Oakland International Airport")
-        self.display_name = self.airport_config.get("display_name", f"{self.airport_code} Tower")
+        self.airport_name = self.airport_config.get(
+            "name", "Oakland International Airport"
+        )
+        self.display_name = self.airport_config.get(
+            "display_name", f"{self.airport_code} Tower"
+        )
 
         # Application state
         self.tower_online = False
@@ -1129,7 +1135,9 @@ class VATSIMMonitor(QApplication):
     def update_tray_tooltip(self):
         """Update the system tray icon tooltip with current status"""
         if not hasattr(self, "current_status"):
-            self.tray_icon.setToolTip(f"VATSIM {self.display_name} Monitor - Starting...")
+            self.tray_icon.setToolTip(
+                f"VATSIM {self.display_name} Monitor - Starting..."
+            )
             return
 
         if self.current_status == "tower_and_supporting_online":
@@ -1149,9 +1157,7 @@ class VATSIMMonitor(QApplication):
             if hasattr(self, "controller_info") and self.controller_info:
                 tower_callsign = self.controller_info.get("callsign", "Unknown")
                 tower_name = self.get_controller_name(self.controller_info)
-                tooltip = (
-                    f"{self.display_name}: ONLINE\nController: {tower_callsign} ({tower_name})"
-                )
+                tooltip = f"{self.display_name}: ONLINE\nController: {tower_callsign} ({tower_name})"
             else:
                 tooltip = f"{self.display_name}: ONLINE"
         elif self.current_status == "supporting_online":
@@ -1261,22 +1267,30 @@ class VATSIMMonitor(QApplication):
                 f"Tower: {tower_callsign} ({tower_name})\n"
                 f"Supporting: {support_callsign} ({support_name}){ground_info}"
             )
-            self.show_toast_notification(f"{self.display_name} Status", message, "success", 3000)
+            self.show_toast_notification(
+                f"{self.display_name} Status", message, "success", 3000
+            )
         elif status == "tower_online":
             callsign = controller_info.get("callsign", "Unknown")
             controller_name = self.get_controller_name(controller_info)
             message = (
                 f"{callsign} is online\nController: {controller_name}{ground_info}"
             )
-            self.show_toast_notification(f"{self.display_name} Status", message, "success", 3000)
+            self.show_toast_notification(
+                f"{self.display_name} Status", message, "success", 3000
+            )
         elif status == "supporting_online":
             callsign = supporting_info.get("callsign", "Unknown")
             controller_name = self.get_controller_name(supporting_info)
             message = f"Tower offline, but {callsign} is online\nController: {controller_name}{ground_info}"
-            self.show_toast_notification(f"{self.display_name} Status", message, "warning", 3000)
+            self.show_toast_notification(
+                f"{self.display_name} Status", message, "warning", 3000
+            )
         else:  # all_offline
             message = f"No controllers found{ground_info}"
-            self.show_toast_notification(f"{self.display_name} Status", message, "info", 3000)
+            self.show_toast_notification(
+                f"{self.display_name} Status", message, "info", 3000
+            )
 
     def on_error(self, error_message):
         """Handle error from worker thread"""
