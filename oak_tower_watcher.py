@@ -31,11 +31,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QTextEdit,
 )
-from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer
-from PyQt6.QtGui import QAction, QIcon, QPixmap, QPainter, QBrush, QPen
-
-# Import pyqttoast for silent notifications
-from pyqttoast import Toast, ToastPreset
+from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer, QPropertyAnimation, QRect, QEasingCurve
+from PyQt6.QtGui import QAction, QIcon, QPixmap, QPainter, QBrush, QPen, QFont
 
 # Configure logging
 logging.basicConfig(
@@ -255,6 +252,152 @@ class VATSIMWorker(QThread):
         self.wait(2000)  # 2 second timeout should be plenty
 
 
+class CustomToast(QDialog):
+    """Custom toast notification widget with multiline support"""
+    
+    def __init__(self, title, message, toast_type="success", duration=3000, parent=None):
+        super().__init__(parent)
+        self.duration = duration
+        self.toast_type = toast_type
+        
+        # Set window properties
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setModal(False)
+        
+        # Setup UI
+        self.setup_ui(title, message)
+        self.position_toast()
+        
+        # Setup animation
+        self.setup_animation()
+        
+        # Auto-hide timer
+        self.hide_timer = QTimer()
+        self.hide_timer.setSingleShot(True)
+        self.hide_timer.timeout.connect(self.hide_toast)
+        
+    def setup_ui(self, title, message):
+        """Setup the toast UI"""
+        layout = QVBoxLayout()
+        layout.setContentsMargins(20, 15, 20, 15)
+        layout.setSpacing(8)
+        
+        # Title label
+        title_label = QLabel(title)
+        title_font = QFont()
+        title_font.setBold(True)
+        title_font.setPointSize(11)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet("color: black;")
+        layout.addWidget(title_label)
+        
+        # Message label (supports multiline)
+        message_label = QLabel(message)
+        message_label.setWordWrap(True)
+        message_label.setStyleSheet("color: black; font-size: 10pt;")
+        layout.addWidget(message_label)
+        
+        self.setLayout(layout)
+        
+        # Set background color based on type
+        if self.toast_type == "success":
+            bg_color = "rgb(76, 175, 80)"  # Green
+        elif self.toast_type == "warning":
+            bg_color = "rgb(255, 152, 0)"  # Orange
+        elif self.toast_type == "error":
+            bg_color = "rgb(244, 67, 54)"  # Red
+        else:  # info
+            bg_color = "rgb(33, 150, 243)"  # Blue
+            
+        self.setStyleSheet(f"""
+            CustomToast {{
+                background-color: {bg_color};
+                border-radius: 8px;
+                border: 1px solid rgba(255, 255, 255, 100);
+            }}
+        """)
+        
+        # Set fixed width and adjust height based on content
+        self.setFixedWidth(320)
+        self.adjustSize()
+        
+    def position_toast(self):
+        """Position toast in bottom-right corner of screen"""
+        from PyQt6.QtWidgets import QApplication
+        primary_screen = QApplication.primaryScreen()
+        if primary_screen:
+            screen = primary_screen.availableGeometry()
+            toast_width = self.width()
+            toast_height = self.height()
+            
+            x = screen.width() - toast_width - 20
+            y = screen.height() - toast_height - 20
+            
+            self.move(x, y)
+        else:
+            # Fallback positioning
+            self.move(100, 100)
+        
+    def setup_animation(self):
+        """Setup slide-in animation"""
+        self.animation = QPropertyAnimation(self, b"geometry")
+        self.animation.setDuration(300)
+        self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        
+    def show_toast(self):
+        """Show the toast with animation"""
+        # Start position (off-screen to the right)
+        from PyQt6.QtWidgets import QApplication
+        primary_screen = QApplication.primaryScreen()
+        if primary_screen:
+            screen = primary_screen.availableGeometry()
+            start_x = screen.width()
+            end_x = screen.width() - self.width() - 20
+            y = screen.height() - self.height() - 20
+            
+            start_rect = QRect(start_x, y, self.width(), self.height())
+            end_rect = QRect(end_x, y, self.width(), self.height())
+            
+            self.setGeometry(start_rect)
+            self.show()
+            
+            # Animate slide-in
+            self.animation.setStartValue(start_rect)
+            self.animation.setEndValue(end_rect)
+            self.animation.start()
+        else:
+            # Fallback - just show without animation
+            self.show()
+        
+        # Start hide timer
+        self.hide_timer.start(self.duration)
+        
+    def hide_toast(self):
+        """Hide the toast with animation"""
+        from PyQt6.QtWidgets import QApplication
+        primary_screen = QApplication.primaryScreen()
+        if primary_screen:
+            screen = primary_screen.availableGeometry()
+            start_x = screen.width() - self.width() - 20
+            end_x = screen.width()
+            y = screen.height() - self.height() - 20
+            
+            start_rect = QRect(start_x, y, self.width(), self.height())
+            end_rect = QRect(end_x, y, self.width(), self.height())
+            
+            self.animation.finished.connect(self.close)
+            self.animation.setStartValue(start_rect)
+            self.animation.setEndValue(end_rect)
+            self.animation.start()
+        else:
+            # Fallback - just close
+            self.close()
+
+
 class StatusDialog(QDialog):
     """Dialog to show current tower status"""
 
@@ -422,19 +565,16 @@ class VATSIMMonitor(QApplication):
         except Exception as e:
             logging.error(f"Error playing notification sound: {e}")
 
-    def show_toast_notification(self, title, message, preset=ToastPreset.SUCCESS, duration=3000):
-        """Show a toast notification with custom sound"""
+    def show_toast_notification(self, title, message, toast_type="success", duration=3000):
+        """Show a custom toast notification with sound"""
         try:
             # Play custom sound
             self.play_notification_sound()
             
-            # Show toast notification
-            toast = Toast()
-            toast.setDuration(duration)
-            toast.setTitle(title)
-            toast.setText(message)
-            toast.applyPreset(preset)
-            toast.show()
+            # Show custom toast notification
+            toast = CustomToast(title, message, toast_type, duration)
+            toast.show_toast()
+            
         except Exception as e:
             logging.error(f"Error showing toast notification: {e}")
             # Fallback to system tray notification if toast fails
@@ -523,18 +663,18 @@ class VATSIMMonitor(QApplication):
             if tower_online:
                 callsign = controller_info.get('callsign', 'Unknown')
                 controller_name = controller_info.get('name', 'Unknown Controller')
-                message = f"{callsign} is now online! - Controller: {controller_name}"
+                message = f"{callsign} is now online!\nController: {controller_name}"
                 self.show_toast_notification(
                     "KOAK Tower Online!",
                     message,
-                    ToastPreset.SUCCESS,
+                    "success",
                     3000
                 )
             else:
                 self.show_toast_notification(
                     "KOAK Tower Offline",
                     "No tower controller found",
-                    ToastPreset.WARNING,
+                    "warning",
                     3000
                 )
 
@@ -557,14 +697,14 @@ class VATSIMMonitor(QApplication):
             self.show_toast_notification(
                 "KOAK Tower Status",
                 message,
-                ToastPreset.SUCCESS,
+                "success",
                 3000
             )
         else:
             self.show_toast_notification(
                 "KOAK Tower Status",
                 "No tower controller found",
-                ToastPreset.INFORMATION,
+                "info",
                 3000
             )
 
@@ -618,7 +758,7 @@ class VATSIMMonitor(QApplication):
             self.show_toast_notification(
                 "Monitor Not Running",
                 "Start monitoring first",
-                ToastPreset.WARNING,
+                "warning",
                 2000
             )
 
@@ -639,7 +779,7 @@ class VATSIMMonitor(QApplication):
             self.show_toast_notification(
                 "Settings Updated",
                 f"Check interval set to {dialog.new_interval} seconds",
-                ToastPreset.SUCCESS,
+                "success",
                 2000
             )
 
