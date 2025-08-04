@@ -64,10 +64,10 @@ def create_release_package(version=None, output_dir='releases'):
     
     # Generate filename
     if version:
-        zip_filename = f'oak-tower-watcher-{version}.zip'
+        zip_filename = f'oak_tower_watcher-{version}.zip'
     else:
         timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-        zip_filename = f'oak-tower-watcher-{timestamp}.zip'
+        zip_filename = f'oak_tower_watcher-{timestamp}.zip'
     
     zip_path = os.path.join(output_dir, zip_filename)
     
