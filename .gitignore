@@ -2,3 +2,5 @@
 .mypy_cache*
 vatsim_monitor.log
 config.json
+__pycache__/*
+*.pyc
