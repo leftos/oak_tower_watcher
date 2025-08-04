@@ -55,6 +55,56 @@ logging.basicConfig(
 _lock_file = None
 
 
+def load_config():
+    """Load configuration from config.json file"""
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    default_config = {
+        "monitoring": {
+            "check_interval": 60
+        },
+        "callsigns": {
+            "tower": ["OAK_TWR", "OAK_1_TWR"],
+            "supporting": ["NCT_APP", "OAK_36_CTR", "OAK_62_CTR"],
+            "ground": ["OAK_GND", "OAK_1_GND"]
+        },
+        "api": {
+            "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
+            "oakland_roster_url": "https://oakartcc.org/about/roster"
+        },
+        "notifications": {
+            "sound_enabled": True,
+            "sound_file": "ding.mp3",
+            "toast_duration": 3000
+        }
+    }
+    
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                logging.info(f"Loaded configuration from {config_path}")
+                return config
+        else:
+            logging.warning(f"Config file not found at {config_path}, using defaults")
+            # Create default config file
+            save_config(default_config)
+            return default_config
+    except Exception as e:
+        logging.error(f"Error loading config file: {e}, using defaults")
+        return default_config
+
+
+def save_config(config):
+    """Save configuration to config.json file"""
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    try:
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2)
+            logging.info(f"Saved configuration to {config_path}")
+    except Exception as e:
+        logging.error(f"Error saving config file: {e}")
+
+
 def acquire_instance_lock():
     """
     Acquire an exclusive lock to prevent multiple instances.
@@ -132,34 +182,23 @@ class VATSIMWorker(QThread):
     error_occurred = pyqtSignal(str)
     force_check_requested = pyqtSignal()  # Signal to request immediate check
 
-    def __init__(self, parent=None):
+    def __init__(self, config, parent=None):
         super().__init__(parent)
         self.running = False
-        self.check_interval = 60
+        self.config = config
+        self.check_interval = config.get("monitoring", {}).get("check_interval", 60)
         self.force_check_flag = False
         self.is_force_check = False
 
-        # VATSIM API endpoints
-        self.vatsim_api_url = "https://data.vatsim.net/v3/vatsim-data.json"
+        # Load API endpoints from config
+        api_config = config.get("api", {})
+        self.vatsim_api_url = api_config.get("vatsim_url", "https://data.vatsim.net/v3/vatsim-data.json")
 
-        # KOAK tower callsigns to monitor
-        self.koak_tower_callsigns = [
-            "OAK_TWR",
-            "OAK_1_TWR",
-        ]
-
-        # Supporting facility callsigns
-        self.supporting_callsigns = [
-            "NCT_APP",
-            "OAK_36_CTR",
-            "OAK_62_CTR",
-        ]
-
-        # Ground controller callsigns
-        self.ground_callsigns = [
-            "OAK_GND",
-            "OAK_1_GND",
-        ]
+        # Load callsigns from config
+        callsigns = config.get("callsigns", {})
+        self.koak_tower_callsigns = callsigns.get("tower", ["OAK_TWR", "OAK_1_TWR"])
+        self.supporting_callsigns = callsigns.get("supporting", ["NCT_APP", "OAK_36_CTR", "OAK_62_CTR"])
+        self.ground_callsigns = callsigns.get("ground", ["OAK_GND", "OAK_1_GND"])
 
         # Connect the force check signal to the slot
         self.force_check_requested.connect(self.request_immediate_check)
@@ -669,6 +708,9 @@ class VATSIMMonitor(QApplication):
             )
             sys.exit(1)
 
+        # Load configuration
+        self.config = load_config()
+
         # Application state
         self.tower_online = False
         self.controller_info = {}
@@ -722,7 +764,8 @@ class VATSIMMonitor(QApplication):
         """Load Oakland ARTCC roster to translate CIDs to real names"""
         try:
             logging.info("Loading Oakland ARTCC roster...")
-            response = requests.get("https://oakartcc.org/about/roster", timeout=10)
+            roster_url = self.config.get("api", {}).get("oakland_roster_url", "https://oakartcc.org/about/roster")
+            response = requests.get(roster_url, timeout=10)
             response.raise_for_status()
 
             soup = BeautifulSoup(response.content, "html.parser")
@@ -947,7 +990,13 @@ class VATSIMMonitor(QApplication):
     def play_notification_sound(self):
         """Play the custom notification sound"""
         try:
-            sound_path = os.path.join(os.path.dirname(__file__), "ding.mp3")
+            # Check if sound is enabled in config
+            notifications_config = self.config.get("notifications", {})
+            if not notifications_config.get("sound_enabled", True):
+                return
+
+            sound_file = notifications_config.get("sound_file", "ding.mp3")
+            sound_path = os.path.join(os.path.dirname(__file__), sound_file)
             if os.path.exists(sound_path):
                 if not hasattr(self, "_vlc_instance") or self._vlc_instance is None:
                     self._vlc_instance = vlc.Instance()
@@ -965,10 +1014,14 @@ class VATSIMMonitor(QApplication):
             logging.error(f"Error playing notification sound: {e}")
 
     def show_toast_notification(
-        self, title, message, toast_type="success", duration=3000
+        self, title, message, toast_type="success", duration=None
     ):
         """Show a custom toast notification with sound"""
         try:
+            # Use duration from config if not specified
+            if duration is None:
+                duration = self.config.get("notifications", {}).get("toast_duration", 3000)
+
             # Play custom sound
             self.play_notification_sound()
 
@@ -980,7 +1033,7 @@ class VATSIMMonitor(QApplication):
             logging.error(f"Error showing toast notification: {e}")
             # Fallback to system tray notification if toast fails
             self.tray_icon.showMessage(
-                title, message, QSystemTrayIcon.MessageIcon.Information, duration
+                title, message, QSystemTrayIcon.MessageIcon.Information, duration or 3000
             )
 
     def setup_tray_icon(self):
@@ -1040,7 +1093,7 @@ class VATSIMMonitor(QApplication):
 
     def setup_worker(self):
         """Setup the VATSIM worker thread"""
-        self.worker = VATSIMWorker()
+        self.worker = VATSIMWorker(self.config)
         self.worker.status_updated.connect(self.on_status_updated)
         self.worker.force_check_completed.connect(self.on_force_check_completed)
         self.worker.error_occurred.connect(self.on_error)
@@ -1209,6 +1262,11 @@ class VATSIMMonitor(QApplication):
         dialog = SettingsDialog(self.worker.check_interval, None)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.worker.set_interval(dialog.new_interval)
+            
+            # Update config and save it
+            self.config["monitoring"]["check_interval"] = dialog.new_interval
+            save_config(self.config)
+            
             logging.info(f"Check interval updated to {dialog.new_interval} seconds")
 
             self.show_toast_notification(

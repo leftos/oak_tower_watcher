@@ -23,20 +23,63 @@ The system tray icon changes color based on current status:
 - 🔴 **Red**: All facilities offline
 - ⚫ **Gray**: Monitoring stopped or API error
 
-## Monitored Facilities
+## Configuration
 
-### Tower Controllers
+The application uses a `config.json` file for all configuration settings. This file is automatically created with default values on first run if it doesn't exist.
+
+### Configuration File Structure
+
+```json
+{
+  "monitoring": {
+    "check_interval": 60,
+    "comment": "Check interval in seconds (minimum 30)"
+  },
+  "callsigns": {
+    "tower": [
+      "OAK_TWR",
+      "OAK_1_TWR"
+    ],
+    "supporting": [
+      "NCT_APP",
+      "OAK_36_CTR",
+      "OAK_62_CTR"
+    ],
+    "ground": [
+      "OAK_GND",
+      "OAK_1_GND"
+    ]
+  },
+  "api": {
+    "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
+    "oakland_roster_url": "https://oakartcc.org/about/roster"
+  },
+  "notifications": {
+    "sound_enabled": true,
+    "sound_file": "ding.mp3",
+    "toast_duration": 3000
+  }
+}
+```
+
+### Customizing Monitored Facilities
+
+You can customize which callsigns to monitor by editing the `config.json` file:
+
+#### Tower Controllers
 - `OAK_TWR` - Oakland Tower
 - `OAK_1_TWR` - Oakland Tower (alternate)
 
-### Supporting Facilities
+#### Supporting Facilities
 - `NCT_APP` - Northern California TRACON
 - `OAK_36_CTR` - Oakland Center (Sector 36)
 - `OAK_62_CTR` - Oakland Center (Sector 62)
 
-### Ground Controllers
+#### Ground Controllers
 - `OAK_GND` - Oakland Ground
 - `OAK_1_GND` - Oakland Ground (alternate)
+
+**Note**: You can add or remove callsigns from any category by editing the corresponding arrays in `config.json`. Changes take effect after restarting the application.
 
 ## Installation
 
@@ -95,20 +138,60 @@ Right-click the system tray icon to access:
 
 Double-click the system tray icon to quickly view the current tower status.
 
-## Configuration
+## Runtime Configuration
 
 ### Check Interval
 
-The default check interval is 60 seconds. You can modify this through the Settings dialog:
+The default check interval is 60 seconds. You can modify this in two ways:
 
+#### Method 1: Settings Dialog (Recommended)
 1. Right-click the system tray icon
 2. Select "Settings"
 3. Enter desired interval (minimum 30 seconds)
 4. Click "Save"
 
+This method automatically updates the `config.json` file and persists the setting.
+
+#### Method 2: Direct File Edit
+Edit the `check_interval` value in `config.json`:
+```json
+{
+  "monitoring": {
+    "check_interval": 120
+  }
+}
+```
+
 ### Sound Notifications
 
-The application plays a custom notification sound (`ding.mp3`) when status changes occur. Ensure the audio file is in the same directory as the main script.
+Sound notifications can be configured in the `config.json` file:
+
+```json
+{
+  "notifications": {
+    "sound_enabled": true,
+    "sound_file": "ding.mp3",
+    "toast_duration": 3000
+  }
+}
+```
+
+- `sound_enabled`: Enable/disable notification sounds
+- `sound_file`: Name of the audio file (must be in the same directory)
+- `toast_duration`: Duration of toast notifications in milliseconds
+
+### API Endpoints
+
+You can customize the API endpoints used by the application:
+
+```json
+{
+  "api": {
+    "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
+    "oakland_roster_url": "https://oakartcc.org/about/roster"
+  }
+}
+```
 
 ## Logging
 
@@ -196,6 +279,7 @@ type vatsim_monitor.log     # Windows
 ```
 oak_tower_watcher/
 ├── oak_tower_watcher.py    # Main application
+├── config.json            # Configuration file
 ├── requirements.txt        # Python dependencies
 ├── launch.bat             # Windows launcher
 ├── ding.mp3              # Notification sound
@@ -210,6 +294,44 @@ oak_tower_watcher/
 - `CustomToast`: Cross-platform notification system
 - `StatusDialog`: Controller information display
 - `SettingsDialog`: Configuration interface
+
+## Configuration Examples
+
+### Monitoring Different Airports
+
+To monitor a different airport, update the callsigns in `config.json`:
+
+```json
+{
+  "callsigns": {
+    "tower": ["LAX_TWR", "LAX_N_TWR", "LAX_S_TWR"],
+    "supporting": ["SCT_APP", "LAX_APP"],
+    "ground": ["LAX_GND", "LAX_N_GND", "LAX_S_GND"]
+  }
+}
+```
+
+### Disabling Sound Notifications
+
+```json
+{
+  "notifications": {
+    "sound_enabled": false,
+    "sound_file": "ding.mp3",
+    "toast_duration": 3000
+  }
+}
+```
+
+### Custom Check Intervals
+
+```json
+{
+  "monitoring": {
+    "check_interval": 30
+  }
+}
+```
 
 ## Contributing
 

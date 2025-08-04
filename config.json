@@ -1,0 +1,30 @@
+{
+  "monitoring": {
+    "check_interval": 60,
+    "comment": "Check interval in seconds (minimum 30)"
+  },
+  "callsigns": {
+    "tower": [
+      "OAK_TWR",
+      "OAK_1_TWR"
+    ],
+    "supporting": [
+      "NCT_APP",
+      "OAK_36_CTR",
+      "OAK_62_CTR"
+    ],
+    "ground": [
+      "OAK_GND",
+      "OAK_1_GND"
+    ]
+  },
+  "api": {
+    "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
+    "oakland_roster_url": "https://oakartcc.org/about/roster"
+  },
+  "notifications": {
+    "sound_enabled": true,
+    "sound_file": "ding.mp3",
+    "toast_duration": 3000
+  }
+}
