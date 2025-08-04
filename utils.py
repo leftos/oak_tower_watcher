@@ -9,6 +9,7 @@ import sys
 import logging
 import re
 import requests
+from datetime import datetime, timezone
 from bs4 import BeautifulSoup, Tag
 
 # fcntl is only available on Unix-like systems
@@ -280,3 +281,54 @@ def get_controller_name(controller_info, controller_names):
 
     # Fallback to VATSIM name or "Unknown Controller"
     return vatsim_name if vatsim_name else "Unknown Controller"
+
+
+def calculate_time_online(logon_time_str):
+    """
+    Calculate time online duration from logon time string.
+    
+    Args:
+        logon_time_str: Logon time string in ISO format (e.g., "2024-01-01T12:00:00.000000Z")
+    
+    Returns:
+        String: Formatted duration (e.g., "2h 30m", "45m", "1h 5m")
+    """
+    if not logon_time_str or logon_time_str == "Unknown":
+        return "Unknown"
+    
+    try:
+        # Parse the logon time - handle both with and without microseconds
+        if '.' in logon_time_str:
+            # Has microseconds
+            logon_time = datetime.fromisoformat(logon_time_str.replace('Z', '+00:00'))
+        else:
+            # No microseconds, add Z if not present
+            if not logon_time_str.endswith('Z'):
+                logon_time_str += 'Z'
+            logon_time = datetime.fromisoformat(logon_time_str.replace('Z', '+00:00'))
+        
+        # Get current time in UTC
+        current_time = datetime.now(timezone.utc)
+        
+        # Calculate duration
+        duration = current_time - logon_time
+        total_seconds = int(duration.total_seconds())
+        
+        # Convert to hours and minutes
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        
+        # Format the duration
+        if hours > 0:
+            if minutes > 0:
+                return f"{hours}h {minutes}m"
+            else:
+                return f"{hours}h"
+        elif minutes > 0:
+            return f"{minutes}m"
+        else:
+            return "< 1m"
+            
+    except (ValueError, TypeError) as e:
+        logging.warning(f"Could not parse logon time '{logon_time_str}': {e}")
+        return "Unknown"

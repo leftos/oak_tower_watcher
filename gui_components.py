@@ -23,7 +23,7 @@ from PyQt6.QtCore import (
     QEasingCurve,
 )
 from PyQt6.QtGui import QFont
-from utils import translate_controller_rating
+from utils import translate_controller_rating, calculate_time_online
 
 
 class CustomToast(QDialog):
@@ -239,7 +239,7 @@ Callsign: {supporting_below.get('callsign', 'Unknown')}
 Name: {supporting_below.get('name', 'Unknown')}
 Frequency: {supporting_below.get('frequency', 'Unknown')}
 Rating: {translate_controller_rating(supporting_below.get('rating', 'Unknown'))}
-Logon Time: {supporting_below.get('logon_time', 'Unknown')}
+Time Online: {calculate_time_online(supporting_below.get('logon_time', 'Unknown'))}
 Server: {supporting_below.get('server', 'Unknown')}"""
             return supporting_below_details
 
@@ -263,7 +263,7 @@ Server: {supporting_below.get('server', 'Unknown')}"""
 Name: {controller.get('name', 'Unknown')}
 Frequency: {controller.get('frequency', 'Unknown')}
 Rating: {translate_controller_rating(controller.get('rating', 'Unknown'))}
-Logon Time: {controller.get('logon_time', 'Unknown')}
+Time Online: {calculate_time_online(controller.get('logon_time', 'Unknown'))}
 Server: {controller.get('server', 'Unknown')}
 """
             return details
