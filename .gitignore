@@ -1,3 +1,4 @@
 .aider*
 .mypy_cache*
 vatsim_monitor.log
+config.json
