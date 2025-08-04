@@ -74,6 +74,12 @@ class VATSIMWorker(QThread):
         # Connect the force check signal to the slot
         self.force_check_requested.connect(self.request_immediate_check)
 
+    def is_controller_active(self, controller):
+        """Check if a controller is active (not on inactive frequency 199.998)"""
+        frequency = controller.get("frequency", "")
+        # Convert frequency to string for comparison to handle both string and numeric types
+        return str(frequency) != "199.998"
+
     def set_interval(self, interval):
         """Set check interval"""
         self.check_interval = max(30, interval)  # Minimum 30 seconds
@@ -95,6 +101,12 @@ class VATSIMWorker(QThread):
 
             for controller in controllers:
                 callsign = controller.get("callsign", "")
+
+                # Skip inactive controllers (frequency 199.998)
+                if not self.is_controller_active(controller):
+                    freq = controller.get('frequency', 'Unknown')
+                    logging.debug(f"Skipping inactive controller {callsign} (freq: {freq})")
+                    continue
 
                 # Check for main facility controllers using regex patterns
                 # This captures all controllers matching any main facility pattern
