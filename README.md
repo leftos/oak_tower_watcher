@@ -412,3 +412,4 @@ For issues, feature requests, or questions:
 - Oakland ARTCC for the controller roster information
 - Qt/PyQt6 for the cross-platform GUI framework
 - VLC for reliable audio playback capabilities
+- [Control-tower icons created by Ahmad Yafie - Flaticon](https://www.flaticon.com/free-icons/control-tower)

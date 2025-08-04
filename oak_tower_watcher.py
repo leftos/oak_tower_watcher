@@ -16,6 +16,7 @@ import atexit
 import vlc
 import re
 from bs4 import BeautifulSoup, Tag
+from PIL import Image
 
 # fcntl is only available on Unix-like systems
 if sys.platform != "win32":
@@ -201,11 +202,15 @@ class VATSIMWorker(QThread):
 
         # Load callsigns from config
         callsigns = config.get("callsigns", {})
-        self.main_facility_callsigns = callsigns.get("main_facility", ["OAK_TWR", "OAK_1_TWR"])
+        self.main_facility_callsigns = callsigns.get(
+            "main_facility", ["OAK_TWR", "OAK_1_TWR"]
+        )
         self.supporting_above_callsigns = callsigns.get(
             "supporting_above", ["NCT_APP", "OAK_36_CTR", "OAK_62_CTR"]
         )
-        self.supporting_below_callsigns = callsigns.get("supporting_below", ["OAK_GND", "OAK_1_GND"])
+        self.supporting_below_callsigns = callsigns.get(
+            "supporting_below", ["OAK_GND", "OAK_1_GND"]
+        )
 
         # Connect the force check signal to the slot
         self.force_check_requested.connect(self.request_immediate_check)
@@ -253,7 +258,11 @@ class VATSIMWorker(QThread):
                 ):
                     supporting_below_controllers.append(controller)
 
-            return main_facility_controllers, supporting_above_controllers, supporting_below_controllers
+            return (
+                main_facility_controllers,
+                supporting_above_controllers,
+                supporting_below_controllers,
+            )
 
         except requests.exceptions.RequestException as e:
             logging.error(f"Error querying VATSIM API: {e}")
@@ -266,9 +275,11 @@ class VATSIMWorker(QThread):
 
     def check_main_facility_status(self):
         """Check if main facility is online"""
-        main_facility_controllers, supporting_above_controllers, supporting_below_controllers = (
-            self.query_vatsim_api()
-        )
+        (
+            main_facility_controllers,
+            supporting_above_controllers,
+            supporting_below_controllers,
+        ) = self.query_vatsim_api()
 
         if (
             main_facility_controllers is None
@@ -386,7 +397,13 @@ class CustomToast(QDialog):
     """Custom toast notification widget with multiline support"""
 
     def __init__(
-        self, title, message, toast_type="success", duration=3000, bg_color=None, parent=None
+        self,
+        title,
+        message,
+        toast_type="success",
+        duration=3000,
+        bg_color=None,
+        parent=None,
     ):
         super().__init__(parent)
         self.duration = duration
@@ -599,7 +616,9 @@ Logon Time: {supporting_below.get('logon_time', 'Unknown')}
 Server: {supporting_below.get('server', 'Unknown')}"""
             return supporting_below_details
 
-        supporting_below_details = format_supporting_below_controllers_details(supporting_below_controllers)
+        supporting_below_details = format_supporting_below_controllers_details(
+            supporting_below_controllers
+        )
 
         if (
             status == "main_facility_and_supporting_above_online"
@@ -644,9 +663,7 @@ Rating: {supporting_info.get('rating', 'Unknown')}
 Logon Time: {supporting_info.get('logon_time', 'Unknown')}
 Server: {supporting_info.get('server', 'Unknown')}{supporting_below_details}"""
         else:
-            details = (
-                f"No main facility or supporting above controllers currently online.{supporting_below_details}"
-            )
+            details = f"No main facility or supporting above controllers currently online.{supporting_below_details}"
 
         if last_check:
             details += f"\n\nLast checked: {last_check.strftime('%Y-%m-%d %H:%M:%S')}"
@@ -760,50 +777,134 @@ class VATSIMMonitor(QApplication):
         # Setup signal processing timer for immediate Ctrl+C handling
         self.setup_signal_timer()
 
+        # Initialize cached icons
+        self.initialize_cached_icons()
+
     def get_status_colors(self, status):
         """Get both tray icon and notification colors for a given status"""
         color_map = {
             "main_facility_and_supporting_above_online": {
                 "tray": "purple",
-                "notification": "rgb(75, 0, 130)"  # Dark purple for readability with white text
+                "notification": "rgb(75, 0, 130)",  # Dark purple for readability with white text
             },
             "main_facility_online": {
                 "tray": "green",
-                "notification": "rgb(0, 100, 0)"  # Dark green for readability with white text
+                "notification": "rgb(0, 100, 0)",  # Dark green for readability with white text
             },
             "supporting_above_online": {
                 "tray": "yellow",
-                "notification": "rgb(184, 134, 11)"  # Dark yellow/gold for readability with white text
+                "notification": "rgb(184, 134, 11)",  # Dark yellow/gold for readability with white text
             },
             "all_offline": {
                 "tray": "red",
-                "notification": "rgb(139, 0, 0)"  # Dark red for readability with white text
+                "notification": "rgb(139, 0, 0)",  # Dark red for readability with white text
             },
             "error": {
                 "tray": "gray",
-                "notification": "rgb(64, 64, 64)"  # Dark gray for readability with white text
-            }
+                "notification": "rgb(64, 64, 64)",  # Dark gray for readability with white text
+            },
         }
         return color_map.get(status, color_map["error"])
 
-    def create_icon(self, color="gray"):
-        """Create a colored circle icon"""
+    def colorize_airport_tower(self, color_rgb, brightness=1.2):
+        """
+        Colorize the airport tower icon to the specified RGB color.
+
+        Args:
+            color_rgb: Tuple of (R, G, B) values (0-255)
+            brightness: Brightness multiplier (1.0 = normal, >1.0 = brighter)
+
+        Returns:
+            QIcon: Colorized airport tower icon
+        """
+        try:
+            # Load the original airport tower image
+            tower_path = os.path.join(os.path.dirname(__file__), "airport-tower.png")
+            if not os.path.exists(tower_path):
+                logging.warning(
+                    f"Airport tower icon not found at {tower_path}, falling back to circle"
+                )
+                return self.create_circle_icon(color_rgb)
+
+            # Open and process the image
+            pil_img = Image.open(tower_path).convert("RGBA")
+
+            # Create a new image with the same size
+            colored_img = Image.new("RGBA", pil_img.size, (0, 0, 0, 0))
+
+            # Process each pixel
+            for y in range(pil_img.height):
+                for x in range(pil_img.width):
+                    pixel = pil_img.getpixel((x, y))
+
+                    # Handle different pixel formats
+                    if isinstance(pixel, tuple):
+                        if len(pixel) == 4:
+                            r, g, b, a = pixel
+                        elif len(pixel) == 3:
+                            r, g, b = pixel
+                            a = 255  # Fully opaque
+                        else:
+                            continue  # Skip invalid pixels
+                    else:
+                        # Handle single channel or other formats
+                        continue
+
+                    # If pixel is not transparent
+                    if a > 0:
+                        # Calculate brightness of original pixel (for anti-aliasing edges)
+                        original_brightness = (r + g + b) / 3 / 255.0
+
+                        # Apply the new color while preserving alpha and edge smoothing
+                        new_r = int(
+                            color_rgb[0] * brightness * (1 - original_brightness)
+                        )
+                        new_g = int(
+                            color_rgb[1] * brightness * (1 - original_brightness)
+                        )
+                        new_b = int(
+                            color_rgb[2] * brightness * (1 - original_brightness)
+                        )
+
+                        # Clamp values to 0-255
+                        new_r = max(0, min(255, new_r))
+                        new_g = max(0, min(255, new_g))
+                        new_b = max(0, min(255, new_b))
+
+                        colored_img.putpixel((x, y), (new_r, new_g, new_b, a))
+                    else:
+                        # Keep transparent pixels transparent
+                        colored_img.putpixel((x, y), (0, 0, 0, 0))
+
+            # Convert PIL image to QPixmap
+            import io
+
+            img_bytes = io.BytesIO()
+            colored_img.save(img_bytes, format="PNG")
+            img_bytes.seek(0)
+
+            pixmap = QPixmap()
+            pixmap.loadFromData(img_bytes.getvalue())
+
+            return QIcon(pixmap)
+
+        except Exception as e:
+            logging.error(f"Error colorizing airport tower icon: {e}")
+            return self.create_circle_icon(color_rgb)
+
+    def create_circle_icon(self, color_rgb):
+        """Fallback method to create a colored circle icon"""
         pixmap = QPixmap(64, 64)
         pixmap.fill(Qt.GlobalColor.transparent)
 
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        if color == "green":
-            brush = QBrush(Qt.GlobalColor.green)
-        elif color == "red":
-            brush = QBrush(Qt.GlobalColor.red)
-        elif color == "yellow":
-            brush = QBrush(Qt.GlobalColor.yellow)
-        elif color == "purple":
-            brush = QBrush(Qt.GlobalColor.magenta)  # Using magenta for purple
-        else:  # gray
-            brush = QBrush(Qt.GlobalColor.gray)
+        # Convert RGB tuple to QBrush
+        from PyQt6.QtGui import QColor
+
+        color = QColor(color_rgb[0], color_rgb[1], color_rgb[2])
+        brush = QBrush(color)
 
         painter.setBrush(brush)
         painter.setPen(QPen(Qt.GlobalColor.black, 2))
@@ -811,6 +912,52 @@ class VATSIMMonitor(QApplication):
         painter.end()
 
         return QIcon(pixmap)
+
+    def create_icon(self, color="gray"):
+        """Create a colored airport tower icon from cached versions"""
+        # Return cached icon if available
+        if hasattr(self, "_cached_icons") and color in self._cached_icons:
+            return self._cached_icons[color]
+
+        # Fallback to circle if no cached icons available
+        color_map = {
+            "green": (0, 150, 0),
+            "red": (200, 0, 0),
+            "yellow": (200, 150, 0),
+            "purple": (128, 0, 128),
+            "gray": (100, 100, 100),
+        }
+
+        rgb_color = color_map.get(color, (100, 100, 100))
+        return self.create_circle_icon(rgb_color)
+
+    def initialize_cached_icons(self):
+        """Initialize and cache all colored versions of the airport tower icon"""
+        logging.info("Initializing cached airport tower icons...")
+
+        # Define colors for different states
+        colors = {
+            "green": (0, 150, 0),  # Main facility online
+            "red": (200, 0, 0),  # All offline
+            "yellow": (200, 150, 0),  # Supporting above online
+            "purple": (128, 0, 128),  # Full coverage (main + supporting above)
+            "gray": (100, 100, 100),  # Error/stopped state
+        }
+
+        self._cached_icons = {}
+
+        for color_name, rgb_values in colors.items():
+            try:
+                self._cached_icons[color_name] = self.colorize_airport_tower(rgb_values)
+                logging.debug(f"Cached {color_name} airport tower icon")
+            except Exception as e:
+                logging.error(f"Failed to create {color_name} icon: {e}")
+                # Fallback to circle icon
+                self._cached_icons[color_name] = self.create_circle_icon(rgb_values)
+
+        logging.info(
+            f"Successfully cached {len(self._cached_icons)} airport tower icons"
+        )
 
     def load_roster(self):
         """Load ARTCC roster to translate CIDs to real names"""
@@ -967,7 +1114,9 @@ class VATSIMMonitor(QApplication):
         """Generate appropriate notification message based on state transition"""
 
         # Get supporting below controller info for all messages
-        supporting_below_info = self.format_supporting_below_controllers_info(supporting_below_controllers)
+        supporting_below_info = self.format_supporting_below_controllers_info(
+            supporting_below_controllers
+        )
 
         # Handle transitions to full coverage
         if current_status == "main_facility_and_supporting_above_online":
@@ -1001,9 +1150,7 @@ class VATSIMMonitor(QApplication):
                 return title, message, "warning"
             elif previous_status == "supporting_above_online":
                 title = "Main Facility Now Online!"
-                message = (
-                    f"Main facility controller is now online\n{callsign} ({controller_name}){supporting_below_info}"
-                )
+                message = f"Main facility controller is now online\n{callsign} ({controller_name}){supporting_below_info}"
                 return title, message, "success"
             else:  # from all_offline
                 title = f"{self.display_name} Online!"
@@ -1041,20 +1188,18 @@ class VATSIMMonitor(QApplication):
         else:  # all_offline
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "All Facilities Now Offline"
-                message = (
-                    f"Both main facility and supporting above controllers have gone offline{supporting_below_info}"
-                )
+                message = f"Both main facility and supporting above controllers have gone offline{supporting_below_info}"
             elif previous_status == "main_facility_online":
                 title = "Main Facility Now Offline"
-                message = f"Main facility controller has gone offline{supporting_below_info}"
+                message = (
+                    f"Main facility controller has gone offline{supporting_below_info}"
+                )
             elif previous_status == "supporting_above_online":
                 title = "Supporting Above Facility Now Offline"
                 message = f"Supporting above controller has gone offline{supporting_below_info}"
             else:
                 title = "All Facilities Offline"
-                message = (
-                    f"No main facility or supporting above controllers found{supporting_below_info}"
-                )
+                message = f"No main facility or supporting above controllers found{supporting_below_info}"
 
             return title, message, "error"
 
@@ -1224,7 +1369,10 @@ class VATSIMMonitor(QApplication):
             tooltip = f"{self.display_name}: OFFLINE"
 
         # Add supporting below controller info if available
-        if hasattr(self, "supporting_below_controllers") and self.supporting_below_controllers:
+        if (
+            hasattr(self, "supporting_below_controllers")
+            and self.supporting_below_controllers
+        ):
             supporting_below_info = []
             for sbc in self.supporting_below_controllers:
                 callsign = sbc.get("callsign", "Unknown")
@@ -1309,7 +1457,9 @@ class VATSIMMonitor(QApplication):
         self.update_tray_tooltip()
 
         # Always show notification for force checks
-        supporting_below_info = self.format_supporting_below_controllers_info(supporting_below_controllers)
+        supporting_below_info = self.format_supporting_below_controllers_info(
+            supporting_below_controllers
+        )
 
         if status == "main_facility_and_supporting_above_online":
             main_facility_callsign = controller_info.get("callsign", "Unknown")
@@ -1326,9 +1476,7 @@ class VATSIMMonitor(QApplication):
         elif status == "main_facility_online":
             callsign = controller_info.get("callsign", "Unknown")
             controller_name = self.get_controller_name(controller_info)
-            message = (
-                f"{callsign} is online\nController: {controller_name}{supporting_below_info}"
-            )
+            message = f"{callsign} is online\nController: {controller_name}{supporting_below_info}"
             self.show_toast_notification(
                 f"{self.display_name} Status", message, "success", 3000, status
             )
@@ -1398,7 +1546,11 @@ class VATSIMMonitor(QApplication):
             self.worker.force_check_requested.emit()
         else:
             self.show_toast_notification(
-                "Monitor Not Running", "Start monitoring first", "warning", 2000, "error"
+                "Monitor Not Running",
+                "Start monitoring first",
+                "warning",
+                2000,
+                "error",
             )
 
     def show_status(self):
@@ -1431,7 +1583,7 @@ class VATSIMMonitor(QApplication):
                 f"Check interval set to {dialog.new_interval} seconds",
                 "success",
                 2000,
-                self.current_status
+                self.current_status,
             )
 
     def quit_application(self):
