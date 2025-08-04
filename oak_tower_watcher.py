@@ -89,6 +89,35 @@ def darken_color_for_notification(rgb_values, factor=0.6):
         return "rgb(64, 64, 64)"
 
 
+def translate_controller_rating(rating_id):
+    """Translate VATSIM controller rating ID to human-readable name"""
+    # VATSIM Controller Ratings mapping based on https://vatsim.dev/resources/ratings/
+    rating_map = {
+        -1: "Inactive",
+        0: "Suspended",
+        1: "Pilot/Observer",
+        2: "Student Controller (S1)",
+        3: "Tower Controller (S2)",
+        4: "TMA Controller (S3)",
+        5: "Enroute Controller (C1)",
+        6: "Senior Controller (C2)",
+        7: "Senior Controller (C3)",
+        8: "Instructor (I1)",
+        9: "Senior Instructor (I2)",
+        10: "Senior Instructor (I3)",
+        11: "Supervisor (SUP)",
+        12: "Administrator (ADM)"
+    }
+    
+    try:
+        # Convert rating to integer if it's a string
+        if isinstance(rating_id, str):
+            rating_id = int(rating_id)
+        return rating_map.get(rating_id, f"Unknown Rating ({rating_id})")
+    except (ValueError, TypeError):
+        return f"Invalid Rating ({rating_id})"
+
+
 def load_config():
     """Load configuration from config.json file"""
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
@@ -660,7 +689,7 @@ class StatusDialog(QDialog):
 Callsign: {supporting_below.get('callsign', 'Unknown')}
 Name: {supporting_below.get('name', 'Unknown')}
 Frequency: {supporting_below.get('frequency', 'Unknown')}
-Rating: {supporting_below.get('rating', 'Unknown')}
+Rating: {translate_controller_rating(supporting_below.get('rating', 'Unknown'))}
 Logon Time: {supporting_below.get('logon_time', 'Unknown')}
 Server: {supporting_below.get('server', 'Unknown')}"""
             return supporting_below_details
@@ -684,7 +713,7 @@ Server: {supporting_below.get('server', 'Unknown')}"""
                 details += f"""Callsign: {controller.get('callsign', 'Unknown')}
 Name: {controller.get('name', 'Unknown')}
 Frequency: {controller.get('frequency', 'Unknown')}
-Rating: {controller.get('rating', 'Unknown')}
+Rating: {translate_controller_rating(controller.get('rating', 'Unknown'))}
 Logon Time: {controller.get('logon_time', 'Unknown')}
 Server: {controller.get('server', 'Unknown')}
 """
