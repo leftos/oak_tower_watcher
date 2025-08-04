@@ -24,7 +24,7 @@ def load_config():
         "airport": {
             "code": "KOAK",
             "name": "Oakland International Airport",
-            "display_name": "Oakland Main Facility",
+            "display_name": "Oakland Tower",
         },
         "monitoring": {"check_interval": 30},
         "callsigns": {
