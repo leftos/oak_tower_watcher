@@ -15,7 +15,7 @@ import os
 import atexit
 import vlc
 import re
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 # fcntl is only available on Unix-like systems
 if sys.platform != "win32":
@@ -33,7 +33,15 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QTextEdit,
 )
-from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer, QPropertyAnimation, QRect, QEasingCurve
+from PyQt6.QtCore import (
+    QThread,
+    pyqtSignal,
+    Qt,
+    QTimer,
+    QPropertyAnimation,
+    QRect,
+    QEasingCurve,
+)
 from PyQt6.QtGui import QAction, QIcon, QPixmap, QPainter, QBrush, QPen, QFont
 
 # Configure logging
@@ -115,8 +123,12 @@ def release_instance_lock():
 class VATSIMWorker(QThread):
     """Worker thread for VATSIM API calls"""
 
-    status_updated = pyqtSignal(str, dict, dict, list)  # status, tower_info, supporting_info, ground_controllers
-    force_check_completed = pyqtSignal(str, dict, dict, list)  # status, tower_info, supporting_info, ground_controllers
+    status_updated = pyqtSignal(
+        str, dict, dict, list
+    )  # status, tower_info, supporting_info, ground_controllers
+    force_check_completed = pyqtSignal(
+        str, dict, dict, list
+    )  # status, tower_info, supporting_info, ground_controllers
     error_occurred = pyqtSignal(str)
     force_check_requested = pyqtSignal()  # Signal to request immediate check
 
@@ -135,20 +147,20 @@ class VATSIMWorker(QThread):
             "OAK_TWR",
             "OAK_1_TWR",
         ]
-        
+
         # Supporting facility callsigns
         self.supporting_callsigns = [
             "NCT_APP",
             "OAK_36_CTR",
             "OAK_62_CTR",
         ]
-        
+
         # Ground controller callsigns
         self.ground_callsigns = [
             "OAK_GND",
             "OAK_1_GND",
         ]
-        
+
         # Connect the force check signal to the slot
         self.force_check_requested.connect(self.request_immediate_check)
 
@@ -170,24 +182,24 @@ class VATSIMWorker(QThread):
             koak_controllers = []
             supporting_controllers = []
             ground_controllers = []
-            
+
             for controller in controllers:
                 callsign = controller.get("callsign", "")
-                
+
                 # Check for tower controllers
                 if any(
                     tower_call in callsign.upper()
                     for tower_call in self.koak_tower_callsigns
                 ):
                     koak_controllers.append(controller)
-                
+
                 # Check for supporting facility controllers
                 elif any(
                     support_call in callsign.upper()
                     for support_call in self.supporting_callsigns
                 ):
                     supporting_controllers.append(controller)
-                
+
                 # Check for ground controllers
                 elif any(
                     ground_call in callsign.upper()
@@ -208,9 +220,15 @@ class VATSIMWorker(QThread):
 
     def check_tower_status(self):
         """Check if KOAK tower is online"""
-        tower_controllers, supporting_controllers, ground_controllers = self.query_vatsim_api()
+        tower_controllers, supporting_controllers, ground_controllers = (
+            self.query_vatsim_api()
+        )
 
-        if tower_controllers is None and supporting_controllers is None and ground_controllers is None:
+        if (
+            tower_controllers is None
+            and supporting_controllers is None
+            and ground_controllers is None
+        ):
             # API error - don't change status
             return
 
@@ -219,7 +237,9 @@ class VATSIMWorker(QThread):
             # Both tower and supporting facilities online - highest priority
             status = "tower_and_supporting_online"
             controller_info = tower_controllers[0]  # Use first controller found
-            supporting_info = supporting_controllers[0]  # Use first supporting controller found
+            supporting_info = supporting_controllers[
+                0
+            ]  # Use first supporting controller found
             logging.info(
                 f"KOAK Tower AND Supporting Facility ONLINE: Tower: {controller_info['callsign']}, "
                 f"Supporting: {supporting_info['callsign']}"
@@ -236,7 +256,9 @@ class VATSIMWorker(QThread):
             # Tower offline but supporting facilities online
             status = "supporting_online"
             controller_info = {}
-            supporting_info = supporting_controllers[0]  # Use first supporting controller found
+            supporting_info = supporting_controllers[
+                0
+            ]  # Use first supporting controller found
             logging.info(
                 f"KOAK Tower OFFLINE but supporting facility ONLINE: "
                 f"{supporting_info['callsign']} - {supporting_info.get('name', 'Unknown')}"
@@ -249,10 +271,14 @@ class VATSIMWorker(QThread):
             logging.info("KOAK Tower and supporting facilities OFFLINE")
 
         if self.is_force_check:
-            self.force_check_completed.emit(status, controller_info, supporting_info, ground_controllers)
+            self.force_check_completed.emit(
+                status, controller_info, supporting_info, ground_controllers
+            )
             self.is_force_check = False
         else:
-            self.status_updated.emit(status, controller_info, supporting_info, ground_controllers)
+            self.status_updated.emit(
+                status, controller_info, supporting_info, ground_controllers
+            )
 
     def request_immediate_check(self):
         """Slot to handle force check requests"""
@@ -276,7 +302,7 @@ class VATSIMWorker(QThread):
                         self.force_check_flag = False
                         logging.info("Force check requested, breaking sleep cycle")
                         break
-                    
+
                     chunk_size = min(sleep_chunk, sleep_time)
                     self.msleep(chunk_size)
                     sleep_time -= chunk_size
@@ -293,9 +319,11 @@ class VATSIMWorker(QThread):
                     # Check if force check was requested during error recovery too
                     if self.force_check_flag:
                         self.force_check_flag = False
-                        logging.info("Force check requested during error recovery, breaking sleep cycle")
+                        logging.info(
+                            "Force check requested during error recovery, breaking sleep cycle"
+                        )
                         break
-                    
+
                     chunk_size = min(sleep_chunk, sleep_time)
                     self.msleep(chunk_size)
                     sleep_time -= chunk_size
@@ -310,38 +338,40 @@ class VATSIMWorker(QThread):
 
 class CustomToast(QDialog):
     """Custom toast notification widget with multiline support"""
-    
-    def __init__(self, title, message, toast_type="success", duration=3000, parent=None):
+
+    def __init__(
+        self, title, message, toast_type="success", duration=3000, parent=None
+    ):
         super().__init__(parent)
         self.duration = duration
         self.toast_type = toast_type
-        
+
         # Set window properties
         self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.Tool
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.Tool
         )
         self.setModal(False)
-        
+
         # Setup UI
         self.setup_ui(title, message)
         self.position_toast()
-        
+
         # Setup animation
         self.setup_animation()
-        
+
         # Auto-hide timer
         self.hide_timer = QTimer()
         self.hide_timer.setSingleShot(True)
         self.hide_timer.timeout.connect(self.hide_toast)
-        
+
     def setup_ui(self, title, message):
         """Setup the toast UI"""
         layout = QVBoxLayout()
         layout.setContentsMargins(20, 15, 20, 15)
         layout.setSpacing(8)
-        
+
         # Title label
         title_label = QLabel(title)
         title_font = QFont()
@@ -350,15 +380,15 @@ class CustomToast(QDialog):
         title_label.setFont(title_font)
         title_label.setStyleSheet("color: black;")
         layout.addWidget(title_label)
-        
+
         # Message label (supports multiline)
         message_label = QLabel(message)
         message_label.setWordWrap(True)
         message_label.setStyleSheet("color: black; font-size: 10pt;")
         layout.addWidget(message_label)
-        
+
         self.setLayout(layout)
-        
+
         # Set background color based on type
         if self.toast_type == "success":
             bg_color = "rgb(76, 175, 80)"  # Green
@@ -368,59 +398,63 @@ class CustomToast(QDialog):
             bg_color = "rgb(244, 67, 54)"  # Red
         else:  # info
             bg_color = "rgb(33, 150, 243)"  # Blue
-            
-        self.setStyleSheet(f"""
+
+        self.setStyleSheet(
+            f"""
             CustomToast {{
                 background-color: {bg_color};
                 border-radius: 8px;
                 border: 1px solid rgba(255, 255, 255, 100);
             }}
-        """)
-        
+        """
+        )
+
         # Set fixed width and adjust height based on content
         self.setFixedWidth(320)
         self.adjustSize()
-        
+
     def position_toast(self):
         """Position toast in bottom-right corner of screen"""
         from PyQt6.QtWidgets import QApplication
+
         primary_screen = QApplication.primaryScreen()
         if primary_screen:
             screen = primary_screen.availableGeometry()
             toast_width = self.width()
             toast_height = self.height()
-            
+
             x = screen.width() - toast_width - 20
             y = screen.height() - toast_height - 20
-            
+
             self.move(x, y)
         else:
             # Fallback positioning
             self.move(100, 100)
-        
+
     def setup_animation(self):
         """Setup slide-in animation"""
         self.animation = QPropertyAnimation(self, b"geometry")
         self.animation.setDuration(300)
         self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-        
+
     def show_toast(self):
         """Show the toast with animation"""
         # Start position (off-screen to the right)
         from PyQt6.QtWidgets import QApplication
+
         primary_screen = QApplication.primaryScreen()
         if primary_screen:
             screen = primary_screen.availableGeometry()
             start_x = screen.width()
             end_x = screen.width() - self.width() - 20
             y = screen.height() - self.height() - 20
-            
+
             start_rect = QRect(start_x, y, self.width(), self.height())
             end_rect = QRect(end_x, y, self.width(), self.height())
-            
+
             self.setGeometry(start_rect)
             self.show()
-            
+
             # Animate slide-in
             self.animation.setStartValue(start_rect)
             self.animation.setEndValue(end_rect)
@@ -428,23 +462,24 @@ class CustomToast(QDialog):
         else:
             # Fallback - just show without animation
             self.show()
-        
+
         # Start hide timer
         self.hide_timer.start(self.duration)
-        
+
     def hide_toast(self):
         """Hide the toast with animation"""
         from PyQt6.QtWidgets import QApplication
+
         primary_screen = QApplication.primaryScreen()
         if primary_screen:
             screen = primary_screen.availableGeometry()
             start_x = screen.width() - self.width() - 20
             end_x = screen.width()
             y = screen.height() - self.height() - 20
-            
+
             start_rect = QRect(start_x, y, self.width(), self.height())
             end_rect = QRect(end_x, y, self.width(), self.height())
-            
+
             self.animation.finished.connect(self.close)
             self.animation.setStartValue(start_rect)
             self.animation.setEndValue(end_rect)
@@ -457,7 +492,15 @@ class CustomToast(QDialog):
 class StatusDialog(QDialog):
     """Dialog to show current tower status"""
 
-    def __init__(self, status, controller_info, supporting_info, ground_controllers, last_check, parent=None):
+    def __init__(
+        self,
+        status,
+        controller_info,
+        supporting_info,
+        ground_controllers,
+        last_check,
+        parent=None,
+    ):
         super().__init__(parent)
         self.setWindowTitle("KOAK Tower Status")
         self.setFixedSize(450, 350)
@@ -491,7 +534,7 @@ class StatusDialog(QDialog):
         def format_ground_controllers_details(ground_controllers):
             if not ground_controllers:
                 return ""
-            
+
             ground_details = "\n\nGround Controllers:"
             for ground in ground_controllers:
                 ground_details += f"""
@@ -505,7 +548,11 @@ Server: {ground.get('server', 'Unknown')}"""
 
         ground_details = format_ground_controllers_details(ground_controllers)
 
-        if status == "tower_and_supporting_online" and controller_info and supporting_info:
+        if (
+            status == "tower_and_supporting_online"
+            and controller_info
+            and supporting_info
+        ):
             details = f"""Tower Controller Information:
 
 Callsign: {controller_info.get('callsign', 'Unknown')}
@@ -522,7 +569,7 @@ Frequency: {supporting_info.get('frequency', 'Unknown')}
 Rating: {supporting_info.get('rating', 'Unknown')}
 Logon Time: {supporting_info.get('logon_time', 'Unknown')}
 Server: {supporting_info.get('server', 'Unknown')}{ground_details}"""
-                
+
         elif status == "tower_online" and controller_info:
             details = f"""Tower Controller Information:
 
@@ -532,7 +579,7 @@ Frequency: {controller_info.get('frequency', 'Unknown')}
 Rating: {controller_info.get('rating', 'Unknown')}
 Logon Time: {controller_info.get('logon_time', 'Unknown')}
 Server: {controller_info.get('server', 'Unknown')}{ground_details}"""
-                
+
         elif status == "supporting_online" and supporting_info:
             details = f"""Tower Controller: OFFLINE
 
@@ -628,10 +675,10 @@ class VATSIMMonitor(QApplication):
         self.last_check = None
         self.monitoring = False
         self._shutting_down = False
-        
+
         # Controller name lookup dictionary
         self.controller_names = {}
-        
+
         # Load Oakland ARTCC roster at startup
         self.load_oakland_roster()
 
@@ -677,46 +724,69 @@ class VATSIMMonitor(QApplication):
             logging.info("Loading Oakland ARTCC roster...")
             response = requests.get("https://oakartcc.org/about/roster", timeout=10)
             response.raise_for_status()
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
+
+            soup = BeautifulSoup(response.content, "html.parser")
+
             # Look for controller information in the roster
             # Try to find tables or structured data containing CID and names
-            tables = soup.find_all('table')
+            tables = soup.find_all("table")
             for table in tables:
-                rows = table.find_all('tr')
-                for row in rows:
-                    cells = row.find_all(['td', 'th'])
+                if isinstance(table, Tag):
+                    rows = table.find_all("tr")
+                    for row in rows:
+                        if isinstance(row, Tag):
+                            cells = row.find_all(["td", "th"])
+                        else:
+                            continue
+                else:
+                    continue
                     if len(cells) >= 2:
                         # Look for patterns that might be CID (numeric) and name
                         for i, cell in enumerate(cells):
                             text = cell.get_text(strip=True)
                             # Check if this looks like a CID (numeric ID)
-                            if text.isdigit() and len(text) >= 6:  # CIDs are typically 6+ digits
+                            if (
+                                text.isdigit() and len(text) >= 6
+                            ):  # CIDs are typically 6+ digits
                                 cid = text
                                 # Look for name in adjacent cells
-                                for j in range(max(0, i-2), min(len(cells), i+3)):
+                                for j in range(max(0, i - 2), min(len(cells), i + 3)):
                                     if j != i:
                                         name_text = cells[j].get_text(strip=True)
                                         # Skip if it's also numeric or empty
-                                        if name_text and not name_text.isdigit() and len(name_text) > 2:
+                                        if (
+                                            name_text
+                                            and not name_text.isdigit()
+                                            and len(name_text) > 2
+                                        ):
                                             # Clean up the name (remove extra whitespace, etc.)
-                                            clean_name = re.sub(r'\s+', ' ', name_text).strip()
-                                            if clean_name and not any(char.isdigit() for char in clean_name[:3]):
+                                            clean_name = re.sub(
+                                                r"\s+", " ", name_text
+                                            ).strip()
+                                            if clean_name and not any(
+                                                char.isdigit()
+                                                for char in clean_name[:3]
+                                            ):
                                                 # Convert name format to "firstname lastname"
-                                                formatted_name = self.format_controller_name(clean_name)
-                                                self.controller_names[cid] = formatted_name
+                                                formatted_name = (
+                                                    self.format_controller_name(
+                                                        clean_name
+                                                    )
+                                                )
+                                                self.controller_names[cid] = (
+                                                    formatted_name
+                                                )
                                                 break
-            
+
             # Also try to find div elements or other structures with controller info
             # Look for patterns like "John Doe - 1234567" or similar
             text_content = soup.get_text()
             # Pattern to match name followed by CID or CID followed by name
             patterns = [
-                r'([A-Za-z\s]{3,30})\s*[-–]\s*(\d{6,})',  # Name - CID
-                r'(\d{6,})\s*[-–]\s*([A-Za-z\s]{3,30})',  # CID - Name
+                r"([A-Za-z\s]{3,30})\s*[-–]\s*(\d{6,})",  # Name - CID
+                r"(\d{6,})\s*[-–]\s*([A-Za-z\s]{3,30})",  # CID - Name
             ]
-            
+
             for pattern in patterns:
                 matches = re.findall(pattern, text_content)
                 for match in matches:
@@ -724,18 +794,22 @@ class VATSIMMonitor(QApplication):
                         cid, name = match[0], match[1].strip()
                     else:  # First group is name
                         name, cid = match[0].strip(), match[1]
-                    
+
                     # Clean up the name
-                    clean_name = re.sub(r'\s+', ' ', name).strip()
+                    clean_name = re.sub(r"\s+", " ", name).strip()
                     if clean_name and len(clean_name) > 2:
                         # Convert name format to "firstname lastname"
                         formatted_name = self.format_controller_name(clean_name)
                         self.controller_names[cid] = formatted_name
-            
-            logging.info(f"Loaded {len(self.controller_names)} controller names from Oakland ARTCC roster")
+
+            logging.info(
+                f"Loaded {len(self.controller_names)} controller names from Oakland ARTCC roster"
+            )
             if self.controller_names:
-                logging.debug(f"Sample entries: {dict(list(self.controller_names.items())[:3])}")
-                
+                logging.debug(
+                    f"Sample entries: {dict(list(self.controller_names.items())[:3])}"
+                )
+
         except Exception as e:
             logging.warning(f"Could not load Oakland ARTCC roster: {e}")
             self.controller_names = {}
@@ -743,62 +817,70 @@ class VATSIMMonitor(QApplication):
     def format_controller_name(self, name):
         """Convert 'lastname, firstname(operatinginitials)' to 'firstname lastname'"""
         # Check if the name matches the pattern "lastname, firstname(operatinginitials)"
-        match = re.match(r'^([^,]+),\s*([^(]+)(?:\([^)]*\))?', name)
+        match = re.match(r"^([^,]+),\s*([^(]+)(?:\([^)]*\))?", name)
         if match:
             lastname = match.group(1).strip()
             firstname = match.group(2).strip()
             return f"{firstname} {lastname}"
-        
+
         # If it doesn't match the pattern, return the original name
         return name
 
     def get_controller_name(self, controller_info):
         """Get the real name of a controller, using roster lookup if needed"""
         # First try the name from VATSIM data
-        vatsim_name = controller_info.get('name', '').strip()
-        
+        vatsim_name = controller_info.get("name", "").strip()
+
         # If VATSIM name exists and doesn't look like just a number, use it
         if vatsim_name and not vatsim_name.isdigit() and len(vatsim_name) > 2:
             return vatsim_name
-        
+
         # Otherwise, try to look up by CID in our roster
-        cid = str(controller_info.get('cid', ''))
+        cid = str(controller_info.get("cid", ""))
         if cid in self.controller_names:
             return self.controller_names[cid]
-        
+
         # Fallback to VATSIM name or "Unknown Controller"
-        return vatsim_name if vatsim_name else 'Unknown Controller'
+        return vatsim_name if vatsim_name else "Unknown Controller"
 
     def format_ground_controllers_info(self, ground_controllers):
         """Format ground controllers information for display"""
         if not ground_controllers:
             return ""
-        
+
         ground_info = []
         for ground in ground_controllers:
-            callsign = ground.get('callsign', 'Unknown')
+            callsign = ground.get("callsign", "Unknown")
             name = self.get_controller_name(ground)
             ground_info.append(f"{callsign} ({name})")
-        
+
         if len(ground_info) == 1:
             return f"\nGround: {ground_info[0]}"
         else:
             return f"\nGround: {', '.join(ground_info)}"
 
-    def get_transition_notification(self, previous_status, current_status, controller_info, supporting_info, ground_controllers):
+    def get_transition_notification(
+        self,
+        previous_status,
+        current_status,
+        controller_info,
+        supporting_info,
+        ground_controllers,
+    ):
         """Generate appropriate notification message based on state transition"""
-        
+
         # Get ground controller info for all messages
         ground_info = self.format_ground_controllers_info(ground_controllers)
-        
+
         # Handle transitions to full coverage
         if current_status == "tower_and_supporting_online":
-            tower_callsign = controller_info.get('callsign', 'Unknown')
+            tower_callsign = controller_info.get("callsign", "Unknown")
             tower_name = self.get_controller_name(controller_info)
-            support_callsign = supporting_info.get('callsign', 'Unknown')
+            support_callsign = supporting_info.get("callsign", "Unknown")
             support_name = self.get_controller_name(supporting_info)
-            message = f"Tower: {tower_callsign} ({tower_name})\nSupporting: {support_callsign} ({support_name}){ground_info}"
-            
+            message = (f"Tower: {tower_callsign} ({tower_name})\n"
+                       f"Supporting: {support_callsign} ({support_name}){ground_info}")
+
             if previous_status == "tower_online":
                 title = "Supporting Facilities Now Online!"
                 return title, message, "success"
@@ -808,12 +890,12 @@ class VATSIMMonitor(QApplication):
             else:  # from all_offline
                 title = "Full Coverage Online!"
                 return title, message, "success"
-        
+
         # Handle transitions to tower only
         elif current_status == "tower_online":
-            callsign = controller_info.get('callsign', 'Unknown')
+            callsign = controller_info.get("callsign", "Unknown")
             controller_name = self.get_controller_name(controller_info)
-            
+
             if previous_status == "tower_and_supporting_online":
                 title = "Supporting Facilities Now Offline"
                 message = f"Only tower remains online\n{callsign} ({controller_name}){ground_info}"
@@ -826,12 +908,12 @@ class VATSIMMonitor(QApplication):
                 title = "KOAK Tower Online!"
                 message = f"{callsign} is now online!\nController: {controller_name}{ground_info}"
                 return title, message, "success"
-        
+
         # Handle transitions to supporting only
         elif current_status == "supporting_online":
-            callsign = supporting_info.get('callsign', 'Unknown')
+            callsign = supporting_info.get("callsign", "Unknown")
             controller_name = self.get_controller_name(supporting_info)
-            
+
             if previous_status == "tower_and_supporting_online":
                 title = "Tower Now Offline"
                 message = f"Only supporting facility remains online\n{callsign} ({controller_name}){ground_info}"
@@ -844,7 +926,7 @@ class VATSIMMonitor(QApplication):
                 title = "Supporting Facility Online"
                 message = f"Tower offline, but {callsign} is online\nController: {controller_name}{ground_info}"
                 return title, message, "warning"
-        
+
         # Handle transitions to all offline
         else:  # all_offline
             if previous_status == "tower_and_supporting_online":
@@ -859,7 +941,7 @@ class VATSIMMonitor(QApplication):
             else:
                 title = "All Facilities Offline"
                 message = f"No tower or supporting controllers found{ground_info}"
-            
+
             return title, message, "error"
 
     def play_notification_sound(self):
@@ -867,32 +949,39 @@ class VATSIMMonitor(QApplication):
         try:
             sound_path = os.path.join(os.path.dirname(__file__), "ding.mp3")
             if os.path.exists(sound_path):
-                if not hasattr(self, '_vlc_instance'):
+                if not hasattr(self, "_vlc_instance") or self._vlc_instance is None:
                     self._vlc_instance = vlc.Instance()
-                    self._vlc_player = self._vlc_instance.media_player_new()
-                
-                media = self._vlc_instance.media_new(sound_path)
-                self._vlc_player.set_media(media)
-                self._vlc_player.play()
+                    if self._vlc_instance is not None:
+                        self._vlc_player = self._vlc_instance.media_player_new()
+
+                if self._vlc_instance is not None:
+                    media = self._vlc_instance.media_new(sound_path)
+                    if hasattr(self, '_vlc_player') and self._vlc_player is not None:
+                        self._vlc_player.set_media(media)
+                        self._vlc_player.play()
             else:
                 logging.warning(f"Sound file not found: {sound_path}")
         except Exception as e:
             logging.error(f"Error playing notification sound: {e}")
 
-    def show_toast_notification(self, title, message, toast_type="success", duration=3000):
+    def show_toast_notification(
+        self, title, message, toast_type="success", duration=3000
+    ):
         """Show a custom toast notification with sound"""
         try:
             # Play custom sound
             self.play_notification_sound()
-            
+
             # Show custom toast notification
             toast = CustomToast(title, message, toast_type, duration)
             toast.show_toast()
-            
+
         except Exception as e:
             logging.error(f"Error showing toast notification: {e}")
             # Fallback to system tray notification if toast fails
-            self.tray_icon.showMessage(title, message, QSystemTrayIcon.MessageIcon.Information, duration)
+            self.tray_icon.showMessage(
+                title, message, QSystemTrayIcon.MessageIcon.Information, duration
+            )
 
     def setup_tray_icon(self):
         """Setup system tray icon and menu"""
@@ -955,7 +1044,7 @@ class VATSIMMonitor(QApplication):
         self.worker.status_updated.connect(self.on_status_updated)
         self.worker.force_check_completed.connect(self.on_force_check_completed)
         self.worker.error_occurred.connect(self.on_error)
-        
+
         # Add supporting facility info and ground controllers
         self.supporting_info = {}
         self.ground_controllers = []
@@ -966,11 +1055,13 @@ class VATSIMMonitor(QApplication):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             self.show_status()
 
-    def on_status_updated(self, status, controller_info, supporting_info, ground_controllers):
+    def on_status_updated(
+        self, status, controller_info, supporting_info, ground_controllers
+    ):
         """Handle status update from worker thread"""
         previous_status = self.current_status
         self.current_status = status
-        self.tower_online = (status == "tower_online")
+        self.tower_online = status == "tower_online"
         self.controller_info = controller_info
         self.supporting_info = supporting_info
         self.ground_controllers = ground_controllers
@@ -985,21 +1076,27 @@ class VATSIMMonitor(QApplication):
             color = "yellow"
         else:  # all_offline
             color = "red"
-        
+
         self.tray_icon.setIcon(self.create_icon(color))
 
         # Show notification if status changed
         if status != previous_status:
             title, message, toast_type = self.get_transition_notification(
-                previous_status, status, controller_info, supporting_info, ground_controllers
+                previous_status,
+                status,
+                controller_info,
+                supporting_info,
+                ground_controllers,
             )
             self.show_toast_notification(title, message, toast_type, 3000)
 
-    def on_force_check_completed(self, status, controller_info, supporting_info, ground_controllers):
+    def on_force_check_completed(
+        self, status, controller_info, supporting_info, ground_controllers
+    ):
         """Handle force check completion - always show notification"""
         # Update internal state
         self.current_status = status
-        self.tower_online = (status == "tower_online")
+        self.tower_online = status == "tower_online"
         self.controller_info = controller_info
         self.supporting_info = supporting_info
         self.ground_controllers = ground_controllers
@@ -1014,52 +1111,35 @@ class VATSIMMonitor(QApplication):
             color = "yellow"
         else:  # all_offline
             color = "red"
-        
+
         self.tray_icon.setIcon(self.create_icon(color))
 
         # Always show notification for force checks
         ground_info = self.format_ground_controllers_info(ground_controllers)
-        
+
         if status == "tower_and_supporting_online":
-            tower_callsign = controller_info.get('callsign', 'Unknown')
+            tower_callsign = controller_info.get("callsign", "Unknown")
             tower_name = self.get_controller_name(controller_info)
-            support_callsign = supporting_info.get('callsign', 'Unknown')
+            support_callsign = supporting_info.get("callsign", "Unknown")
             support_name = self.get_controller_name(supporting_info)
-            message = f"Tower: {tower_callsign} ({tower_name})\nSupporting: {support_callsign} ({support_name}){ground_info}"
-            self.show_toast_notification(
-                "KOAK Tower Status",
-                message,
-                "success",
-                3000
-            )
+            message = (f"Tower: {tower_callsign} ({tower_name})\n"
+                       f"Supporting: {support_callsign} ({support_name}){ground_info}")
+            self.show_toast_notification("KOAK Tower Status", message, "success", 3000)
         elif status == "tower_online":
-            callsign = controller_info.get('callsign', 'Unknown')
+            callsign = controller_info.get("callsign", "Unknown")
             controller_name = self.get_controller_name(controller_info)
-            message = f"{callsign} is online\nController: {controller_name}{ground_info}"
-            self.show_toast_notification(
-                "KOAK Tower Status",
-                message,
-                "success",
-                3000
+            message = (
+                f"{callsign} is online\nController: {controller_name}{ground_info}"
             )
+            self.show_toast_notification("KOAK Tower Status", message, "success", 3000)
         elif status == "supporting_online":
-            callsign = supporting_info.get('callsign', 'Unknown')
+            callsign = supporting_info.get("callsign", "Unknown")
             controller_name = self.get_controller_name(supporting_info)
             message = f"Tower offline, but {callsign} is online\nController: {controller_name}{ground_info}"
-            self.show_toast_notification(
-                "KOAK Tower Status",
-                message,
-                "warning",
-                3000
-            )
+            self.show_toast_notification("KOAK Tower Status", message, "warning", 3000)
         else:  # all_offline
             message = f"No controllers found{ground_info}"
-            self.show_toast_notification(
-                "KOAK Tower Status",
-                message,
-                "info",
-                3000
-            )
+            self.show_toast_notification("KOAK Tower Status", message, "info", 3000)
 
     def on_error(self, error_message):
         """Handle error from worker thread"""
@@ -1109,16 +1189,18 @@ class VATSIMMonitor(QApplication):
             self.worker.force_check_requested.emit()
         else:
             self.show_toast_notification(
-                "Monitor Not Running",
-                "Start monitoring first",
-                "warning",
-                2000
+                "Monitor Not Running", "Start monitoring first", "warning", 2000
             )
 
     def show_status(self):
         """Show status dialog"""
         dialog = StatusDialog(
-            self.current_status, self.controller_info, self.supporting_info, self.ground_controllers, self.last_check, None
+            self.current_status,
+            self.controller_info,
+            self.supporting_info,
+            self.ground_controllers,
+            self.last_check,
+            None,
         )
         dialog.exec()
 
@@ -1133,7 +1215,7 @@ class VATSIMMonitor(QApplication):
                 "Settings Updated",
                 f"Check interval set to {dialog.new_interval} seconds",
                 "success",
-                2000
+                2000,
             )
 
     def quit_application(self):
