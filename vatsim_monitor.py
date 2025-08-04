@@ -87,6 +87,7 @@ class VATSIMMonitor(QApplication):
         """Get both tray icon and notification colors for a given status"""
         # Get colors from config
         colors_config = self.config.get("colors", {})
+        notification_colors = colors_config.get("notifications", {})
 
         # Map status to color names for tray icons
         status_to_color_name = {
@@ -97,11 +98,18 @@ class VATSIMMonitor(QApplication):
             "error": "gray",
         }
 
-        # Get the RGB values from config and create darkened notification color
-        rgb_values = colors_config.get(
-            status, colors_config.get("error", [100, 100, 100])
-        )
-        notification_color = darken_color_for_notification(rgb_values)
+        # Get the notification color from config
+        notification_color_str = notification_colors.get(status, notification_colors.get("error", "rgb(64, 64, 64)"))
+
+        # Parse RGB string to extract values for darkening
+        import re
+        rgb_match = re.match(r'rgb\((\d+),\s*(\d+),\s*(\d+)\)', notification_color_str)
+        if rgb_match:
+            rgb_values = [int(rgb_match.group(1)), int(rgb_match.group(2)), int(rgb_match.group(3))]
+            notification_color = darken_color_for_notification(rgb_values)
+        else:
+            # Fallback if parsing fails
+            notification_color = notification_color_str
 
         return {
             "tray": status_to_color_name.get(status, "gray"),
@@ -341,7 +349,7 @@ class VATSIMMonitor(QApplication):
         # Handle transitions to full coverage
         if current_status == "main_facility_and_supporting_above_online":
             main_facility_info = self.format_multiple_controllers_info(
-                controller_info, "Main Facility: "
+                controller_info, f"{self.display_name}: "
             )
             support_info = self.format_multiple_controllers_info(
                 supporting_info, "Supporting Above: "
@@ -352,7 +360,7 @@ class VATSIMMonitor(QApplication):
                 title = "Supporting Above Facilities Now Online!"
                 return title, message, "success"
             elif previous_status == "supporting_above_online":
-                title = "Main Facility Now Online!"
+                title = f"{self.display_name} Now Online!"
                 return title, message, "success"
             else:  # from all_offline
                 title = "Full Coverage Online!"
@@ -364,11 +372,11 @@ class VATSIMMonitor(QApplication):
 
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "Supporting Above Facilities Now Offline"
-                message = f"Only main facility remains online\n{main_facility_info}{supporting_below_info}"
+                message = f"Only {self.display_name} remains online\n{main_facility_info}{supporting_below_info}"
                 return title, message, "warning"
             elif previous_status == "supporting_above_online":
-                title = "Main Facility Now Online!"
-                message = f"Main facility controller is now online\n{main_facility_info}{supporting_below_info}"
+                title = f"{self.display_name} Now Online!"
+                message = f"{self.display_name} controller is now online\n{main_facility_info}{supporting_below_info}"
                 return title, message, "success"
             else:  # from all_offline
                 title = f"{self.display_name} Online!"
@@ -380,19 +388,19 @@ class VATSIMMonitor(QApplication):
             support_info = self.format_multiple_controllers_info(supporting_info)
 
             if previous_status == "main_facility_and_supporting_above_online":
-                title = "Main Facility Now Offline"
+                title = f"{self.display_name} Now Offline"
                 message = (
                     f"Only supporting above facility remains online\n"
                     f"{support_info}{supporting_below_info}"
                 )
                 return title, message, "warning"
             elif previous_status == "main_facility_online":
-                title = "Main Facility Now Offline"
-                message = f"Main facility went offline, but {support_info} is online{supporting_below_info}"
+                title = f"{self.display_name} Now Offline"
+                message = f"{self.display_name} went offline, but {support_info} is online{supporting_below_info}"
                 return title, message, "warning"
             else:  # from all_offline
                 title = "Supporting Above Facility Online"
-                message = f"Main facility offline, but {support_info} is online{supporting_below_info}"
+                message = f"{self.display_name} is offline, but {support_info} is online{supporting_below_info}"
                 return title, message, "warning"
 
         # Handle transitions to all offline
@@ -400,20 +408,20 @@ class VATSIMMonitor(QApplication):
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "All Facilities Now Offline"
                 message = (
-                    "Both main facility and supporting above controllers have gone offline"
+                    f"Both {self.display_name} and supporting above controllers have gone offline"
                     + f"{supporting_below_info}"
                 )
             elif previous_status == "main_facility_online":
-                title = "Main Facility Now Offline"
+                title = f"{self.display_name} Now Offline"
                 message = (
-                    f"Main facility controller has gone offline{supporting_below_info}"
+                    f"{self.display_name} controller has gone offline{supporting_below_info}"
                 )
             elif previous_status == "supporting_above_online":
                 title = "Supporting Above Facility Now Offline"
                 message = f"Supporting above controller has gone offline{supporting_below_info}"
             else:
                 title = "All Facilities Offline"
-                message = f"No main facility or supporting above controllers found{supporting_below_info}"
+                message = f"No {self.display_name} or supporting above controllers found{supporting_below_info}"
 
             return title, message, "error"
 
