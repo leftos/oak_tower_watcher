@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-VATSIM KOAK Tower Monitor
-A system tray application that monitors VATSIM for KOAK tower controllers.
+VATSIM Tower Monitor
+A system tray application that monitors VATSIM for tower controllers.
 Uses Qt for cross-platform GUI components.
 """
 
@@ -59,28 +59,31 @@ def load_config():
     """Load configuration from config.json file"""
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
     default_config = {
-        "monitoring": {
-            "check_interval": 60
+        "airport": {
+            "code": "KOAK",
+            "name": "Oakland International Airport",
+            "display_name": "Oakland Tower"
         },
+        "monitoring": {"check_interval": 60},
         "callsigns": {
             "tower": ["OAK_TWR", "OAK_1_TWR"],
             "supporting": ["NCT_APP", "OAK_36_CTR", "OAK_62_CTR"],
-            "ground": ["OAK_GND", "OAK_1_GND"]
+            "ground": ["OAK_GND", "OAK_1_GND"],
         },
         "api": {
             "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
-            "oakland_roster_url": "https://oakartcc.org/about/roster"
+            "roster_url": "https://oakartcc.org/about/roster",
         },
         "notifications": {
             "sound_enabled": True,
             "sound_file": "ding.mp3",
-            "toast_duration": 3000
-        }
+            "toast_duration": 3000,
+        },
     }
-    
+
     try:
         if os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
                 logging.info(f"Loaded configuration from {config_path}")
                 return config
@@ -98,7 +101,7 @@ def save_config(config):
     """Save configuration to config.json file"""
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
     try:
-        with open(config_path, 'w', encoding='utf-8') as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)
             logging.info(f"Saved configuration to {config_path}")
     except Exception as e:
@@ -192,12 +195,16 @@ class VATSIMWorker(QThread):
 
         # Load API endpoints from config
         api_config = config.get("api", {})
-        self.vatsim_api_url = api_config.get("vatsim_url", "https://data.vatsim.net/v3/vatsim-data.json")
+        self.vatsim_api_url = api_config.get(
+            "vatsim_url", "https://data.vatsim.net/v3/vatsim-data.json"
+        )
 
         # Load callsigns from config
         callsigns = config.get("callsigns", {})
-        self.koak_tower_callsigns = callsigns.get("tower", ["OAK_TWR", "OAK_1_TWR"])
-        self.supporting_callsigns = callsigns.get("supporting", ["NCT_APP", "OAK_36_CTR", "OAK_62_CTR"])
+        self.tower_callsigns = callsigns.get("tower", ["OAK_TWR", "OAK_1_TWR"])
+        self.supporting_callsigns = callsigns.get(
+            "supporting", ["NCT_APP", "OAK_36_CTR", "OAK_62_CTR"]
+        )
         self.ground_callsigns = callsigns.get("ground", ["OAK_GND", "OAK_1_GND"])
 
         # Connect the force check signal to the slot
@@ -217,8 +224,8 @@ class VATSIMWorker(QThread):
             data = response.json()
             controllers = data.get("controllers", [])
 
-            # Look for KOAK tower controllers
-            koak_controllers = []
+            # Look for tower controllers
+            tower_controllers = []
             supporting_controllers = []
             ground_controllers = []
 
@@ -228,9 +235,9 @@ class VATSIMWorker(QThread):
                 # Check for tower controllers
                 if any(
                     tower_call in callsign.upper()
-                    for tower_call in self.koak_tower_callsigns
+                    for tower_call in self.tower_callsigns
                 ):
-                    koak_controllers.append(controller)
+                    tower_controllers.append(controller)
 
                 # Check for supporting facility controllers
                 elif any(
@@ -246,7 +253,7 @@ class VATSIMWorker(QThread):
                 ):
                     ground_controllers.append(controller)
 
-            return koak_controllers, supporting_controllers, ground_controllers
+            return tower_controllers, supporting_controllers, ground_controllers
 
         except requests.exceptions.RequestException as e:
             logging.error(f"Error querying VATSIM API: {e}")
@@ -258,7 +265,7 @@ class VATSIMWorker(QThread):
             return None, None, None
 
     def check_tower_status(self):
-        """Check if KOAK tower is online"""
+        """Check if tower is online"""
         tower_controllers, supporting_controllers, ground_controllers = (
             self.query_vatsim_api()
         )
@@ -280,7 +287,7 @@ class VATSIMWorker(QThread):
                 0
             ]  # Use first supporting controller found
             logging.info(
-                f"KOAK Tower AND Supporting Facility ONLINE: Tower: {controller_info['callsign']}, "
+                f"Tower AND Supporting Facility ONLINE: Tower: {controller_info['callsign']}, "
                 f"Supporting: {supporting_info['callsign']}"
             )
         elif tower_controllers:
@@ -289,7 +296,7 @@ class VATSIMWorker(QThread):
             controller_info = tower_controllers[0]  # Use first controller found
             supporting_info = {}
             logging.info(
-                f"KOAK Tower ONLINE: {controller_info['callsign']} - {controller_info.get('name', 'Unknown')}"
+                f"Tower ONLINE: {controller_info['callsign']} - {controller_info.get('name', 'Unknown')}"
             )
         elif supporting_controllers:
             # Tower offline but supporting facilities online
@@ -299,7 +306,7 @@ class VATSIMWorker(QThread):
                 0
             ]  # Use first supporting controller found
             logging.info(
-                f"KOAK Tower OFFLINE but supporting facility ONLINE: "
+                f"Tower OFFLINE but supporting facility ONLINE: "
                 f"{supporting_info['callsign']} - {supporting_info.get('name', 'Unknown')}"
             )
         else:
@@ -307,7 +314,7 @@ class VATSIMWorker(QThread):
             status = "all_offline"
             controller_info = {}
             supporting_info = {}
-            logging.info("KOAK Tower and supporting facilities OFFLINE")
+            logging.info("Tower and supporting facilities OFFLINE")
 
         if self.is_force_check:
             self.force_check_completed.emit(
@@ -538,10 +545,11 @@ class StatusDialog(QDialog):
         supporting_info,
         ground_controllers,
         last_check,
+        display_name="Tower",
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("KOAK Tower Status")
+        self.setWindowTitle(f"{display_name} Status")
         self.setFixedSize(450, 350)
 
         layout = QVBoxLayout()
@@ -560,7 +568,7 @@ class StatusDialog(QDialog):
             status_text = "OFFLINE"
             color = "🔴"
 
-        status_label = QLabel(f"{color} KOAK Tower: {status_text}")
+        status_label = QLabel(f"{color} {display_name}: {status_text}")
         status_label.setStyleSheet("font-size: 16px; font-weight: bold; margin: 10px;")
         status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(status_label)
@@ -630,7 +638,7 @@ Rating: {supporting_info.get('rating', 'Unknown')}
 Logon Time: {supporting_info.get('logon_time', 'Unknown')}
 Server: {supporting_info.get('server', 'Unknown')}{ground_details}"""
         else:
-            details = f"No KOAK tower or supporting controllers currently online.{ground_details}"
+            details = f"No tower or supporting controllers currently online.{ground_details}"
 
         if last_check:
             details += f"\n\nLast checked: {last_check.strftime('%Y-%m-%d %H:%M:%S')}"
@@ -710,6 +718,12 @@ class VATSIMMonitor(QApplication):
 
         # Load configuration
         self.config = load_config()
+        
+        # Get airport configuration
+        self.airport_config = self.config.get("airport", {})
+        self.airport_code = self.airport_config.get("code", "KOAK")
+        self.airport_name = self.airport_config.get("name", "Oakland International Airport")
+        self.display_name = self.airport_config.get("display_name", f"{self.airport_code} Tower")
 
         # Application state
         self.tower_online = False
@@ -721,8 +735,8 @@ class VATSIMMonitor(QApplication):
         # Controller name lookup dictionary
         self.controller_names = {}
 
-        # Load Oakland ARTCC roster at startup
-        self.load_oakland_roster()
+        # Load ARTCC roster at startup
+        self.load_roster()
 
         # Setup components
         self.setup_tray_icon()
@@ -760,11 +774,13 @@ class VATSIMMonitor(QApplication):
 
         return QIcon(pixmap)
 
-    def load_oakland_roster(self):
-        """Load Oakland ARTCC roster to translate CIDs to real names"""
+    def load_roster(self):
+        """Load ARTCC roster to translate CIDs to real names"""
         try:
-            logging.info("Loading Oakland ARTCC roster...")
-            roster_url = self.config.get("api", {}).get("oakland_roster_url", "https://oakartcc.org/about/roster")
+            logging.info("Loading ARTCC roster...")
+            roster_url = self.config.get("api", {}).get(
+                "roster_url", "https://oakartcc.org/about/roster"
+            )
             response = requests.get(roster_url, timeout=10)
             response.raise_for_status()
 
@@ -846,7 +862,7 @@ class VATSIMMonitor(QApplication):
                         self.controller_names[cid] = formatted_name
 
             logging.info(
-                f"Loaded {len(self.controller_names)} controller names from Oakland ARTCC roster"
+                f"Loaded {len(self.controller_names)} controller names from ARTCC roster"
             )
             if self.controller_names:
                 logging.debug(
@@ -854,7 +870,7 @@ class VATSIMMonitor(QApplication):
                 )
 
         except Exception as e:
-            logging.warning(f"Could not load Oakland ARTCC roster: {e}")
+            logging.warning(f"Could not load ARTCC roster: {e}")
             self.controller_names = {}
 
     def format_controller_name(self, name):
@@ -921,8 +937,10 @@ class VATSIMMonitor(QApplication):
             tower_name = self.get_controller_name(controller_info)
             support_callsign = supporting_info.get("callsign", "Unknown")
             support_name = self.get_controller_name(supporting_info)
-            message = (f"Tower: {tower_callsign} ({tower_name})\n"
-                       f"Supporting: {support_callsign} ({support_name}){ground_info}")
+            message = (
+                f"Tower: {tower_callsign} ({tower_name})\n"
+                f"Supporting: {support_callsign} ({support_name}){ground_info}"
+            )
 
             if previous_status == "tower_online":
                 title = "Supporting Facilities Now Online!"
@@ -948,7 +966,7 @@ class VATSIMMonitor(QApplication):
                 message = f"Tower controller is now online\n{callsign} ({controller_name}){ground_info}"
                 return title, message, "success"
             else:  # from all_offline
-                title = "KOAK Tower Online!"
+                title = f"{self.display_name} Online!"
                 message = f"{callsign} is now online!\nController: {controller_name}{ground_info}"
                 return title, message, "success"
 
@@ -1005,7 +1023,7 @@ class VATSIMMonitor(QApplication):
 
                 if self._vlc_instance is not None:
                     media = self._vlc_instance.media_new(sound_path)
-                    if hasattr(self, '_vlc_player') and self._vlc_player is not None:
+                    if hasattr(self, "_vlc_player") and self._vlc_player is not None:
                         self._vlc_player.set_media(media)
                         self._vlc_player.play()
             else:
@@ -1020,7 +1038,9 @@ class VATSIMMonitor(QApplication):
         try:
             # Use duration from config if not specified
             if duration is None:
-                duration = self.config.get("notifications", {}).get("toast_duration", 3000)
+                duration = self.config.get("notifications", {}).get(
+                    "toast_duration", 3000
+                )
 
             # Play custom sound
             self.play_notification_sound()
@@ -1033,20 +1053,23 @@ class VATSIMMonitor(QApplication):
             logging.error(f"Error showing toast notification: {e}")
             # Fallback to system tray notification if toast fails
             self.tray_icon.showMessage(
-                title, message, QSystemTrayIcon.MessageIcon.Information, duration or 3000
+                title,
+                message,
+                QSystemTrayIcon.MessageIcon.Information,
+                duration or 3000,
             )
 
     def setup_tray_icon(self):
         """Setup system tray icon and menu"""
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setIcon(self.create_icon("gray"))
-        self.tray_icon.setToolTip("VATSIM KOAK Monitor")
+        self.update_tray_tooltip()
 
         # Create menu
         tray_menu = QMenu()
 
         # Status action
-        status_action = QAction("KOAK Tower Status", self)
+        status_action = QAction(f"{self.display_name} Status", self)
         status_action.triggered.connect(self.show_status)
         tray_menu.addAction(status_action)
 
@@ -1103,6 +1126,59 @@ class VATSIMMonitor(QApplication):
         self.ground_controllers = []
         self.current_status = "all_offline"
 
+    def update_tray_tooltip(self):
+        """Update the system tray icon tooltip with current status"""
+        if not hasattr(self, "current_status"):
+            self.tray_icon.setToolTip(f"VATSIM {self.display_name} Monitor - Starting...")
+            return
+
+        if self.current_status == "tower_and_supporting_online":
+            if hasattr(self, "controller_info") and hasattr(self, "supporting_info"):
+                tower_callsign = self.controller_info.get("callsign", "Unknown")
+                tower_name = self.get_controller_name(self.controller_info)
+                support_callsign = self.supporting_info.get("callsign", "Unknown")
+                support_name = self.get_controller_name(self.supporting_info)
+                tooltip = (
+                    f"{self.display_name}: ONLINE (Full Coverage)\n"
+                    f"Tower: {tower_callsign} ({tower_name})\n"
+                    f"Supporting: {support_callsign} ({support_name})"
+                )
+            else:
+                tooltip = f"{self.display_name}: ONLINE (Full Coverage)"
+        elif self.current_status == "tower_online":
+            if hasattr(self, "controller_info") and self.controller_info:
+                tower_callsign = self.controller_info.get("callsign", "Unknown")
+                tower_name = self.get_controller_name(self.controller_info)
+                tooltip = (
+                    f"{self.display_name}: ONLINE\nController: {tower_callsign} ({tower_name})"
+                )
+            else:
+                tooltip = f"{self.display_name}: ONLINE"
+        elif self.current_status == "supporting_online":
+            if hasattr(self, "supporting_info") and self.supporting_info:
+                support_callsign = self.supporting_info.get("callsign", "Unknown")
+                support_name = self.get_controller_name(self.supporting_info)
+                tooltip = f"{self.display_name}: OFFLINE\nSupporting: {support_callsign} ({support_name}) ONLINE"
+            else:
+                tooltip = f"{self.display_name}: OFFLINE (Supporting Online)"
+        else:  # all_offline
+            tooltip = f"{self.display_name}: OFFLINE"
+
+        # Add ground controller info if available
+        if hasattr(self, "ground_controllers") and self.ground_controllers:
+            ground_info = []
+            for gc in self.ground_controllers:
+                callsign = gc.get("callsign", "Unknown")
+                name = self.get_controller_name(gc)
+                ground_info.append(f"{callsign} ({name})")
+
+            if len(ground_info) == 1:
+                tooltip += f"\nGround: {ground_info[0]}"
+            elif len(ground_info) > 1:
+                tooltip += f"\nGround: {', '.join(ground_info)}"
+
+        self.tray_icon.setToolTip(tooltip)
+
     def tray_icon_activated(self, reason):
         """Handle tray icon activation"""
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
@@ -1131,6 +1207,9 @@ class VATSIMMonitor(QApplication):
             color = "red"
 
         self.tray_icon.setIcon(self.create_icon(color))
+
+        # Update tooltip with current status
+        self.update_tray_tooltip()
 
         # Show notification if status changed
         if status != previous_status:
@@ -1167,6 +1246,9 @@ class VATSIMMonitor(QApplication):
 
         self.tray_icon.setIcon(self.create_icon(color))
 
+        # Update tooltip with current status
+        self.update_tray_tooltip()
+
         # Always show notification for force checks
         ground_info = self.format_ground_controllers_info(ground_controllers)
 
@@ -1175,29 +1257,32 @@ class VATSIMMonitor(QApplication):
             tower_name = self.get_controller_name(controller_info)
             support_callsign = supporting_info.get("callsign", "Unknown")
             support_name = self.get_controller_name(supporting_info)
-            message = (f"Tower: {tower_callsign} ({tower_name})\n"
-                       f"Supporting: {support_callsign} ({support_name}){ground_info}")
-            self.show_toast_notification("KOAK Tower Status", message, "success", 3000)
+            message = (
+                f"Tower: {tower_callsign} ({tower_name})\n"
+                f"Supporting: {support_callsign} ({support_name}){ground_info}"
+            )
+            self.show_toast_notification(f"{self.display_name} Status", message, "success", 3000)
         elif status == "tower_online":
             callsign = controller_info.get("callsign", "Unknown")
             controller_name = self.get_controller_name(controller_info)
             message = (
                 f"{callsign} is online\nController: {controller_name}{ground_info}"
             )
-            self.show_toast_notification("KOAK Tower Status", message, "success", 3000)
+            self.show_toast_notification(f"{self.display_name} Status", message, "success", 3000)
         elif status == "supporting_online":
             callsign = supporting_info.get("callsign", "Unknown")
             controller_name = self.get_controller_name(supporting_info)
             message = f"Tower offline, but {callsign} is online\nController: {controller_name}{ground_info}"
-            self.show_toast_notification("KOAK Tower Status", message, "warning", 3000)
+            self.show_toast_notification(f"{self.display_name} Status", message, "warning", 3000)
         else:  # all_offline
             message = f"No controllers found{ground_info}"
-            self.show_toast_notification("KOAK Tower Status", message, "info", 3000)
+            self.show_toast_notification(f"{self.display_name} Status", message, "info", 3000)
 
     def on_error(self, error_message):
         """Handle error from worker thread"""
         logging.error(error_message)
         self.tray_icon.setIcon(self.create_icon("gray"))
+        self.tray_icon.setToolTip(f"VATSIM {self.display_name} Monitor - Error")
 
     def start_monitoring(self):
         """Start monitoring VATSIM"""
@@ -1226,6 +1311,7 @@ class VATSIMMonitor(QApplication):
             self.stop_action.setEnabled(False)
 
             self.tray_icon.setIcon(self.create_icon("gray"))
+            self.tray_icon.setToolTip(f"VATSIM {self.display_name} Monitor - Stopped")
             # self.tray_icon.showMessage(
             #     "VATSIM Monitor Stopped",
             #     "No longer monitoring KOAK tower",
@@ -1253,6 +1339,7 @@ class VATSIMMonitor(QApplication):
             self.supporting_info,
             self.ground_controllers,
             self.last_check,
+            self.display_name,
             None,
         )
         dialog.exec()
@@ -1262,11 +1349,11 @@ class VATSIMMonitor(QApplication):
         dialog = SettingsDialog(self.worker.check_interval, None)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.worker.set_interval(dialog.new_interval)
-            
+
             # Update config and save it
             self.config["monitoring"]["check_interval"] = dialog.new_interval
             save_config(self.config)
-            
+
             logging.info(f"Check interval updated to {dialog.new_interval} seconds")
 
             self.show_toast_notification(
@@ -1333,7 +1420,7 @@ def main():
     try:
         app = VATSIMMonitor(sys.argv)
 
-        logging.info("Starting VATSIM KOAK Tower Monitor...")
+        logging.info(f"Starting VATSIM {app.display_name} Monitor...")
 
         # Start monitoring automatically
         app.start_monitoring()

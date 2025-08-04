@@ -1,15 +1,15 @@
-# VATSIM KOAK Tower Monitor
+# VATSIM Tower Monitor
 
-A system tray application that monitors VATSIM for Oakland International Airport (KOAK) tower controllers and provides real-time notifications when controllers come online or go offline.
+A configurable system tray application that monitors VATSIM for tower controllers at any airport and provides real-time notifications when controllers come online or go offline.
 
 ## Features
 
-- **Real-time Monitoring**: Continuously monitors VATSIM API for KOAK tower controllers
+- **Real-time Monitoring**: Continuously monitors VATSIM API for configurable tower controllers
 - **System Tray Integration**: Runs quietly in the system tray with color-coded status indicators
 - **Smart Notifications**: Custom toast notifications with sound alerts for status changes
 - **Multiple Controller Types**: Monitors tower, supporting facilities, and ground controllers
 - **Controller Information**: Displays detailed controller information including callsign, name, frequency, and more
-- **Oakland ARTCC Integration**: Automatically fetches controller names from Oakland ARTCC roster
+- **ARTCC Integration**: Automatically fetches controller names from configurable ARTCC roster
 - **Customizable Settings**: Adjustable check intervals (minimum 30 seconds)
 - **Cross-platform**: Works on Windows, macOS, and Linux
 
@@ -31,6 +31,11 @@ The application uses a `config.json` file for all configuration settings. This f
 
 ```json
 {
+  "airport": {
+    "code": "KOAK",
+    "name": "Oakland International Airport",
+    "display_name": "Oakland Tower"
+  },
   "monitoring": {
     "check_interval": 60,
     "comment": "Check interval in seconds (minimum 30)"
@@ -52,7 +57,7 @@ The application uses a `config.json` file for all configuration settings. This f
   },
   "api": {
     "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
-    "oakland_roster_url": "https://oakartcc.org/about/roster"
+    "roster_url": "https://oakartcc.org/about/roster"
   },
   "notifications": {
     "sound_enabled": true,
@@ -62,22 +67,32 @@ The application uses a `config.json` file for all configuration settings. This f
 }
 ```
 
+### Airport Configuration
+
+The application can be configured to monitor any airport by updating the airport section:
+
+```json
+{
+  "airport": {
+    "code": "KOAK",
+    "name": "Oakland International Airport",
+    "display_name": "KOAK Tower"
+  }
+}
+```
+
+- `code`: Airport ICAO code (used for identification)
+- `name`: Full airport name (for documentation)
+- `display_name`: Name shown in notifications and UI
+
 ### Customizing Monitored Facilities
 
 You can customize which callsigns to monitor by editing the `config.json` file:
 
-#### Tower Controllers
-- `OAK_TWR` - Oakland Tower
-- `OAK_1_TWR` - Oakland Tower (alternate)
-
-#### Supporting Facilities
-- `NCT_APP` - Northern California TRACON
-- `OAK_36_CTR` - Oakland Center (Sector 36)
-- `OAK_62_CTR` - Oakland Center (Sector 62)
-
-#### Ground Controllers
-- `OAK_GND` - Oakland Ground
-- `OAK_1_GND` - Oakland Ground (alternate)
+#### Default Configuration (Oakland International Airport)
+- **Tower Controllers**: `OAK_TWR`, `OAK_1_TWR`
+- **Supporting Facilities**: `NCT_APP`, `OAK_36_CTR`, `OAK_62_CTR`
+- **Ground Controllers**: `OAK_GND`, `OAK_1_GND`
 
 **Note**: You can add or remove callsigns from any category by editing the corresponding arrays in `config.json`. Changes take effect after restarting the application.
 
@@ -299,14 +314,23 @@ oak_tower_watcher/
 
 ### Monitoring Different Airports
 
-To monitor a different airport, update the callsigns in `config.json`:
+To monitor a different airport, update both the airport information and callsigns in `config.json`:
 
 ```json
 {
+  "airport": {
+    "code": "KLAX",
+    "name": "Los Angeles International Airport",
+    "display_name": "LAX Tower"
+  },
   "callsigns": {
     "tower": ["LAX_TWR", "LAX_N_TWR", "LAX_S_TWR"],
     "supporting": ["SCT_APP", "LAX_APP"],
     "ground": ["LAX_GND", "LAX_N_GND", "LAX_S_GND"]
+  },
+  "api": {
+    "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
+    "roster_url": "https://socal-artcc.org/about/roster"
   }
 }
 ```
@@ -329,6 +353,35 @@ To monitor a different airport, update the callsigns in `config.json`:
 {
   "monitoring": {
     "check_interval": 30
+  }
+}
+```
+
+### Complete Configuration Example (Chicago O'Hare)
+
+```json
+{
+  "airport": {
+    "code": "KORD",
+    "name": "Chicago O'Hare International Airport",
+    "display_name": "ORD Tower"
+  },
+  "monitoring": {
+    "check_interval": 45
+  },
+  "callsigns": {
+    "tower": ["ORD_TWR", "ORD_1_TWR", "ORD_2_TWR"],
+    "supporting": ["C90_APP", "ZAU_CTR"],
+    "ground": ["ORD_GND", "ORD_1_GND", "ORD_2_GND"]
+  },
+  "api": {
+    "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
+    "roster_url": "https://zau-artcc.org/about/roster"
+  },
+  "notifications": {
+    "sound_enabled": true,
+    "sound_file": "custom_alert.mp3",
+    "toast_duration": 4000
   }
 }
 ```

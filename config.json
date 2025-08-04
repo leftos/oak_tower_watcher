@@ -1,4 +1,9 @@
 {
+  "airport": {
+    "code": "KOAK",
+    "name": "Oakland International Airport",
+    "display_name": "Oakland Tower"
+  },
   "monitoring": {
     "check_interval": 60,
     "comment": "Check interval in seconds (minimum 30)"
@@ -20,7 +25,7 @@
   },
   "api": {
     "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
-    "oakland_roster_url": "https://oakartcc.org/about/roster"
+    "roster_url": "https://oakartcc.org/about/roster"
   },
   "notifications": {
     "sound_enabled": true,
