@@ -56,6 +56,39 @@ logging.basicConfig(
 _lock_file = None
 
 
+def darken_color_for_notification(rgb_values, factor=0.6):
+    """
+    Darken an RGB color for notification backgrounds to ensure white text readability.
+
+    Args:
+        rgb_values: List or tuple of [R, G, B] values (0-255)
+        factor: Darkening factor (0.0 = black, 1.0 = original color)
+
+    Returns:
+        String in format "rgb(r, g, b)" with darkened values
+    """
+    try:
+        r, g, b = rgb_values
+        # Apply darkening factor and ensure minimum darkness for readability
+        darkened_r = max(0, min(255, int(r * factor)))
+        darkened_g = max(0, min(255, int(g * factor)))
+        darkened_b = max(0, min(255, int(b * factor)))
+
+        # Ensure the color is dark enough for white text (luminance check)
+        luminance = (0.299 * darkened_r + 0.587 * darkened_g + 0.114 * darkened_b) / 255
+        if luminance > 0.5:  # Too bright for white text
+            # Further darken if needed
+            additional_factor = 0.4
+            darkened_r = int(darkened_r * additional_factor)
+            darkened_g = int(darkened_g * additional_factor)
+            darkened_b = int(darkened_b * additional_factor)
+
+        return f"rgb({darkened_r}, {darkened_g}, {darkened_b})"
+    except (ValueError, TypeError, IndexError):
+        # Fallback to a safe dark color
+        return "rgb(64, 64, 64)"
+
+
 def load_config():
     """Load configuration from config.json file"""
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
@@ -79,6 +112,22 @@ def load_config():
             "sound_enabled": True,
             "sound_file": "ding.mp3",
             "toast_duration": 3000,
+        },
+        "colors": {
+            "tray_icon": {
+                "green": [0, 150, 0],
+                "red": [200, 0, 0],
+                "yellow": [200, 150, 0],
+                "purple": [128, 0, 128],
+                "gray": [100, 100, 100],
+            },
+            "notifications": {
+                "main_facility_and_supporting_above_online": "rgb(75, 0, 130)",
+                "main_facility_online": "rgb(0, 100, 0)",
+                "supporting_above_online": "rgb(184, 134, 11)",
+                "all_offline": "rgb(139, 0, 0)",
+                "error": "rgb(64, 64, 64)",
+            },
         },
     }
 
@@ -178,10 +227,10 @@ class VATSIMWorker(QThread):
     """Worker thread for VATSIM API calls"""
 
     status_updated = pyqtSignal(
-        str, dict, dict, list
+        str, list, list, list
     )  # status, main_facility_info, supporting_above_info, supporting_below_controllers
     force_check_completed = pyqtSignal(
-        str, dict, dict, list
+        str, list, list, list
     )  # status, main_facility_info, supporting_above_info, supporting_below_controllers
     error_occurred = pyqtSignal(str)
     force_check_requested = pyqtSignal()  # Signal to request immediate check
@@ -293,38 +342,38 @@ class VATSIMWorker(QThread):
         if main_facility_controllers and supporting_above_controllers:
             # Both main facility and supporting above facilities online - highest priority
             status = "main_facility_and_supporting_above_online"
-            controller_info = main_facility_controllers[0]  # Use first controller found
-            supporting_info = supporting_above_controllers[
-                0
-            ]  # Use first supporting above controller found
+            controller_info = main_facility_controllers  # Use all controllers found
+            supporting_info = supporting_above_controllers  # Use all supporting above controllers found
+            main_callsigns = [c.get('callsign', 'Unknown') for c in main_facility_controllers]
+            support_callsigns = [c.get('callsign', 'Unknown') for c in supporting_above_controllers]
             logging.info(
-                f"Main Facility AND Supporting Above Facility ONLINE: Main Facility: {controller_info['callsign']}, "
-                f"Supporting Above: {supporting_info['callsign']}"
+                f"Main Facility AND Supporting Above Facility ONLINE: Main Facility: {', '.join(main_callsigns)}, "
+                f"Supporting Above: {', '.join(support_callsigns)}"
             )
         elif main_facility_controllers:
             # Main facility is online but no supporting above facilities
             status = "main_facility_online"
-            controller_info = main_facility_controllers[0]  # Use first controller found
-            supporting_info = {}
+            controller_info = main_facility_controllers  # Use all controllers found
+            supporting_info = []
+            main_callsigns = [c.get('callsign', 'Unknown') for c in main_facility_controllers]
             logging.info(
-                f"Main Facility ONLINE: {controller_info['callsign']} - {controller_info.get('name', 'Unknown')}"
+                f"Main Facility ONLINE: {', '.join(main_callsigns)}"
             )
         elif supporting_above_controllers:
             # Main facility offline but supporting above facilities online
             status = "supporting_above_online"
-            controller_info = {}
-            supporting_info = supporting_above_controllers[
-                0
-            ]  # Use first supporting above controller found
+            controller_info = []
+            supporting_info = supporting_above_controllers  # Use all supporting above controllers found
+            support_callsigns = [c.get('callsign', 'Unknown') for c in supporting_above_controllers]
             logging.info(
                 f"Main Facility OFFLINE but supporting above facility ONLINE: "
-                f"{supporting_info['callsign']} - {supporting_info.get('name', 'Unknown')}"
+                f"{', '.join(support_callsigns)}"
             )
         else:
             # Everything offline
             status = "all_offline"
-            controller_info = {}
-            supporting_info = {}
+            controller_info = []
+            supporting_info = []
             logging.info("Main facility and supporting above facilities OFFLINE")
 
         if self.is_force_check:
@@ -620,48 +669,44 @@ Server: {supporting_below.get('server', 'Unknown')}"""
             supporting_below_controllers
         )
 
+        def format_controller_details(controllers, title):
+            """Helper function to format controller details"""
+            if not controllers:
+                return f"{title}: OFFLINE\n"
+            
+            if isinstance(controllers, dict):  # Handle legacy single controller format
+                controllers = [controllers]
+            
+            details = f"{title}:\n"
+            for i, controller in enumerate(controllers, 1):
+                if len(controllers) > 1:
+                    details += f"\nController {i}:\n"
+                details += f"""Callsign: {controller.get('callsign', 'Unknown')}
+Name: {controller.get('name', 'Unknown')}
+Frequency: {controller.get('frequency', 'Unknown')}
+Rating: {controller.get('rating', 'Unknown')}
+Logon Time: {controller.get('logon_time', 'Unknown')}
+Server: {controller.get('server', 'Unknown')}
+"""
+            return details
+
         if (
             status == "main_facility_and_supporting_above_online"
             and controller_info
             and supporting_info
         ):
-            details = f"""Main Facility Controller Information:
-
-Callsign: {controller_info.get('callsign', 'Unknown')}
-Name: {controller_info.get('name', 'Unknown')}
-Frequency: {controller_info.get('frequency', 'Unknown')}
-Rating: {controller_info.get('rating', 'Unknown')}
-Logon Time: {controller_info.get('logon_time', 'Unknown')}
-Server: {controller_info.get('server', 'Unknown')}
-
-Supporting Above Facility Information:
-Callsign: {supporting_info.get('callsign', 'Unknown')}
-Name: {supporting_info.get('name', 'Unknown')}
-Frequency: {supporting_info.get('frequency', 'Unknown')}
-Rating: {supporting_info.get('rating', 'Unknown')}
-Logon Time: {supporting_info.get('logon_time', 'Unknown')}
-Server: {supporting_info.get('server', 'Unknown')}{supporting_below_details}"""
+            main_details = format_controller_details(controller_info, "Main Facility Controller Information")
+            support_details = format_controller_details(supporting_info, "Supporting Above Facility Information")
+            details = f"{main_details}\n{support_details}{supporting_below_details}"
 
         elif status == "main_facility_online" and controller_info:
-            details = f"""Main Facility Controller Information:
-
-Callsign: {controller_info.get('callsign', 'Unknown')}
-Name: {controller_info.get('name', 'Unknown')}
-Frequency: {controller_info.get('frequency', 'Unknown')}
-Rating: {controller_info.get('rating', 'Unknown')}
-Logon Time: {controller_info.get('logon_time', 'Unknown')}
-Server: {controller_info.get('server', 'Unknown')}{supporting_below_details}"""
+            main_details = format_controller_details(controller_info, 'Main Facility Controller Information')
+            details = f"{main_details}{supporting_below_details}"
 
         elif status == "supporting_above_online" and supporting_info:
-            details = f"""Main Facility Controller: OFFLINE
-
-Supporting Above Facility Online:
-Callsign: {supporting_info.get('callsign', 'Unknown')}
-Name: {supporting_info.get('name', 'Unknown')}
-Frequency: {supporting_info.get('frequency', 'Unknown')}
-Rating: {supporting_info.get('rating', 'Unknown')}
-Logon Time: {supporting_info.get('logon_time', 'Unknown')}
-Server: {supporting_info.get('server', 'Unknown')}{supporting_below_details}"""
+            main_details = format_controller_details([], "Main Facility Controller")
+            support_details = format_controller_details(supporting_info, "Supporting Above Facility Online")
+            details = f"{main_details}\n{support_details}{supporting_below_details}"
         else:
             details = f"No main facility or supporting above controllers currently online.{supporting_below_details}"
 
@@ -782,29 +827,28 @@ class VATSIMMonitor(QApplication):
 
     def get_status_colors(self, status):
         """Get both tray icon and notification colors for a given status"""
-        color_map = {
-            "main_facility_and_supporting_above_online": {
-                "tray": "purple",
-                "notification": "rgb(75, 0, 130)",  # Dark purple for readability with white text
-            },
-            "main_facility_online": {
-                "tray": "green",
-                "notification": "rgb(0, 100, 0)",  # Dark green for readability with white text
-            },
-            "supporting_above_online": {
-                "tray": "yellow",
-                "notification": "rgb(184, 134, 11)",  # Dark yellow/gold for readability with white text
-            },
-            "all_offline": {
-                "tray": "red",
-                "notification": "rgb(139, 0, 0)",  # Dark red for readability with white text
-            },
-            "error": {
-                "tray": "gray",
-                "notification": "rgb(64, 64, 64)",  # Dark gray for readability with white text
-            },
+        # Get colors from config
+        colors_config = self.config.get("colors", {})
+
+        # Map status to color names for tray icons
+        status_to_color_name = {
+            "main_facility_and_supporting_above_online": "purple",
+            "main_facility_online": "green",
+            "supporting_above_online": "yellow",
+            "all_offline": "red",
+            "error": "gray",
         }
-        return color_map.get(status, color_map["error"])
+
+        # Get the RGB values from config and create darkened notification color
+        rgb_values = colors_config.get(
+            status, colors_config.get("error", [100, 100, 100])
+        )
+        notification_color = darken_color_for_notification(rgb_values)
+
+        return {
+            "tray": status_to_color_name.get(status, "gray"),
+            "notification": notification_color,
+        }
 
     def colorize_airport_tower(self, color_rgb, brightness=1.2):
         """
@@ -919,29 +963,51 @@ class VATSIMMonitor(QApplication):
         if hasattr(self, "_cached_icons") and color in self._cached_icons:
             return self._cached_icons[color]
 
-        # Fallback to circle if no cached icons available
+        # Fallback to circle if no cached icons available - use config colors
+        colors_config = self.config.get("colors", {})
         color_map = {
-            "green": (0, 150, 0),
-            "red": (200, 0, 0),
-            "yellow": (200, 150, 0),
-            "purple": (128, 0, 128),
-            "gray": (100, 100, 100),
+            "green": tuple(colors_config.get("main_facility_online", [0, 150, 0])),
+            "red": tuple(colors_config.get("all_offline", [200, 0, 0])),
+            "yellow": tuple(
+                colors_config.get("supporting_above_online", [200, 150, 0])
+            ),
+            "purple": tuple(
+                colors_config.get(
+                    "main_facility_and_supporting_above_online", [128, 0, 128]
+                )
+            ),
+            "gray": tuple(colors_config.get("error", [100, 100, 100])),
         }
 
-        rgb_color = color_map.get(color, (100, 100, 100))
+        rgb_color = color_map.get(
+            color, tuple(colors_config.get("error", [100, 100, 100]))
+        )
         return self.create_circle_icon(rgb_color)
 
     def initialize_cached_icons(self):
         """Initialize and cache all colored versions of the airport tower icon"""
         logging.info("Initializing cached airport tower icons...")
 
-        # Define colors for different states
+        # Get colors from config using status-based color mapping
+        colors_config = self.config.get("colors", {})
+
+        # Define colors for different states with fallback defaults
         colors = {
-            "green": (0, 150, 0),  # Main facility online
-            "red": (200, 0, 0),  # All offline
-            "yellow": (200, 150, 0),  # Supporting above online
-            "purple": (128, 0, 128),  # Full coverage (main + supporting above)
-            "gray": (100, 100, 100),  # Error/stopped state
+            "green": tuple(
+                colors_config.get("main_facility_online", [0, 150, 0])
+            ),  # Main facility online
+            "red": tuple(colors_config.get("all_offline", [200, 0, 0])),  # All offline
+            "yellow": tuple(
+                colors_config.get("supporting_above_online", [200, 150, 0])
+            ),  # Supporting above online
+            "purple": tuple(
+                colors_config.get(
+                    "main_facility_and_supporting_above_online", [128, 0, 128]
+                )
+            ),  # Full coverage
+            "gray": tuple(
+                colors_config.get("error", [100, 100, 100])
+            ),  # Error/stopped state
         }
 
         self._cached_icons = {}
@@ -1103,6 +1169,25 @@ class VATSIMMonitor(QApplication):
         else:
             return f"\nSupporting Below: {', '.join(supporting_below_info)}"
 
+    def format_multiple_controllers_info(self, controllers, prefix=""):
+        """Format multiple controllers information for display"""
+        if not controllers:
+            return ""
+        
+        if isinstance(controllers, dict):  # Handle legacy single controller format
+            controllers = [controllers]
+        
+        controller_info = []
+        for controller in controllers:
+            callsign = controller.get("callsign", "Unknown")
+            name = self.get_controller_name(controller)
+            controller_info.append(f"{callsign} ({name})")
+        
+        if len(controller_info) == 1:
+            return f"{prefix}{controller_info[0]}"
+        else:
+            return f"{prefix}{', '.join(controller_info)}"
+
     def get_transition_notification(
         self,
         previous_status,
@@ -1120,14 +1205,9 @@ class VATSIMMonitor(QApplication):
 
         # Handle transitions to full coverage
         if current_status == "main_facility_and_supporting_above_online":
-            main_facility_callsign = controller_info.get("callsign", "Unknown")
-            main_facility_name = self.get_controller_name(controller_info)
-            support_callsign = supporting_info.get("callsign", "Unknown")
-            support_name = self.get_controller_name(supporting_info)
-            message = (
-                f"Main Facility: {main_facility_callsign} ({main_facility_name})\n"
-                f"Supporting Above: {support_callsign} ({support_name}){supporting_below_info}"
-            )
+            main_facility_info = self.format_multiple_controllers_info(controller_info, "Main Facility: ")
+            support_info = self.format_multiple_controllers_info(supporting_info, "Supporting Above: ")
+            message = f"{main_facility_info}\n{support_info}{supporting_below_info}"
 
             if previous_status == "main_facility_online":
                 title = "Supporting Above Facilities Now Online!"
@@ -1141,46 +1221,42 @@ class VATSIMMonitor(QApplication):
 
         # Handle transitions to main facility only
         elif current_status == "main_facility_online":
-            callsign = controller_info.get("callsign", "Unknown")
-            controller_name = self.get_controller_name(controller_info)
+            main_facility_info = self.format_multiple_controllers_info(controller_info)
 
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "Supporting Above Facilities Now Offline"
-                message = f"Only main facility remains online\n{callsign} ({controller_name}){supporting_below_info}"
+                message = f"Only main facility remains online\n{main_facility_info}{supporting_below_info}"
                 return title, message, "warning"
             elif previous_status == "supporting_above_online":
                 title = "Main Facility Now Online!"
-                message = f"Main facility controller is now online\n{callsign} ({controller_name}){supporting_below_info}"
+                message = f"Main facility controller is now online\n{main_facility_info}{supporting_below_info}"
                 return title, message, "success"
             else:  # from all_offline
                 title = f"{self.display_name} Online!"
-                message = f"{callsign} is now online!\nController: {controller_name}{supporting_below_info}"
+                message = f"{main_facility_info} is now online!{supporting_below_info}"
                 return title, message, "success"
 
         # Handle transitions to supporting above only
         elif current_status == "supporting_above_online":
-            callsign = supporting_info.get("callsign", "Unknown")
-            controller_name = self.get_controller_name(supporting_info)
+            support_info = self.format_multiple_controllers_info(supporting_info)
 
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "Main Facility Now Offline"
                 message = (
                     f"Only supporting above facility remains online\n"
-                    f"{callsign} ({controller_name}){supporting_below_info}"
+                    f"{support_info}{supporting_below_info}"
                 )
                 return title, message, "warning"
             elif previous_status == "main_facility_online":
                 title = "Main Facility Now Offline"
                 message = (
-                    f"Main facility went offline, but {callsign} is online\n"
-                    f"Controller: {controller_name}{supporting_below_info}"
+                    f"Main facility went offline, but {support_info} is online{supporting_below_info}"
                 )
                 return title, message, "warning"
             else:  # from all_offline
                 title = "Supporting Above Facility Online"
                 message = (
-                    f"Main facility offline, but {callsign} is online\n"
-                    f"Controller: {controller_name}{supporting_below_info}"
+                    f"Main facility offline, but {support_info} is online{supporting_below_info}"
                 )
                 return title, message, "warning"
 
@@ -1188,7 +1264,8 @@ class VATSIMMonitor(QApplication):
         else:  # all_offline
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "All Facilities Now Offline"
-                message = f"Both main facility and supporting above controllers have gone offline{supporting_below_info}"
+                message = "Both main facility and supporting above controllers have gone offline" + \
+                          f"{supporting_below_info}"
             elif previous_status == "main_facility_online":
                 title = "Main Facility Now Offline"
                 message = (
@@ -1243,7 +1320,7 @@ class VATSIMMonitor(QApplication):
             # Play custom sound
             self.play_notification_sound()
 
-            # Get background color based on status if provided
+            # Get background color based on status if provided, or use toast type colors from config
             bg_color = None
             if status:
                 colors = self.get_status_colors(status)
@@ -1340,29 +1417,25 @@ class VATSIMMonitor(QApplication):
 
         if self.current_status == "main_facility_and_supporting_above_online":
             if hasattr(self, "controller_info") and hasattr(self, "supporting_info"):
-                main_facility_callsign = self.controller_info.get("callsign", "Unknown")
-                main_facility_name = self.get_controller_name(self.controller_info)
-                support_callsign = self.supporting_info.get("callsign", "Unknown")
-                support_name = self.get_controller_name(self.supporting_info)
+                main_facility_info = self.format_multiple_controllers_info(self.controller_info)
+                support_info = self.format_multiple_controllers_info(self.supporting_info)
                 tooltip = (
                     f"{self.display_name}: ONLINE (Full Coverage)\n"
-                    f"Main Facility: {main_facility_callsign} ({main_facility_name})\n"
-                    f"Supporting Above: {support_callsign} ({support_name})"
+                    f"Main Facility: {main_facility_info}\n"
+                    f"Supporting Above: {support_info}"
                 )
             else:
                 tooltip = f"{self.display_name}: ONLINE (Full Coverage)"
         elif self.current_status == "main_facility_online":
             if hasattr(self, "controller_info") and self.controller_info:
-                main_facility_callsign = self.controller_info.get("callsign", "Unknown")
-                main_facility_name = self.get_controller_name(self.controller_info)
-                tooltip = f"{self.display_name}: ONLINE\nController: {main_facility_callsign} ({main_facility_name})"
+                main_facility_info = self.format_multiple_controllers_info(self.controller_info)
+                tooltip = f"{self.display_name}: ONLINE\nController: {main_facility_info}"
             else:
                 tooltip = f"{self.display_name}: ONLINE"
         elif self.current_status == "supporting_above_online":
             if hasattr(self, "supporting_info") and self.supporting_info:
-                support_callsign = self.supporting_info.get("callsign", "Unknown")
-                support_name = self.get_controller_name(self.supporting_info)
-                tooltip = f"{self.display_name}: OFFLINE\nSupporting Above: {support_callsign} ({support_name}) ONLINE"
+                support_info = self.format_multiple_controllers_info(self.supporting_info)
+                tooltip = f"{self.display_name}: OFFLINE\nSupporting Above: {support_info} ONLINE"
             else:
                 tooltip = f"{self.display_name}: OFFLINE (Supporting Above Online)"
         else:  # all_offline
@@ -1373,16 +1446,8 @@ class VATSIMMonitor(QApplication):
             hasattr(self, "supporting_below_controllers")
             and self.supporting_below_controllers
         ):
-            supporting_below_info = []
-            for sbc in self.supporting_below_controllers:
-                callsign = sbc.get("callsign", "Unknown")
-                name = self.get_controller_name(sbc)
-                supporting_below_info.append(f"{callsign} ({name})")
-
-            if len(supporting_below_info) == 1:
-                tooltip += f"\nSupporting Below: {supporting_below_info[0]}"
-            elif len(supporting_below_info) > 1:
-                tooltip += f"\nSupporting Below: {', '.join(supporting_below_info)}"
+            supporting_below_info = self.format_supporting_below_controllers_info(self.supporting_below_controllers)
+            tooltip += supporting_below_info
 
         self.tray_icon.setToolTip(tooltip)
 
@@ -1397,7 +1462,7 @@ class VATSIMMonitor(QApplication):
         """Handle status update from worker thread"""
         previous_status = self.current_status
         self.current_status = status
-        self.main_facility_online = status == "main_facility_online"
+        self.main_facility_online = status in ["main_facility_online", "main_facility_and_supporting_above_online"]
         self.controller_info = controller_info
         self.supporting_info = supporting_info
         self.supporting_below_controllers = supporting_below_controllers
@@ -1435,7 +1500,7 @@ class VATSIMMonitor(QApplication):
         """Handle force check completion - always show notification"""
         # Update internal state
         self.current_status = status
-        self.main_facility_online = status == "main_facility_online"
+        self.main_facility_online = status in ["main_facility_online", "main_facility_and_supporting_above_online"]
         self.controller_info = controller_info
         self.supporting_info = supporting_info
         self.supporting_below_controllers = supporting_below_controllers
@@ -1462,31 +1527,21 @@ class VATSIMMonitor(QApplication):
         )
 
         if status == "main_facility_and_supporting_above_online":
-            main_facility_callsign = controller_info.get("callsign", "Unknown")
-            main_facility_name = self.get_controller_name(controller_info)
-            support_callsign = supporting_info.get("callsign", "Unknown")
-            support_name = self.get_controller_name(supporting_info)
-            message = (
-                f"Main Facility: {main_facility_callsign} ({main_facility_name})\n"
-                f"Supporting Above: {support_callsign} ({support_name}){supporting_below_info}"
-            )
+            main_facility_info = self.format_multiple_controllers_info(controller_info, "Main Facility: ")
+            support_info = self.format_multiple_controllers_info(supporting_info, "Supporting Above: ")
+            message = f"{main_facility_info}\n{support_info}{supporting_below_info}"
             self.show_toast_notification(
                 f"{self.display_name} Status", message, "success", 3000, status
             )
         elif status == "main_facility_online":
-            callsign = controller_info.get("callsign", "Unknown")
-            controller_name = self.get_controller_name(controller_info)
-            message = f"{callsign} is online\nController: {controller_name}{supporting_below_info}"
+            main_facility_info = self.format_multiple_controllers_info(controller_info)
+            message = f"{main_facility_info} is online{supporting_below_info}"
             self.show_toast_notification(
                 f"{self.display_name} Status", message, "success", 3000, status
             )
         elif status == "supporting_above_online":
-            callsign = supporting_info.get("callsign", "Unknown")
-            controller_name = self.get_controller_name(supporting_info)
-            message = (
-                f"Main facility offline, but {callsign} is online\n"
-                f"Controller: {controller_name}{supporting_below_info}"
-            )
+            support_info = self.format_multiple_controllers_info(supporting_info)
+            message = f"Main facility offline, but {support_info} is online{supporting_below_info}"
             self.show_toast_notification(
                 f"{self.display_name} Status", message, "warning", 3000, status
             )
