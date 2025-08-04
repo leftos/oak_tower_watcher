@@ -13,6 +13,7 @@ import signal
 import logging
 import os
 import atexit
+import pygame
 
 # fcntl is only available on Unix-like systems
 if sys.platform != "win32":
@@ -32,6 +33,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer
 from PyQt6.QtGui import QAction, QIcon, QPixmap, QPainter, QBrush, QPen
+
+# Import pyqttoast for silent notifications
+from pyqttoast import Toast, ToastPreset
 
 # Configure logging
 logging.basicConfig(
@@ -402,6 +406,40 @@ class VATSIMMonitor(QApplication):
 
         return QIcon(pixmap)
 
+    def play_notification_sound(self):
+        """Play the custom notification sound"""
+        try:
+            if not hasattr(self, '_pygame_initialized'):
+                pygame.mixer.init()
+                self._pygame_initialized = True
+            
+            sound_path = os.path.join(os.path.dirname(__file__), "ding.mp3")
+            if os.path.exists(sound_path):
+                pygame.mixer.music.load(sound_path)
+                pygame.mixer.music.play()
+            else:
+                logging.warning(f"Sound file not found: {sound_path}")
+        except Exception as e:
+            logging.error(f"Error playing notification sound: {e}")
+
+    def show_toast_notification(self, title, message, preset=ToastPreset.SUCCESS, duration=3000):
+        """Show a toast notification with custom sound"""
+        try:
+            # Play custom sound
+            self.play_notification_sound()
+            
+            # Show toast notification
+            toast = Toast()
+            toast.setDuration(duration)
+            toast.setTitle(title)
+            toast.setText(message)
+            toast.applyPreset(preset)
+            toast.show()
+        except Exception as e:
+            logging.error(f"Error showing toast notification: {e}")
+            # Fallback to system tray notification if toast fails
+            self.tray_icon.showMessage(title, message, QSystemTrayIcon.MessageIcon.Information, duration)
+
     def setup_tray_icon(self):
         """Setup system tray icon and menu"""
         self.tray_icon = QSystemTrayIcon(self)
@@ -483,21 +521,21 @@ class VATSIMMonitor(QApplication):
         # Show notification if status changed
         if tower_online != previous_status:
             if tower_online:
-                message = f"{controller_info.get('callsign', 'Unknown')} is now online!"
-                if controller_info.get("name"):
-                    message += f"\nController: {controller_info['name']}"
-                self.tray_icon.showMessage(
+                callsign = controller_info.get('callsign', 'Unknown')
+                controller_name = controller_info.get('name', 'Unknown Controller')
+                message = f"{callsign} is now online! - Controller: {controller_name}"
+                self.show_toast_notification(
                     "KOAK Tower Online!",
                     message,
-                    QSystemTrayIcon.MessageIcon.Information,
-                    3000,
+                    ToastPreset.SUCCESS,
+                    3000
                 )
             else:
-                self.tray_icon.showMessage(
+                self.show_toast_notification(
                     "KOAK Tower Offline",
                     "No tower controller found",
-                    QSystemTrayIcon.MessageIcon.Warning,
-                    3000,
+                    ToastPreset.WARNING,
+                    3000
                 )
 
     def on_force_check_completed(self, tower_online, controller_info):
@@ -513,21 +551,21 @@ class VATSIMMonitor(QApplication):
 
         # Always show notification for force checks
         if tower_online:
-            message = f"{controller_info.get('callsign', 'Unknown')} is online"
-            if controller_info.get("name"):
-                message += f"\nController: {controller_info['name']}"
-            self.tray_icon.showMessage(
+            callsign = controller_info.get('callsign', 'Unknown')
+            controller_name = controller_info.get('name', 'Unknown Controller')
+            message = f"{callsign} is online\nController: {controller_name}"
+            self.show_toast_notification(
                 "KOAK Tower Status",
                 message,
-                QSystemTrayIcon.MessageIcon.Information,
-                3000,
+                ToastPreset.SUCCESS,
+                3000
             )
         else:
-            self.tray_icon.showMessage(
+            self.show_toast_notification(
                 "KOAK Tower Status",
                 "No tower controller found",
-                QSystemTrayIcon.MessageIcon.Information,
-                3000,
+                ToastPreset.INFORMATION,
+                3000
             )
 
     def on_error(self, error_message):
@@ -577,11 +615,11 @@ class VATSIMMonitor(QApplication):
             logging.info("Requesting immediate check...")
             self.worker.force_check_requested.emit()
         else:
-            self.tray_icon.showMessage(
+            self.show_toast_notification(
                 "Monitor Not Running",
                 "Start monitoring first",
-                QSystemTrayIcon.MessageIcon.Warning,
-                2000,
+                ToastPreset.WARNING,
+                2000
             )
 
     def show_status(self):
@@ -598,11 +636,11 @@ class VATSIMMonitor(QApplication):
             self.worker.set_interval(dialog.new_interval)
             logging.info(f"Check interval updated to {dialog.new_interval} seconds")
 
-            self.tray_icon.showMessage(
+            self.show_toast_notification(
                 "Settings Updated",
                 f"Check interval set to {dialog.new_interval} seconds",
-                QSystemTrayIcon.MessageIcon.Information,
-                2000,
+                ToastPreset.SUCCESS,
+                2000
             )
 
     def quit_application(self):
