@@ -10,6 +10,8 @@ import logging
 import atexit
 from utils import acquire_instance_lock, release_instance_lock
 from vatsim_monitor import VATSIMMonitor
+from config import load_config
+from updater import check_for_updates
 
 # Configure logging
 logging.basicConfig(
@@ -41,6 +43,26 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
 
     try:
+        # Load configuration for update check
+        config = load_config()
+        
+        # Check for updates before starting the application
+        try:
+            success, message, updated = check_for_updates(config)
+            if updated:
+                logging.info(f"Application updated: {message}")
+                print(f"Application updated: {message}")
+                print("Please restart the application to use the new version.")
+                release_instance_lock()
+                sys.exit(0)
+            elif not success:
+                logging.warning(f"Update check failed: {message}")
+            else:
+                logging.info(f"Update check: {message}")
+        except Exception as e:
+            logging.error(f"Update check error: {e}")
+            # Continue with application startup even if update check fails
+
         app = VATSIMMonitor(sys.argv)
 
         logging.info(f"Starting VATSIM {app.display_name} Monitor...")

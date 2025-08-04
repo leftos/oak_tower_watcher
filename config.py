@@ -27,6 +27,10 @@ def load_config():
             "display_name": "Oakland Tower",
         },
         "monitoring": {"check_interval": 30},
+        "auto_update": {
+            "enabled": True,
+            "github_repo": "leftos/oak_tower_watcher",
+        },
         "callsigns": {
             "main_facility": [r"^OAK_(?:\d+_)?TWR$"],
             "supporting_above": [r"^NCT_APP$", r"^OAK_\d+_CTR$"],
