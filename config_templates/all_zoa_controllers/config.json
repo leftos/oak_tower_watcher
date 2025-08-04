@@ -1,0 +1,122 @@
+{
+  "airport": {
+    "code": "vZOA",
+    "name": "Oakland ARTCC",
+    "display_name": "vZOA Controllers"
+  },
+  "monitoring": {
+    "check_interval": 30
+  },
+  "callsigns": {
+    "main_facility": [
+      "^NLC_(?:[A-Z0-9]_)?TWR$",
+      "^OAK_(?:[A-Z0-9]_)?TWR$",
+      "^SFO_(?:[A-Z0-9]_)?TWR$",
+      "^APC_TWR$",
+      "^BAB_TWR$",
+      "^BAY_TWR$",
+      "^CCR_TWR$",
+      "^CIC_TWR$",
+      "^HWD_TWR$",
+      "^KWA_TWR$",
+      "^LVK_TWR$",
+      "^MCC_TWR$",
+      "^MER_TWR$",
+      "^MHR_TWR$",
+      "^NUQ_TWR$",
+      "^PAO_TWR$",
+      "^RDD_TWR$",
+      "^RHV_TWR$",
+      "^RNO_TWR$",
+      "^SAC_TWR$",
+      "^SCK_TWR$",
+      "^SJC_TWR$",
+      "^SMF_TWR$",
+      "^SNS_TWR$",
+      "^SQL_TWR$",
+      "^STS_TWR$",
+      "^SUU_TWR$",
+      "^TRK_TWR$"
+    ],
+      "supporting_above": [
+      "^OAK_\\d+_CTR$",
+      "^SFO_(?:[A-Z0-9]_)?APP$",
+      "^OAK_(?:[A-Z0-9]_)?APP$",
+      "^SJC_(?:[A-Z0-9]_)?APP$",
+      "^FAT_(?:[A-Z0-9]_)?APP$",
+      "^MRY_(?:[A-Z0-9]_)?APP$",
+      "^NCT_(?:[A-Z0-9]_)?APP$",
+      "^SFO_(?:[A-Z0-9]_)?DEP$",
+      "^OAK_(?:[A-Z0-9]_)?DEP$",
+      "^SJC_(?:[A-Z0-9]_)?DEP$",
+      "^FAT_(?:[A-Z0-9]_)?DEP$",
+      "^MRY_(?:[A-Z0-9]_)?DEP$",
+      "^BAY_(?:[A-Z0-9]_)?DEP$",
+      "^NLC_DEP$",
+      "^NCT_DEP$",
+      "^TVL_DEL$",
+      "^NCT_TMU$"
+    ],
+
+    "supporting_below": [
+      "^SFO_(?:[A-Z0-9]_)?GND$",
+      "^OAK_(?:[A-Z0-9]_)?GND$",
+      "^APC_GND$",
+      "^BAB_GND$",
+      "^CCR_GND$",
+      "^CIC_GND$",
+      "^FAT_GND$",
+      "^HWD_GND$",
+      "^KWA_GND$",
+      "^LVK_GND$",
+      "^MCC_GND$",
+      "^MER_GND$",
+      "^MHR_GND$",
+      "^MOD_GND$",
+      "^MRY_GND$",
+      "^NLC_GND$",
+      "^NUQ_GND$",
+      "^PAO_GND$",
+      "^RDD_GND$",
+      "^RHV_GND$",
+      "^RNO_GND$",
+      "^SAC_GND$",
+      "^SCK_GND$",
+      "^SJC_GND$",
+      "^SMF_GND$",
+      "^SNS_GND$",
+      "^SQL_GND$",
+      "^STS_GND$",
+      "^SUU_GND$",
+      "^TRK_GND$",
+      "^FAT_DEL$",
+      "^MRY_DEL$",
+      "^NLC_DEL$",
+      "^OAK_DEL$",
+      "^RNO_DEL$",
+      "^SFO_DEL$",
+      "^SJC_DEL$",
+      "^SMF_DEL$",
+      "^SUU_DEL$",
+      "^TVL_DEL$"
+    ]
+  },
+  "api": {
+    "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
+    "roster_url": "https://oakartcc.org/about/roster"
+  },
+  "notifications": {
+    "sound_enabled": true,
+    "sound_file": "ding.mp3",
+    "toast_duration": 3000
+  },
+  "colors": {
+    "notifications": {
+      "main_facility_and_supporting_above_online": "rgb(75, 0, 130)",
+      "main_facility_online": "rgb(0, 100, 0)",
+      "supporting_above_online": "rgb(184, 134, 11)",
+      "all_offline": "rgb(139, 0, 0)",
+      "error": "rgb(64, 64, 64)"
+    }
+  }
+}
