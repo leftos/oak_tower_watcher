@@ -9,16 +9,16 @@
     "comment": "Check interval in seconds (minimum 30)"
   },
   "callsigns": {
-    "tower": [
+    "main_facility": [
       "OAK_TWR",
       "OAK_1_TWR"
     ],
-    "supporting": [
+    "supporting_above": [
       "NCT_APP",
       "OAK_36_CTR",
       "OAK_62_CTR"
     ],
-    "ground": [
+    "supporting_below": [
       "OAK_GND",
       "OAK_1_GND"
     ]
