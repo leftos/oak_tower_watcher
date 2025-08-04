@@ -14,6 +14,8 @@ import logging
 import os
 import atexit
 import pygame
+import re
+from bs4 import BeautifulSoup
 
 # fcntl is only available on Unix-like systems
 if sys.platform != "win32":
@@ -113,8 +115,8 @@ def release_instance_lock():
 class VATSIMWorker(QThread):
     """Worker thread for VATSIM API calls"""
 
-    status_updated = pyqtSignal(bool, dict)  # tower_online, controller_info
-    force_check_completed = pyqtSignal(bool, dict)  # tower_online, controller_info (always shows notification)
+    status_updated = pyqtSignal(str, dict, dict)  # status, tower_info, supporting_info
+    force_check_completed = pyqtSignal(str, dict, dict)  # status, tower_info, supporting_info
     error_occurred = pyqtSignal(str)
     force_check_requested = pyqtSignal()  # Signal to request immediate check
 
@@ -132,6 +134,13 @@ class VATSIMWorker(QThread):
         self.koak_tower_callsigns = [
             "OAK_TWR",
             "OAK_1_TWR",
+        ]
+        
+        # Supporting facility callsigns
+        self.supporting_callsigns = [
+            "NCT_APP",
+            "OAK_36_CTR",
+            "OAK_62_CTR",
         ]
         
         # Connect the force check signal to the slot
@@ -153,50 +162,83 @@ class VATSIMWorker(QThread):
 
             # Look for KOAK tower controllers
             koak_controllers = []
+            supporting_controllers = []
+            
             for controller in controllers:
                 callsign = controller.get("callsign", "")
+                
+                # Check for tower controllers
                 if any(
                     tower_call in callsign.upper()
                     for tower_call in self.koak_tower_callsigns
                 ):
                     koak_controllers.append(controller)
+                
+                # Check for supporting facility controllers
+                elif any(
+                    support_call in callsign.upper()
+                    for support_call in self.supporting_callsigns
+                ):
+                    supporting_controllers.append(controller)
 
-            return koak_controllers
+            return koak_controllers, supporting_controllers
 
         except requests.exceptions.RequestException as e:
             logging.error(f"Error querying VATSIM API: {e}")
             self.error_occurred.emit(f"API Error: {str(e)}")
-            return None
+            return None, None
         except json.JSONDecodeError as e:
             logging.error(f"Error parsing VATSIM API response: {e}")
             self.error_occurred.emit(f"JSON Error: {str(e)}")
-            return None
+            return None, None
 
     def check_tower_status(self):
         """Check if KOAK tower is online"""
-        controllers = self.query_vatsim_api()
+        tower_controllers, supporting_controllers = self.query_vatsim_api()
 
-        if controllers is None:
+        if tower_controllers is None and supporting_controllers is None:
             # API error - don't change status
             return
 
-        if controllers:
-            controller_info = controllers[0]  # Use first controller found
+        # Determine status based on what's online
+        if tower_controllers and supporting_controllers:
+            # Both tower and supporting facilities online - highest priority
+            status = "tower_and_supporting_online"
+            controller_info = tower_controllers[0]  # Use first controller found
+            supporting_info = supporting_controllers[0]  # Use first supporting controller found
+            logging.info(
+                f"KOAK Tower AND Supporting Facility ONLINE: Tower: {controller_info['callsign']}, "
+                f"Supporting: {supporting_info['callsign']}"
+            )
+        elif tower_controllers:
+            # Tower is online but no supporting facilities
+            status = "tower_online"
+            controller_info = tower_controllers[0]  # Use first controller found
+            supporting_info = {}
             logging.info(
                 f"KOAK Tower ONLINE: {controller_info['callsign']} - {controller_info.get('name', 'Unknown')}"
             )
-            if self.is_force_check:
-                self.force_check_completed.emit(True, controller_info)
-                self.is_force_check = False
-            else:
-                self.status_updated.emit(True, controller_info)
+        elif supporting_controllers:
+            # Tower offline but supporting facilities online
+            status = "supporting_online"
+            controller_info = {}
+            supporting_info = supporting_controllers[0]  # Use first supporting controller found
+            logging.info(
+                f"KOAK Tower OFFLINE but supporting facility ONLINE: "
+                f"{supporting_info['callsign']} - {supporting_info.get('name', 'Unknown')}"
+            )
         else:
-            logging.info("KOAK Tower OFFLINE")
-            if self.is_force_check:
-                self.force_check_completed.emit(False, {})
-                self.is_force_check = False
-            else:
-                self.status_updated.emit(False, {})
+            # Everything offline
+            status = "all_offline"
+            controller_info = {}
+            supporting_info = {}
+            logging.info("KOAK Tower and supporting facilities OFFLINE")
+
+        if self.is_force_check:
+            self.force_check_completed.emit(status, controller_info, supporting_info)
+            self.is_force_check = False
+        else:
+            self.status_updated.emit(status, controller_info, supporting_info)
 
     def request_immediate_check(self):
         """Slot to handle force check requests"""
@@ -401,20 +443,29 @@ class CustomToast(QDialog):
 class StatusDialog(QDialog):
     """Dialog to show current tower status"""
 
-    def __init__(self, tower_online, controller_info, last_check, parent=None):
+    def __init__(self, status, controller_info, supporting_info, last_check, parent=None):
         super().__init__(parent)
         self.setWindowTitle("KOAK Tower Status")
-        self.setFixedSize(400, 300)
+        self.setFixedSize(450, 350)
 
         layout = QVBoxLayout()
 
         # Status header
-        status = "ONLINE" if tower_online else "OFFLINE"
-        color = "🟢" if tower_online else "🔴"
+        if status == "tower_and_supporting_online":
+            status_text = "ONLINE (Full Coverage)"
+            color = "🟣"
+        elif status == "tower_online":
+            status_text = "ONLINE"
+            color = "🟢"
+        elif status == "supporting_online":
+            status_text = "OFFLINE (Supporting Online)"
+            color = "🟡"
+        else:  # all_offline
+            status_text = "OFFLINE"
+            color = "🔴"
 
-        status_label = QLabel(f"{color} KOAK Tower: {status}")
+        status_label = QLabel(f"{color} KOAK Tower: {status_text}")
         status_label.setStyleSheet("font-size: 16px; font-weight: bold; margin: 10px;")
-
         status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(status_label)
 
@@ -422,8 +473,26 @@ class StatusDialog(QDialog):
         details_text = QTextEdit()
         details_text.setReadOnly(True)
 
-        if tower_online and controller_info:
-            details = f"""Controller Information:
+        if status == "tower_and_supporting_online" and controller_info and supporting_info:
+            details = f"""Tower Controller Information:
+
+Callsign: {controller_info.get('callsign', 'Unknown')}
+Name: {controller_info.get('name', 'Unknown')}
+Frequency: {controller_info.get('frequency', 'Unknown')}
+Rating: {controller_info.get('rating', 'Unknown')}
+Logon Time: {controller_info.get('logon_time', 'Unknown')}
+Server: {controller_info.get('server', 'Unknown')}
+
+Supporting Facility Information:
+Callsign: {supporting_info.get('callsign', 'Unknown')}
+Name: {supporting_info.get('name', 'Unknown')}
+Frequency: {supporting_info.get('frequency', 'Unknown')}
+Rating: {supporting_info.get('rating', 'Unknown')}
+Logon Time: {supporting_info.get('logon_time', 'Unknown')}
+Server: {supporting_info.get('server', 'Unknown')}"""
+                
+        elif status == "tower_online" and controller_info:
+            details = f"""Tower Controller Information:
 
 Callsign: {controller_info.get('callsign', 'Unknown')}
 Name: {controller_info.get('name', 'Unknown')}
@@ -431,8 +500,19 @@ Frequency: {controller_info.get('frequency', 'Unknown')}
 Rating: {controller_info.get('rating', 'Unknown')}
 Logon Time: {controller_info.get('logon_time', 'Unknown')}
 Server: {controller_info.get('server', 'Unknown')}"""
+                
+        elif status == "supporting_online" and supporting_info:
+            details = f"""Tower Controller: OFFLINE
+
+Supporting Facility Online:
+Callsign: {supporting_info.get('callsign', 'Unknown')}
+Name: {supporting_info.get('name', 'Unknown')}
+Frequency: {supporting_info.get('frequency', 'Unknown')}
+Rating: {supporting_info.get('rating', 'Unknown')}
+Logon Time: {supporting_info.get('logon_time', 'Unknown')}
+Server: {supporting_info.get('server', 'Unknown')}"""
         else:
-            details = "No KOAK tower controller currently online."
+            details = "No KOAK tower or supporting controllers currently online."
 
         if last_check:
             details += f"\n\nLast checked: {last_check.strftime('%Y-%m-%d %H:%M:%S')}"
@@ -516,6 +596,12 @@ class VATSIMMonitor(QApplication):
         self.last_check = None
         self.monitoring = False
         self._shutting_down = False
+        
+        # Controller name lookup dictionary
+        self.controller_names = {}
+        
+        # Load Oakland ARTCC roster at startup
+        self.load_oakland_roster()
 
         # Setup components
         self.setup_tray_icon()
@@ -539,6 +625,10 @@ class VATSIMMonitor(QApplication):
             brush = QBrush(Qt.GlobalColor.green)
         elif color == "red":
             brush = QBrush(Qt.GlobalColor.red)
+        elif color == "yellow":
+            brush = QBrush(Qt.GlobalColor.yellow)
+        elif color == "purple":
+            brush = QBrush(Qt.GlobalColor.magenta)  # Using magenta for purple
         else:  # gray
             brush = QBrush(Qt.GlobalColor.gray)
 
@@ -548,6 +638,178 @@ class VATSIMMonitor(QApplication):
         painter.end()
 
         return QIcon(pixmap)
+
+    def load_oakland_roster(self):
+        """Load Oakland ARTCC roster to translate CIDs to real names"""
+        try:
+            logging.info("Loading Oakland ARTCC roster...")
+            response = requests.get("https://oakartcc.org/about/roster", timeout=10)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Look for controller information in the roster
+            # Try to find tables or structured data containing CID and names
+            tables = soup.find_all('table')
+            for table in tables:
+                rows = table.find_all('tr')
+                for row in rows:
+                    cells = row.find_all(['td', 'th'])
+                    if len(cells) >= 2:
+                        # Look for patterns that might be CID (numeric) and name
+                        for i, cell in enumerate(cells):
+                            text = cell.get_text(strip=True)
+                            # Check if this looks like a CID (numeric ID)
+                            if text.isdigit() and len(text) >= 6:  # CIDs are typically 6+ digits
+                                cid = text
+                                # Look for name in adjacent cells
+                                for j in range(max(0, i-2), min(len(cells), i+3)):
+                                    if j != i:
+                                        name_text = cells[j].get_text(strip=True)
+                                        # Skip if it's also numeric or empty
+                                        if name_text and not name_text.isdigit() and len(name_text) > 2:
+                                            # Clean up the name (remove extra whitespace, etc.)
+                                            clean_name = re.sub(r'\s+', ' ', name_text).strip()
+                                            if clean_name and not any(char.isdigit() for char in clean_name[:3]):
+                                                # Convert name format to "firstname lastname"
+                                                formatted_name = self.format_controller_name(clean_name)
+                                                self.controller_names[cid] = formatted_name
+                                                break
+            
+            # Also try to find div elements or other structures with controller info
+            # Look for patterns like "John Doe - 1234567" or similar
+            text_content = soup.get_text()
+            # Pattern to match name followed by CID or CID followed by name
+            patterns = [
+                r'([A-Za-z\s]{3,30})\s*[-–]\s*(\d{6,})',  # Name - CID
+                r'(\d{6,})\s*[-–]\s*([A-Za-z\s]{3,30})',  # CID - Name
+            ]
+            
+            for pattern in patterns:
+                matches = re.findall(pattern, text_content)
+                for match in matches:
+                    if match[0].isdigit():  # First group is CID
+                        cid, name = match[0], match[1].strip()
+                    else:  # First group is name
+                        name, cid = match[0].strip(), match[1]
+                    
+                    # Clean up the name
+                    clean_name = re.sub(r'\s+', ' ', name).strip()
+                    if clean_name and len(clean_name) > 2:
+                        # Convert name format to "firstname lastname"
+                        formatted_name = self.format_controller_name(clean_name)
+                        self.controller_names[cid] = formatted_name
+            
+            logging.info(f"Loaded {len(self.controller_names)} controller names from Oakland ARTCC roster")
+            if self.controller_names:
+                logging.debug(f"Sample entries: {dict(list(self.controller_names.items())[:3])}")
+                
+        except Exception as e:
+            logging.warning(f"Could not load Oakland ARTCC roster: {e}")
+            self.controller_names = {}
+
+    def format_controller_name(self, name):
+        """Convert 'lastname, firstname(operatinginitials)' to 'firstname lastname'"""
+        # Check if the name matches the pattern "lastname, firstname(operatinginitials)"
+        match = re.match(r'^([^,]+),\s*([^(]+)(?:\([^)]*\))?', name)
+        if match:
+            lastname = match.group(1).strip()
+            firstname = match.group(2).strip()
+            return f"{firstname} {lastname}"
+        
+        # If it doesn't match the pattern, return the original name
+        return name
+
+    def get_controller_name(self, controller_info):
+        """Get the real name of a controller, using roster lookup if needed"""
+        # First try the name from VATSIM data
+        vatsim_name = controller_info.get('name', '').strip()
+        
+        # If VATSIM name exists and doesn't look like just a number, use it
+        if vatsim_name and not vatsim_name.isdigit() and len(vatsim_name) > 2:
+            return vatsim_name
+        
+        # Otherwise, try to look up by CID in our roster
+        cid = str(controller_info.get('cid', ''))
+        if cid in self.controller_names:
+            return self.controller_names[cid]
+        
+        # Fallback to VATSIM name or "Unknown Controller"
+        return vatsim_name if vatsim_name else 'Unknown Controller'
+
+    def get_transition_notification(self, previous_status, current_status, controller_info, supporting_info):
+        """Generate appropriate notification message based on state transition"""
+        
+        # Handle transitions to full coverage
+        if current_status == "tower_and_supporting_online":
+            tower_callsign = controller_info.get('callsign', 'Unknown')
+            tower_name = self.get_controller_name(controller_info)
+            support_callsign = supporting_info.get('callsign', 'Unknown')
+            support_name = self.get_controller_name(supporting_info)
+            message = f"Tower: {tower_callsign} ({tower_name})\nSupporting: {support_callsign} ({support_name})"
+            
+            if previous_status == "tower_online":
+                title = "Supporting Facilities Now Online!"
+                return title, message, "success"
+            elif previous_status == "supporting_online":
+                title = "Tower Now Online!"
+                return title, message, "success"
+            else:  # from all_offline
+                title = "Full Coverage Online!"
+                return title, message, "success"
+        
+        # Handle transitions to tower only
+        elif current_status == "tower_online":
+            callsign = controller_info.get('callsign', 'Unknown')
+            controller_name = self.get_controller_name(controller_info)
+            
+            if previous_status == "tower_and_supporting_online":
+                title = "Supporting Facilities Now Offline"
+                message = f"Only tower remains online\n{callsign} ({controller_name})"
+                return title, message, "warning"
+            elif previous_status == "supporting_online":
+                title = "Tower Now Online!"
+                message = f"Tower controller is now online\n{callsign} ({controller_name})"
+                return title, message, "success"
+            else:  # from all_offline
+                title = "KOAK Tower Online!"
+                message = f"{callsign} is now online!\nController: {controller_name}"
+                return title, message, "success"
+        
+        # Handle transitions to supporting only
+        elif current_status == "supporting_online":
+            callsign = supporting_info.get('callsign', 'Unknown')
+            controller_name = self.get_controller_name(supporting_info)
+            
+            if previous_status == "tower_and_supporting_online":
+                title = "Tower Now Offline"
+                message = f"Only supporting facility remains online\n{callsign} ({controller_name})"
+                return title, message, "warning"
+            elif previous_status == "tower_online":
+                title = "Tower Now Offline"
+                message = f"Tower went offline, but {callsign} is online\nController: {controller_name}"
+                return title, message, "warning"
+            else:  # from all_offline
+                title = "Supporting Facility Online"
+                message = f"Tower offline, but {callsign} is online\nController: {controller_name}"
+                return title, message, "warning"
+        
+        # Handle transitions to all offline
+        else:  # all_offline
+            if previous_status == "tower_and_supporting_online":
+                title = "All Facilities Now Offline"
+                message = "Both tower and supporting controllers have gone offline"
+            elif previous_status == "tower_online":
+                title = "Tower Now Offline"
+                message = "Tower controller has gone offline"
+            elif previous_status == "supporting_online":
+                title = "Supporting Facility Now Offline"
+                message = "Supporting controller has gone offline"
+            else:
+                title = "All Facilities Offline"
+                message = "No tower or supporting controllers found"
+            
+            return title, message, "error"
 
     def play_notification_sound(self):
         """Play the custom notification sound"""
@@ -641,58 +903,81 @@ class VATSIMMonitor(QApplication):
         self.worker.status_updated.connect(self.on_status_updated)
         self.worker.force_check_completed.connect(self.on_force_check_completed)
         self.worker.error_occurred.connect(self.on_error)
+        
+        # Add supporting facility info
+        self.supporting_info = {}
+        self.current_status = "all_offline"
 
     def tray_icon_activated(self, reason):
         """Handle tray icon activation"""
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             self.show_status()
 
-    def on_status_updated(self, tower_online, controller_info):
+    def on_status_updated(self, status, controller_info, supporting_info):
         """Handle status update from worker thread"""
-        previous_status = self.tower_online
-        self.tower_online = tower_online
+        previous_status = self.current_status
+        self.current_status = status
+        self.tower_online = (status == "tower_online")
         self.controller_info = controller_info
+        self.supporting_info = supporting_info
         self.last_check = datetime.now()
 
-        # Update tray icon
-        color = "green" if tower_online else "red"
+        # Update tray icon based on status
+        if status == "tower_and_supporting_online":
+            color = "purple"
+        elif status == "tower_online":
+            color = "green"
+        elif status == "supporting_online":
+            color = "yellow"
+        else:  # all_offline
+            color = "red"
+        
         self.tray_icon.setIcon(self.create_icon(color))
 
         # Show notification if status changed
-        if tower_online != previous_status:
-            if tower_online:
-                callsign = controller_info.get('callsign', 'Unknown')
-                controller_name = controller_info.get('name', 'Unknown Controller')
-                message = f"{callsign} is now online!\nController: {controller_name}"
-                self.show_toast_notification(
-                    "KOAK Tower Online!",
-                    message,
-                    "success",
-                    3000
-                )
-            else:
-                self.show_toast_notification(
-                    "KOAK Tower Offline",
-                    "No tower controller found",
-                    "warning",
-                    3000
-                )
+        if status != previous_status:
+            title, message, toast_type = self.get_transition_notification(
+                previous_status, status, controller_info, supporting_info
+            )
+            self.show_toast_notification(title, message, toast_type, 3000)
 
-    def on_force_check_completed(self, tower_online, controller_info):
+    def on_force_check_completed(self, status, controller_info, supporting_info):
         """Handle force check completion - always show notification"""
         # Update internal state
-        self.tower_online = tower_online
+        self.current_status = status
+        self.tower_online = (status == "tower_online")
         self.controller_info = controller_info
+        self.supporting_info = supporting_info
         self.last_check = datetime.now()
 
-        # Update tray icon
-        color = "green" if tower_online else "red"
+        # Update tray icon based on status
+        if status == "tower_and_supporting_online":
+            color = "purple"
+        elif status == "tower_online":
+            color = "green"
+        elif status == "supporting_online":
+            color = "yellow"
+        else:  # all_offline
+            color = "red"
+        
         self.tray_icon.setIcon(self.create_icon(color))
 
         # Always show notification for force checks
-        if tower_online:
+        if status == "tower_and_supporting_online":
+            tower_callsign = controller_info.get('callsign', 'Unknown')
+            tower_name = self.get_controller_name(controller_info)
+            support_callsign = supporting_info.get('callsign', 'Unknown')
+            support_name = self.get_controller_name(supporting_info)
+            message = f"Tower: {tower_callsign} ({tower_name})\nSupporting: {support_callsign} ({support_name})"
+            self.show_toast_notification(
+                "KOAK Tower Status",
+                message,
+                "success",
+                3000
+            )
+        elif status == "tower_online":
             callsign = controller_info.get('callsign', 'Unknown')
-            controller_name = controller_info.get('name', 'Unknown Controller')
+            controller_name = self.get_controller_name(controller_info)
             message = f"{callsign} is online\nController: {controller_name}"
             self.show_toast_notification(
                 "KOAK Tower Status",
@@ -700,10 +985,20 @@ class VATSIMMonitor(QApplication):
                 "success",
                 3000
             )
-        else:
+        elif status == "supporting_online":
+            callsign = supporting_info.get('callsign', 'Unknown')
+            controller_name = self.get_controller_name(supporting_info)
+            message = f"Tower offline, but {callsign} is online\nController: {controller_name}"
             self.show_toast_notification(
                 "KOAK Tower Status",
-                "No tower controller found",
+                message,
+                "warning",
+                3000
+            )
+        else:  # all_offline
+            self.show_toast_notification(
+                "KOAK Tower Status",
+                "No controllers found",
                 "info",
                 3000
             )
@@ -765,7 +1060,7 @@ class VATSIMMonitor(QApplication):
     def show_status(self):
         """Show status dialog"""
         dialog = StatusDialog(
-            self.tower_online, self.controller_info, self.last_check, None
+            self.current_status, self.controller_info, self.supporting_info, self.last_check, None
         )
         dialog.exec()
 
