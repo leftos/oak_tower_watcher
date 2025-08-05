@@ -47,7 +47,7 @@ def load_config():
         },
         "pushover": {
             "enabled": False,
-            "api_token": "am21ryz2rtugefmga1tcyn6jisgvv1",
+            "api_token": "",
             "user_key": "",
             "priority_levels": {
                 "main_facility_and_supporting_above_online": 1,

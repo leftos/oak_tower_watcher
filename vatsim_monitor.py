@@ -853,6 +853,7 @@ class VATSIMMonitor(QApplication):
             if dialog.pushover_settings_changed:
                 pushover_config = self.config.setdefault("pushover", {})
                 pushover_config["enabled"] = dialog.new_pushover_enabled
+                pushover_config["api_token"] = dialog.new_api_token
                 pushover_config["user_key"] = dialog.new_user_key
                 
                 # Reinitialize Pushover service

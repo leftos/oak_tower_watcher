@@ -7,6 +7,7 @@ A configurable system tray application that monitors VATSIM for tower controller
 - **Real-time Monitoring**: Continuously monitors VATSIM API for configurable tower controllers
 - **System Tray Integration**: Runs quietly in the system tray with color-coded status indicators
 - **Smart Notifications**: Custom toast notifications with sound alerts for status changes
+- **Push Notifications**: Optional Pushover integration for mobile/desktop push notifications
 - **Multiple Controller Types**: Monitors tower, supporting facilities, and ground controllers
 - **Controller Information**: Displays detailed controller information including callsign, name, frequency, and more
 - **ARTCC Integration**: Automatically fetches controller names from configurable ARTCC roster
@@ -145,7 +146,8 @@ Right-click the system tray icon to access:
 
 - **KOAK Tower Status**: View detailed controller information
 - **Check Now**: Force an immediate status check
-- **Settings**: Adjust monitoring interval
+- **Settings**: Adjust monitoring interval and configure Pushover notifications
+- **Test Pushover**: Send a test push notification (if configured)
 - **Start/Stop Monitoring**: Control the monitoring service
 - **Exit**: Close the application
 
@@ -194,6 +196,73 @@ Sound notifications can be configured in the `config.json` file:
 - `sound_enabled`: Enable/disable notification sounds
 - `sound_file`: Name of the audio file (must be in the same directory)
 - `toast_duration`: Duration of toast notifications in milliseconds
+
+### Pushover Notifications
+
+The application supports push notifications via Pushover. To enable Pushover notifications, you'll need to:
+
+1. Create a Pushover account at [pushover.net](https://pushover.net)
+2. Create an application in your Pushover dashboard to get an API token
+3. Note your user key from your Pushover dashboard
+
+Configure Pushover in the application settings:
+
+```json
+{
+  "pushover": {
+    "enabled": true,
+    "api_token": "your_application_api_token_here",
+    "user_key": "your_user_key_here",
+    "priority_levels": {
+      "main_facility_and_supporting_above_online": 1,
+      "main_facility_online": 0,
+      "supporting_above_online": 0,
+      "all_offline": 0,
+      "error": -1
+    },
+    "sounds": {
+      "main_facility_and_supporting_above_online": "magic",
+      "main_facility_online": "pushover",
+      "supporting_above_online": "intermission",
+      "all_offline": "falling",
+      "error": "none"
+    }
+  }
+}
+```
+
+#### Pushover Configuration Options
+
+- `enabled`: Enable/disable Pushover notifications
+- `api_token`: Your Pushover application API token (required)
+- `user_key`: Your Pushover user key (required)
+- `priority_levels`: Notification priority (-2 to 2, 0 is normal)
+- `sounds`: Notification sound (see Pushover documentation for available sounds)
+
+#### Using the Settings Dialog
+
+You can configure Pushover through the application's Settings dialog:
+
+1. Right-click the system tray icon
+2. Select "Settings"
+3. Configure Pushover settings in the "Pushover Notifications" section
+4. Click "Test Pushover" to verify your configuration
+5. Click "Save" to apply changes
+
+#### Priority Levels
+
+The application automatically sets appropriate priority levels based on status:
+- **High Priority (1)**: Full coverage online (tower + supporting facilities)
+- **Normal Priority (0)**: Tower online, supporting facilities online, or facilities offline
+- **Low Priority (-1)**: Error conditions
+
+#### Testing Pushover
+
+You can test your Pushover configuration in two ways:
+1. **Settings Dialog**: Click "Test Pushover" in the settings
+2. **System Tray Menu**: Right-click the tray icon and select "Test Pushover"
+
+**Important**: You must provide your own Pushover API token and user key. The application does not include any pre-configured tokens to prevent abuse and ensure security.
 
 ### API Endpoints
 

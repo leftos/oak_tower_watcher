@@ -347,6 +347,12 @@ class SettingsDialog(QDialog):
         self.pushover_enabled.setChecked(pushover_config.get("enabled", False))
         pushover_layout.addRow("Enable Pushover:", self.pushover_enabled)
         
+        # API token input
+        self.api_token_input = QLineEdit(pushover_config.get("api_token", ""))
+        self.api_token_input.setPlaceholderText("Enter your Pushover API token")
+        self.api_token_input.setEchoMode(QLineEdit.EchoMode.Password)
+        pushover_layout.addRow("API Token:", self.api_token_input)
+        
         # User key input
         self.user_key_input = QLineEdit(pushover_config.get("user_key", ""))
         self.user_key_input.setPlaceholderText("Enter your Pushover user key")
@@ -380,20 +386,19 @@ class SettingsDialog(QDialog):
     def test_pushover(self):
         """Test Pushover configuration"""
         try:
+            api_token = self.api_token_input.text().strip()
             user_key = self.user_key_input.text().strip()
+            
+            if not api_token:
+                QMessageBox.warning(self, "Missing API Token", "Please enter your Pushover API token first.")
+                return
+                
             if not user_key:
                 QMessageBox.warning(self, "Missing User Key", "Please enter your Pushover user key first.")
                 return
                 
             # Create temporary pushover service for testing
             from pushover_service import PushoverService
-            pushover_config = self.config.get("pushover", {})
-            api_token = pushover_config.get("api_token", "")
-            
-            if not api_token:
-                QMessageBox.warning(self, "Missing API Token", "Pushover API token not configured.")
-                return
-                
             test_service = PushoverService(api_token, user_key)
             
             # First validate the user key
@@ -443,16 +448,19 @@ class SettingsDialog(QDialog):
             # Check if pushover settings changed
             pushover_config = self.config.get("pushover", {})
             old_enabled = pushover_config.get("enabled", False)
+            old_api_token = pushover_config.get("api_token", "")
             old_user_key = pushover_config.get("user_key", "")
             
             new_enabled = self.pushover_enabled.isChecked()
+            new_api_token = self.api_token_input.text().strip()
             new_user_key = self.user_key_input.text().strip()
             
-            if old_enabled != new_enabled or old_user_key != new_user_key:
+            if old_enabled != new_enabled or old_api_token != new_api_token or old_user_key != new_user_key:
                 self.pushover_settings_changed = True
                 
             self.new_interval = interval
             self.new_pushover_enabled = new_enabled
+            self.new_api_token = new_api_token
             self.new_user_key = new_user_key
             
             self.accept()
