@@ -37,8 +37,13 @@ COPY config/ config/
 COPY config.sample.json .
 COPY docker-entrypoint.sh .
 
-# Note: We don't switch to non-root user here because the entrypoint script
-# needs to set permissions first, then it will switch to the vatsim user
+# Make entrypoint script executable and create logs directory
+RUN chmod +x docker-entrypoint.sh && \
+    mkdir -p logs && \
+    chown -R vatsim:vatsim /app
+
+# Switch to non-root user
+USER vatsim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
