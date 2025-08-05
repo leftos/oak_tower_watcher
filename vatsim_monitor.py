@@ -30,6 +30,7 @@ from utils import (
 )
 from vatsim_worker import VATSIMWorker
 from gui_components import CustomToast, StatusDialog, SettingsDialog
+from pushover_service import create_pushover_service, get_priority_for_status, get_sound_for_status
 
 
 class VATSIMMonitor(QApplication):
@@ -74,6 +75,7 @@ class VATSIMMonitor(QApplication):
         # Setup components
         self.setup_tray_icon()
         self.setup_worker()
+        self.setup_pushover()
 
         # Don't quit when last window closes (for tray apps)
         self.setQuitOnLastWindowClosed(False)
@@ -452,6 +454,50 @@ class VATSIMMonitor(QApplication):
         except Exception as e:
             logging.error(f"Error playing notification sound: {e}")
 
+    def setup_pushover(self):
+        """Setup Pushover notification service"""
+        self.pushover_service = create_pushover_service(self.config)
+        if self.pushover_service:
+            logging.info("Pushover service initialized")
+        else:
+            logging.info("Pushover service not configured or disabled")
+
+    def send_pushover_notification(self, title: str, message: str, status: str):
+        """Send a Pushover notification if configured"""
+        if not self.pushover_service:
+            return
+
+        try:
+            # Get priority and sound based on status
+            priority = get_priority_for_status(status)
+            sound = get_sound_for_status(status)
+            
+            # Override with config values if available
+            pushover_config = self.config.get("pushover", {})
+            priority_levels = pushover_config.get("priority_levels", {})
+            sounds = pushover_config.get("sounds", {})
+            
+            if status in priority_levels:
+                priority = priority_levels[status]
+            if status in sounds:
+                sound = sounds[status]
+
+            # Send the notification
+            result = self.pushover_service.send_notification(
+                message=message,
+                title=title,
+                priority=priority,
+                sound=sound
+            )
+            
+            if result["success"]:
+                logging.info(f"Pushover notification sent: {title}")
+            else:
+                logging.error(f"Pushover notification failed: {result['error']}")
+                
+        except Exception as e:
+            logging.error(f"Error sending Pushover notification: {e}")
+
     def show_toast_notification(
         self, title, message, toast_type="success", duration=None, status=None
     ):
@@ -509,6 +555,11 @@ class VATSIMMonitor(QApplication):
         settings_action = QAction("Settings", self)
         settings_action.triggered.connect(self.show_settings)
         tray_menu.addAction(settings_action)
+
+        # Test Pushover action
+        test_pushover_action = QAction("Test Pushover", self)
+        test_pushover_action.triggered.connect(self.test_pushover)
+        tray_menu.addAction(test_pushover_action)
 
         tray_menu.addSeparator()
 
@@ -659,6 +710,9 @@ class VATSIMMonitor(QApplication):
                 supporting_below_controllers,
             )
             self.show_toast_notification(title, message, toast_type, 3000, status)
+            
+            # Send Pushover notification if configured
+            self.send_pushover_notification(title, message, status)
 
     def on_force_check_completed(
         self, status, controller_info, supporting_info, supporting_below_controllers
@@ -784,23 +838,85 @@ class VATSIMMonitor(QApplication):
 
     def show_settings(self):
         """Show settings dialog"""
-        dialog = SettingsDialog(self.worker.check_interval, None)
+        dialog = SettingsDialog(self.worker.check_interval, self.config, self.pushover_service, None)
         if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Update monitoring interval
             self.worker.set_interval(dialog.new_interval)
-
-            # Update config and save it
             self.config["monitoring"]["check_interval"] = dialog.new_interval
-            save_config(self.config)
 
+            # Update Pushover settings if changed
+            if dialog.pushover_settings_changed:
+                pushover_config = self.config.setdefault("pushover", {})
+                pushover_config["enabled"] = dialog.new_pushover_enabled
+                pushover_config["user_key"] = dialog.new_user_key
+                
+                # Reinitialize Pushover service
+                self.setup_pushover()
+                
+                logging.info(f"Pushover settings updated - Enabled: {dialog.new_pushover_enabled}")
+
+            # Save config
+            save_config(self.config)
             logging.info(f"Check interval updated to {dialog.new_interval} seconds")
 
+            # Show confirmation
+            message = f"Check interval set to {dialog.new_interval} seconds"
+            if dialog.pushover_settings_changed:
+                pushover_status = "enabled" if dialog.new_pushover_enabled else "disabled"
+                message += f"\nPushover notifications {pushover_status}"
+                
             self.show_toast_notification(
                 "Settings Updated",
-                f"Check interval set to {dialog.new_interval} seconds",
+                message,
                 "success",
-                2000,
+                3000,
                 self.current_status,
             )
+
+    def test_pushover(self):
+        """Test Pushover notification from system tray menu"""
+        if not self.pushover_service:
+            self.show_toast_notification(
+                "Pushover Not Configured",
+                "Please configure Pushover in Settings first",
+                "warning",
+                3000,
+                "error"
+            )
+            return
+            
+        try:
+            result = self.pushover_service.send_test_notification()
+            
+            if result["success"]:
+                self.show_toast_notification(
+                    "Pushover Test Successful",
+                    "Test notification sent! Check your device.",
+                    "success",
+                    3000,
+                    "main_facility_online"
+                )
+                logging.info("Pushover test notification sent successfully")
+            else:
+                self.show_toast_notification(
+                    "Pushover Test Failed",
+                    f"Failed to send test: {result['error']}",
+                    "error",
+                    4000,
+                    "error"
+                )
+                logging.error(f"Pushover test failed: {result['error']}")
+                
+        except Exception as e:
+            error_msg = f"Test error: {str(e)}"
+            self.show_toast_notification(
+                "Pushover Test Error",
+                error_msg,
+                "error",
+                4000,
+                "error"
+            )
+            logging.error(f"Pushover test error: {e}")
 
     def quit_application(self):
         """Quit the application"""

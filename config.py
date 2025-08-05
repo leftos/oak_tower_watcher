@@ -45,6 +45,25 @@ def load_config():
             "sound_file": "ding.mp3",
             "toast_duration": 3000,
         },
+        "pushover": {
+            "enabled": False,
+            "api_token": "am21ryz2rtugefmga1tcyn6jisgvv1",
+            "user_key": "",
+            "priority_levels": {
+                "main_facility_and_supporting_above_online": 1,
+                "main_facility_online": 0,
+                "supporting_above_online": 0,
+                "all_offline": 0,
+                "error": -1
+            },
+            "sounds": {
+                "main_facility_and_supporting_above_online": "magic",
+                "main_facility_online": "pushover",
+                "supporting_above_online": "intermission",
+                "all_offline": "falling",
+                "error": "none"
+            }
+        },
         "colors": {
             "notifications": {
                 "main_facility_and_supporting_above_online": "rgb(75, 0, 130)",

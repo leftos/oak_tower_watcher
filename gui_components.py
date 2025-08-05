@@ -14,6 +14,9 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QTextEdit,
     QApplication,
+    QCheckBox,
+    QGroupBox,
+    QFormLayout,
 )
 from PyQt6.QtCore import (
     Qt,
@@ -313,20 +316,49 @@ Server: {controller.get('server', 'Unknown')}
 class SettingsDialog(QDialog):
     """Dialog for application settings"""
 
-    def __init__(self, current_interval, parent=None):
+    def __init__(self, current_interval, config, pushover_service=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("VATSIM Monitor Settings")
-        self.setFixedSize(300, 150)
+        self.setFixedSize(450, 400)
+        self.config = config
+        self.pushover_service = pushover_service
 
         layout = QVBoxLayout()
 
-        # Interval setting
-        interval_layout = QHBoxLayout()
-        interval_layout.addWidget(QLabel("Check Interval (seconds):"))
-
+        # Monitoring settings group
+        monitoring_group = QGroupBox("Monitoring Settings")
+        monitoring_layout = QFormLayout()
+        
         self.interval_input = QLineEdit(str(current_interval))
-        interval_layout.addWidget(self.interval_input)
-        layout.addLayout(interval_layout)
+        monitoring_layout.addRow("Check Interval (seconds):", self.interval_input)
+        
+        monitoring_group.setLayout(monitoring_layout)
+        layout.addWidget(monitoring_group)
+
+        # Pushover settings group
+        pushover_group = QGroupBox("Pushover Notifications")
+        pushover_layout = QFormLayout()
+        
+        # Get current pushover config
+        pushover_config = self.config.get("pushover", {})
+        
+        # Enable/disable checkbox
+        self.pushover_enabled = QCheckBox()
+        self.pushover_enabled.setChecked(pushover_config.get("enabled", False))
+        pushover_layout.addRow("Enable Pushover:", self.pushover_enabled)
+        
+        # User key input
+        self.user_key_input = QLineEdit(pushover_config.get("user_key", ""))
+        self.user_key_input.setPlaceholderText("Enter your Pushover user key")
+        pushover_layout.addRow("User Key:", self.user_key_input)
+        
+        # Test button
+        self.test_pushover_button = QPushButton("Test Pushover")
+        self.test_pushover_button.clicked.connect(self.test_pushover)
+        pushover_layout.addRow("", self.test_pushover_button)
+        
+        pushover_group.setLayout(pushover_layout)
+        layout.addWidget(pushover_group)
 
         # Buttons
         button_layout = QHBoxLayout()
@@ -343,17 +375,87 @@ class SettingsDialog(QDialog):
         self.setLayout(layout)
 
         self.new_interval = current_interval
+        self.pushover_settings_changed = False
+
+    def test_pushover(self):
+        """Test Pushover configuration"""
+        try:
+            user_key = self.user_key_input.text().strip()
+            if not user_key:
+                QMessageBox.warning(self, "Missing User Key", "Please enter your Pushover user key first.")
+                return
+                
+            # Create temporary pushover service for testing
+            from pushover_service import PushoverService
+            pushover_config = self.config.get("pushover", {})
+            api_token = pushover_config.get("api_token", "")
+            
+            if not api_token:
+                QMessageBox.warning(self, "Missing API Token", "Pushover API token not configured.")
+                return
+                
+            test_service = PushoverService(api_token, user_key)
+            
+            # First validate the user key
+            validation_result = test_service.validate_user_key()
+            if not validation_result["success"]:
+                QMessageBox.warning(
+                    self,
+                    "Invalid User Key",
+                    f"User key validation failed: {validation_result['error']}"
+                )
+                return
+            
+            # Send test notification
+            result = test_service.send_test_notification()
+            
+            if result["success"]:
+                QMessageBox.information(
+                    self,
+                    "Test Successful",
+                    "Test notification sent successfully! Check your device."
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Test Failed",
+                    f"Failed to send test notification: {result['error']}"
+                )
+                
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Test Error",
+                f"An error occurred during testing: {str(e)}"
+            )
 
     def save_settings(self):
         """Save settings and close dialog"""
         try:
+            # Validate interval
             interval = int(self.interval_input.text())
-            if interval >= 30:
-                self.new_interval = interval
-                self.accept()
-            else:
+            if interval < 30:
                 QMessageBox.warning(
                     self, "Invalid Input", "Check interval must be at least 30 seconds."
                 )
+                return
+                
+            # Check if pushover settings changed
+            pushover_config = self.config.get("pushover", {})
+            old_enabled = pushover_config.get("enabled", False)
+            old_user_key = pushover_config.get("user_key", "")
+            
+            new_enabled = self.pushover_enabled.isChecked()
+            new_user_key = self.user_key_input.text().strip()
+            
+            if old_enabled != new_enabled or old_user_key != new_user_key:
+                self.pushover_settings_changed = True
+                
+            self.new_interval = interval
+            self.new_pushover_enabled = new_enabled
+            self.new_user_key = new_user_key
+            
+            self.accept()
+            
         except ValueError:
-            QMessageBox.warning(self, "Invalid Input", "Please enter a valid number.")
+            QMessageBox.warning(self, "Invalid Input", "Please enter a valid number for check interval.")
