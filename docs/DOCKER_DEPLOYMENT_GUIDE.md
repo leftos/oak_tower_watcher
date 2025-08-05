@@ -45,17 +45,17 @@ This guide will help you deploy the headless VATSIM Tower Monitor using Docker, 
 4. **Build and start the service**:
    ```bash
    # Build the image (required on first run or after code changes)
-   docker-compose build
+   docker compose build
    
    # Start the service
-   docker-compose up -d
+   docker compose up -d
    ```
    
    **Note**: The container will automatically create a `config.json` file from the sample if one doesn't exist. Your environment variables will be injected into this configuration.
 
 5. **Check the logs**:
    ```bash
-   docker-compose logs -f
+   docker compose logs -f
    ```
 
 ### Method 2: Using Docker Run
@@ -130,7 +130,7 @@ The Docker container can be configured to start automatically when your system b
 
 ### Method 1: Using Docker's Built-in Restart Policy (Recommended)
 
-The [`docker-compose.yml`](../docker-compose.yml) already includes `restart: unless-stopped`, which means:
+The [`docker compose.yml`](../docker compose.yml) already includes `restart: unless-stopped`, which means:
 - The container will restart automatically if it crashes
 - The container will start when Docker starts (after system boot)
 - The container will NOT restart if you manually stop it
@@ -190,21 +190,21 @@ After reboot, the container should start automatically within a few minutes.
 
 ```bash
 # Start the service
-docker-compose up -d
+docker compose up -d
 
 # Stop the service
-docker-compose down
+docker compose down
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Restart the service
-docker-compose restart
+docker compose restart
 
 # Update the service (after pulling new code)
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ### Docker Commands
@@ -274,8 +274,8 @@ cd oak_tower_watcher
 git pull origin main
 
 # Git automatically converts line endings correctly
-docker-compose build --no-cache
-docker-compose up -d
+docker compose build --no-cache
+docker compose up -d
 ```
 
 **Solution 2: Use the Automated Git Deployment Script**
@@ -295,8 +295,8 @@ chmod +x fix_line_endings.sh
 ./fix_line_endings.sh /path/to/your/project
 
 # Then rebuild the container
-docker-compose build --no-cache
-docker-compose up -d
+docker compose build --no-cache
+docker compose up -d
 ```
 
 **Solution 4: Manual Fix**
@@ -313,8 +313,8 @@ dos2unix docker-entrypoint.sh
 chmod +x docker-entrypoint.sh
 
 # Rebuild the container
-docker-compose build --no-cache
-docker-compose up -d
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ### Docker Permission Issues (Linux)
@@ -339,8 +339,8 @@ docker --version
 **Solution 2: Use sudo (Temporary fix)**
 ```bash
 # Prefix all docker commands with sudo
-sudo docker-compose up -d
-sudo docker-compose logs -f
+sudo docker compose up -d
+sudo docker compose logs -f
 ```
 
 **Solution 3: Fix socket permissions**
@@ -353,7 +353,7 @@ sudo chmod 666 /var/run/docker.sock
 
 1. **Check Docker logs**:
    ```bash
-   docker-compose logs
+   docker compose logs
    # or
    docker logs vatsim-tower-monitor
    ```
@@ -369,7 +369,7 @@ sudo chmod 666 /var/run/docker.sock
 1. **Verify Pushover credentials** in your `.env` file or `config.json`
 2. **Check container logs** for Pushover errors:
    ```bash
-   docker-compose logs | grep -i pushover
+   docker compose logs | grep -i pushover
    ```
 3. **Test Pushover manually** by restarting the container (it sends a test notification on startup)
 
@@ -385,13 +385,13 @@ sudo chmod 666 /var/run/docker.sock
 
 1. **Restart the container** after configuration changes:
    ```bash
-   docker-compose restart
+   docker compose restart
    ```
 
 2. **For major changes**, rebuild the container:
    ```bash
-   docker-compose down
-   docker-compose up -d --build
+   docker compose down
+   docker compose up -d --build
    ```
 
 ## Security Considerations
@@ -399,7 +399,7 @@ sudo chmod 666 /var/run/docker.sock
 - The container runs as a non-root user (`vatsim`)
 - No ports are exposed (outbound-only service)
 - Configuration files can be mounted read-only
-- Resource limits are set in docker-compose.yml
+- Resource limits are set in docker compose.yml
 - Logs are rotated automatically
 
 ## Updating
@@ -411,9 +411,9 @@ sudo chmod 666 /var/run/docker.sock
 git pull
 
 # Rebuild and restart
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ### Using Docker

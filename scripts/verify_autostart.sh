@@ -26,15 +26,15 @@ echo ""
 
 # Check Docker Compose restart policy
 echo "2. Checking Docker Compose restart policy..."
-if [ -f "docker-compose.yml" ]; then
-    if grep -q "restart: unless-stopped" docker-compose.yml; then
+if [ -f "docker compose.yml" ]; then
+    if grep -q "restart: unless-stopped" docker compose.yml; then
         echo "   ✅ Container has 'restart: unless-stopped' policy"
     else
         echo "   ❌ Container does NOT have proper restart policy"
-        echo "   Add 'restart: unless-stopped' to your docker-compose.yml"
+        echo "   Add 'restart: unless-stopped' to your docker compose.yml"
     fi
 else
-    echo "   ❌ docker-compose.yml not found in current directory"
+    echo "   ❌ docker compose.yml not found in current directory"
 fi
 
 echo ""
@@ -66,7 +66,7 @@ if docker ps --format "table {{.Names}}\t{{.Status}}" | grep -q "vatsim-tower-mo
     docker ps --format "table {{.Names}}\t{{.Status}}" | grep "vatsim-tower-monitor"
 else
     echo "   ❌ Container is NOT running"
-    echo "   Run: docker-compose up -d"
+    echo "   Run: docker compose up -d"
 fi
 
 echo ""
@@ -93,6 +93,6 @@ echo "   - Container has restart policy ✓"
 echo "   - Container was running when system shut down"
 echo ""
 echo "💡 To test auto-start:"
-echo "   1. Make sure container is running: docker-compose up -d"
+echo "   1. Make sure container is running: docker compose up -d"
 echo "   2. Reboot your system: sudo reboot"
 echo "   3. After reboot, check: docker ps"

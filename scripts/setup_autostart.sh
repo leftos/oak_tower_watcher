@@ -24,7 +24,7 @@ if ! systemctl is-active --quiet docker; then
 fi
 
 # Check if Docker Compose is available
-if ! command -v docker-compose &> /dev/null; then
+if ! command -v docker compose &> /dev/null; then
     echo "Error: Docker Compose is not installed. Please install Docker Compose first."
     exit 1
 fi
@@ -62,7 +62,7 @@ echo "Available commands:"
 echo "  Start service:    sudo systemctl start vatsim-monitor-docker"
 echo "  Stop service:     sudo systemctl stop vatsim-monitor-docker"
 echo "  Check status:     sudo systemctl status vatsim-monitor-docker"
-echo "  View logs:        docker-compose logs -f"
+echo "  View logs:        docker compose logs -f"
 echo "  Disable autostart: sudo systemctl disable vatsim-monitor-docker"
 echo ""
 echo "To start the service now, run:"

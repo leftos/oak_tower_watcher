@@ -126,12 +126,12 @@ For headless monitoring (no GUI), Docker provides the easiest cross-platform dep
    scripts\deploy_docker.bat
    
    # Or manually
-   docker-compose up -d
+   docker compose up -d
    ```
 
 4. **Monitor**:
    ```bash
-   docker-compose logs -f
+   docker compose logs -f
    ```
 
 See the [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT_GUIDE.md) for detailed instructions.

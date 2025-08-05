@@ -61,16 +61,16 @@ check_prerequisites() {
         exit 1
     fi
     
-    if ! command_exists docker-compose; then
-        print_warning "docker-compose not found, trying docker compose..."
+    if ! command_exists docker compose; then
+        print_warning "docker compose not found, trying docker compose..."
         if ! docker compose version >/dev/null 2>&1; then
-            print_error "Neither docker-compose nor 'docker compose' is available."
+            print_error "Neither docker compose nor 'docker compose' is available."
             exit 1
         else
             DOCKER_COMPOSE_CMD="docker compose"
         fi
     else
-        DOCKER_COMPOSE_CMD="docker-compose"
+        DOCKER_COMPOSE_CMD="docker compose"
     fi
     
     print_success "Prerequisites check passed"

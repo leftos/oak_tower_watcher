@@ -18,20 +18,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Check if docker-compose is available
-docker-compose --version >nul 2>&1
+REM Check if docker compose is available
+docker compose --version >nul 2>&1
 if errorlevel 1 (
-    echo [INFO] docker-compose not found, trying 'docker compose'...
+    echo [INFO] docker compose not found, trying 'docker compose'...
     docker compose version >nul 2>&1
     if errorlevel 1 (
-        echo [ERROR] Neither docker-compose nor 'docker compose' is available
+        echo [ERROR] Neither docker compose nor 'docker compose' is available
         pause
         exit /b 1
     ) else (
         set DOCKER_COMPOSE_CMD=docker compose
     )
 ) else (
-    set DOCKER_COMPOSE_CMD=docker-compose
+    set DOCKER_COMPOSE_CMD=docker compose
 )
 
 echo [SUCCESS] Prerequisites check passed
