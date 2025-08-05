@@ -37,16 +37,6 @@ COPY config/ config/
 COPY config.sample.json .
 COPY docker-entrypoint.sh .
 
-# Convert line endings and make entrypoint script executable
-RUN apt-get update && apt-get install -y dos2unix su-exec && \
-    dos2unix docker-entrypoint.sh && \
-    chmod +x docker-entrypoint.sh && \
-    mkdir -p logs && \
-    chown -R vatsim:vatsim /app && \
-    apt-get remove -y dos2unix && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/*
-
 # Note: We don't switch to non-root user here because the entrypoint script
 # needs to set permissions first, then it will switch to the vatsim user
 
