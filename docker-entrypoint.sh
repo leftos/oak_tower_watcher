@@ -98,4 +98,4 @@ chmod 644 /app/logs/vatsim_monitor_headless.log 2>/dev/null || true
 log "Configuration complete, starting monitor..."
 
 # Switch to vatsim user and execute the main command
-exec su-exec vatsim "$@"
+exec "$@"
