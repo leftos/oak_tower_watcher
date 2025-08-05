@@ -48,8 +48,11 @@ echo "Installing Python dependencies..."
 pip install --upgrade pip
 pip install requests beautifulsoup4
 
-# Create application files directory
-mkdir -p app
+# Note: Additional dependencies will be installed from requirements_headless.txt
+# when the application files are uploaded
+
+# Create application files directory with proper structure
+mkdir -p app/src app/config app/logs
 cd app
 
 echo "Application setup complete for vatsim user."
@@ -57,28 +60,39 @@ EOF
 
 echo "=== Manual Steps Required ==="
 echo ""
-echo "1. Copy your application files to /opt/vatsim-monitor/app/"
-echo "   Required files:"
-echo "   - headless_monitor.py"
-echo "   - headless_worker.py"
-echo "   - notification_manager.py"
-echo "   - config.py"
-echo "   - utils.py"
-echo "   - pushover_service.py"
-echo "   - config.json (with your settings)"
+echo "1. Create and upload your deployment package:"
+echo "   Run: python scripts/create_deployment_package.py"
+echo "   Then upload: scp -r deployment_package username@YOUR_DROPLET_IP:/tmp/"
 echo ""
-echo "2. Set up the systemd service:"
-echo "   sudo cp vatsim-monitor.service /etc/systemd/system/"
+echo "   Or manually copy files maintaining directory structure:"
+echo "   - headless_monitor.py -> /opt/vatsim-monitor/app/"
+echo "   - src/headless_worker.py -> /opt/vatsim-monitor/app/src/"
+echo "   - src/notification_manager.py -> /opt/vatsim-monitor/app/src/"
+echo "   - src/utils.py -> /opt/vatsim-monitor/app/src/"
+echo "   - src/pushover_service.py -> /opt/vatsim-monitor/app/src/"
+echo "   - config/config.py -> /opt/vatsim-monitor/app/config/"
+echo "   - config/requirements_headless.txt -> /opt/vatsim-monitor/app/config/"
+echo "   - config.json -> /opt/vatsim-monitor/app/"
+echo ""
+echo "2. Move files to application directory:"
+echo "   sudo cp -r /tmp/deployment_package/* /opt/vatsim-monitor/app/"
+echo "   sudo chown -R vatsim:vatsim /opt/vatsim-monitor/app/"
+echo ""
+echo "3. Install additional Python dependencies:"
+echo "   sudo -u vatsim bash -c 'cd /opt/vatsim-monitor && source venv/bin/activate && pip install -r app/config/requirements_headless.txt'"
+echo ""
+echo "4. Set up the systemd service:"
+echo "   sudo cp /opt/vatsim-monitor/app/config/vatsim-monitor.service /etc/systemd/system/"
 echo "   sudo systemctl daemon-reload"
 echo "   sudo systemctl enable vatsim-monitor"
 echo ""
-echo "3. Configure your settings in /opt/vatsim-monitor/app/config.json"
+echo "5. Configure your settings in /opt/vatsim-monitor/app/config.json"
 echo "   Make sure to set up your Pushover API credentials!"
 echo ""
-echo "4. Start the service:"
+echo "6. Start the service:"
 echo "   sudo systemctl start vatsim-monitor"
 echo ""
-echo "5. Check service status:"
+echo "7. Check service status:"
 echo "   sudo systemctl status vatsim-monitor"
 echo "   sudo journalctl -u vatsim-monitor -f"
 echo ""

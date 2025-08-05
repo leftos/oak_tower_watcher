@@ -19,7 +19,7 @@ import logging
 
 def load_config():
     """Load configuration from config.json file"""
-    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
     default_config = {
         "airport": {
             "code": "KOAK",
@@ -93,7 +93,7 @@ def load_config():
 
 def save_config(config):
     """Save configuration to config.json file"""
-    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
     try:
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)

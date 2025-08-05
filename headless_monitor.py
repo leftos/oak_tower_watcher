@@ -12,10 +12,10 @@ import atexit
 import time
 import os
 from datetime import datetime
-from utils import load_artcc_roster
-from config import load_config
-from headless_worker import HeadlessVATSIMWorker
-from notification_manager import NotificationManager
+from src.utils import load_artcc_roster
+from config.config import load_config
+from src.headless_worker import HeadlessVATSIMWorker
+from src.notification_manager import NotificationManager
 
 # Headless-specific instance locking (uses /tmp for lock file)
 if sys.platform != "win32":
@@ -201,7 +201,7 @@ def main():
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
-            logging.FileHandler("vatsim_monitor_headless.log"),
+            logging.FileHandler("logs/vatsim_monitor_headless.log"),
             logging.StreamHandler()
         ],
     )

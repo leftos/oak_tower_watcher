@@ -50,7 +50,7 @@ This guide will help you deploy the headless VATSIM Tower Monitor on a DigitalOc
 
 1. **Download the deployment script**:
    ```bash
-   wget https://raw.githubusercontent.com/YOUR_REPO/oak_tower_watcher/main/deploy_to_droplet.sh
+   wget https://raw.githubusercontent.com/YOUR_REPO/oak_tower_watcher/main/scripts/deploy_to_droplet.sh
    chmod +x deploy_to_droplet.sh
    ```
 
@@ -69,32 +69,41 @@ This guide will help you deploy the headless VATSIM Tower Monitor on a DigitalOc
 ## Step 4: Upload Application Files
 
 1. **Create a local deployment package** on your Windows machine:
-   ```bash
-   # In your project directory
-   mkdir deployment_package
-   cp headless_monitor.py deployment_package/
-   cp headless_worker.py deployment_package/
-   cp notification_manager.py deployment_package/
-   cp config.py deployment_package/
-   cp utils.py deployment_package/
-   cp pushover_service.py deployment_package/
-   cp config.json deployment_package/
-   cp vatsim-monitor.service deployment_package/
-   ```
+    
+    **Option A: Use the automated script (Recommended)**:
+    ```bash
+    # In your project directory
+    python scripts/create_deployment_package.py
+    ```
+    This script will automatically create a `deployment_package/` directory with the proper structure.
+    
+    **Option B: Manual creation**:
+    ```bash
+    # In your project directory
+    mkdir -p deployment_package/src deployment_package/config deployment_package/logs
+    cp headless_monitor.py deployment_package/
+    cp src/headless_worker.py deployment_package/src/
+    cp src/notification_manager.py deployment_package/src/
+    cp src/utils.py deployment_package/src/
+    cp src/pushover_service.py deployment_package/src/
+    cp config/config.py deployment_package/config/
+    cp config/requirements_headless.txt deployment_package/config/
+    cp config/vatsim-monitor.service deployment_package/config/
+    cp config.json deployment_package/
+    ```
 
-2. **Upload files to the droplet** using SCP:
-   ```bash
-   scp -r deployment_package/* username@YOUR_DROPLET_IP:/tmp/
-   ```
+2. **Upload the deployment package to the droplet** using SCP:
+    ```bash
+    scp -r deployment_package username@YOUR_DROPLET_IP:/tmp/
+    ```
 
-3. **Move files to the application directory**:
-   ```bash
-   ssh username@YOUR_DROPLET_IP
-   sudo cp /tmp/*.py /opt/vatsim-monitor/app/
-   sudo cp /tmp/config.json /opt/vatsim-monitor/app/
-   sudo cp /tmp/vatsim-monitor.service /tmp/
-   sudo chown -R vatsim:vatsim /opt/vatsim-monitor/app/
-   ```
+3. **Move files to the application directory maintaining structure**:
+    ```bash
+    ssh username@YOUR_DROPLET_IP
+    sudo cp -r /tmp/deployment_package/* /opt/vatsim-monitor/app/
+    sudo cp /tmp/deployment_package/config/vatsim-monitor.service /tmp/
+    sudo chown -R vatsim:vatsim /opt/vatsim-monitor/app/
+    ```
 
 ## Step 5: Configure Pushover
 
@@ -194,11 +203,11 @@ This guide will help you deploy the headless VATSIM Tower Monitor on a DigitalOc
    ```bash
    sudo systemctl stop vatsim-monitor
    ```
-3. **Copy new files**:
-   ```bash
-   sudo cp /tmp/*.py /opt/vatsim-monitor/app/
-   sudo chown -R vatsim:vatsim /opt/vatsim-monitor/app/
-   ```
+3. **Copy new files maintaining structure**:
+    ```bash
+    sudo cp -r /tmp/deployment_package/* /opt/vatsim-monitor/app/
+    sudo chown -R vatsim:vatsim /opt/vatsim-monitor/app/
+    ```
 4. **Start the service**:
    ```bash
    sudo systemctl start vatsim-monitor

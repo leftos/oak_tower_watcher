@@ -8,16 +8,16 @@ import sys
 import signal
 import logging
 import atexit
-from utils import acquire_instance_lock, release_instance_lock
+from src.utils import acquire_instance_lock, release_instance_lock
 from vatsim_monitor import VATSIMMonitor
-from config import load_config
-from updater import check_for_updates
+from config.config import load_config
+from src.updater import check_for_updates
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("vatsim_monitor.log"), logging.StreamHandler()],
+    handlers=[logging.FileHandler("logs/vatsim_monitor.log"), logging.StreamHandler()],
 )
 
 

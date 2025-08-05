@@ -29,7 +29,7 @@ class GitHubUpdater:
         self.repo_name = repo_name
         self.current_version = current_version
         self.github_api_base = "https://api.github.com"
-        self.script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Go up one level from src/
         
     def get_latest_release(self):
         """
@@ -130,7 +130,7 @@ class GitHubUpdater:
     
     def backup_current_files(self):
         """
-        Create backup of current files
+        Create backup of current files with organized structure
         
         Returns:
             str: Path to backup directory or None if failed
@@ -138,18 +138,30 @@ class GitHubUpdater:
         try:
             backup_dir = os.path.join(self.script_dir, f"backup_{int(os.path.getmtime(self.script_dir))}")
             
-            # Files to backup
+            # Files to backup with their relative paths
             files_to_backup = [
-                'main.py', 'config.py', 'vatsim_monitor.py', 'vatsim_worker.py',
-                'gui_components.py', 'utils.py', 'requirements.txt'
+                # Entry points (root level)
+                'main.py', 'vatsim_monitor.py', 'headless_monitor.py',
+                # Config files
+                'config/config.py', 'config/requirements.txt', 'config/requirements_headless.txt',
+                # Source files
+                'src/vatsim_worker.py', 'src/gui_components.py', 'src/utils.py',
+                'src/updater.py', 'src/headless_worker.py', 'src/notification_manager.py',
+                'src/pushover_service.py',
+                # User config
+                'config.json'
             ]
             
             os.makedirs(backup_dir, exist_ok=True)
             
-            for file_name in files_to_backup:
-                src_path = os.path.join(self.script_dir, file_name)
+            for file_path in files_to_backup:
+                src_path = os.path.join(self.script_dir, file_path)
                 if os.path.exists(src_path):
-                    dst_path = os.path.join(backup_dir, file_name)
+                    # Create subdirectories in backup if needed
+                    dst_path = os.path.join(backup_dir, file_path)
+                    dst_dir = os.path.dirname(dst_path)
+                    if dst_dir:
+                        os.makedirs(dst_dir, exist_ok=True)
                     shutil.copy2(src_path, dst_path)
             
             logging.info(f"Created backup at {backup_dir}")
@@ -161,7 +173,7 @@ class GitHubUpdater:
     
     def apply_update(self, update_dir):
         """
-        Apply update by copying new files over current ones
+        Apply update by copying new files over current ones with organized structure
         
         Args:
             update_dir (str): Directory containing update files
@@ -170,19 +182,30 @@ class GitHubUpdater:
             bool: True if successful
         """
         try:
-            # Files to update
+            # Files to update with their relative paths
             files_to_update = [
-                'main.py', 'config.py', 'vatsim_monitor.py', 'vatsim_worker.py',
-                'gui_components.py', 'utils.py', 'requirements.txt', 'updater.py'
+                # Entry points (root level)
+                'main.py', 'vatsim_monitor.py', 'headless_monitor.py',
+                # Config files
+                'config/config.py', 'config/requirements.txt', 'config/requirements_headless.txt',
+                # Source files
+                'src/vatsim_worker.py', 'src/gui_components.py', 'src/utils.py',
+                'src/updater.py', 'src/headless_worker.py', 'src/notification_manager.py',
+                'src/pushover_service.py'
+                # Note: config.json is not updated to preserve user settings
             ]
             
-            for file_name in files_to_update:
-                src_path = os.path.join(update_dir, file_name)
-                dst_path = os.path.join(self.script_dir, file_name)
+            for file_path in files_to_update:
+                src_path = os.path.join(update_dir, file_path)
+                dst_path = os.path.join(self.script_dir, file_path)
                 
                 if os.path.exists(src_path):
+                    # Create subdirectories if needed
+                    dst_dir = os.path.dirname(dst_path)
+                    if dst_dir and not os.path.exists(dst_dir):
+                        os.makedirs(dst_dir, exist_ok=True)
                     shutil.copy2(src_path, dst_path)
-                    logging.info(f"Updated {file_name}")
+                    logging.info(f"Updated {file_path}")
             
             return True
             
@@ -299,7 +322,7 @@ def get_current_version():
             ['git', 'describe', '--tags', '--abbrev=0'],
             capture_output=True,
             text=True,
-            cwd=os.path.dirname(__file__)
+            cwd=os.path.dirname(os.path.dirname(__file__))  # Go up one level from src/
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -307,7 +330,7 @@ def get_current_version():
         pass
     
     # Try to read from version file
-    version_file = os.path.join(os.path.dirname(__file__), 'VERSION')
+    version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'docs', 'VERSION')
     if os.path.exists(version_file):
         try:
             with open(version_file, 'r') as f:

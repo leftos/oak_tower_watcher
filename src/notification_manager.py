@@ -6,8 +6,8 @@ Handles notification logic and formatting that can be shared between GUI and hea
 
 import logging
 from datetime import datetime
-from utils import get_controller_name, get_controller_initials
-from pushover_service import create_pushover_service, get_priority_for_status, get_sound_for_status
+from .utils import get_controller_name, get_controller_initials
+from .pushover_service import create_pushover_service, get_priority_for_status, get_sound_for_status
 
 
 class NotificationManager:

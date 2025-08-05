@@ -26,7 +26,7 @@ from PyQt6.QtCore import (
     QEasingCurve,
 )
 from PyQt6.QtGui import QFont
-from utils import translate_controller_rating, calculate_time_online
+from .utils import translate_controller_rating, calculate_time_online
 
 
 class CustomToast(QDialog):
@@ -398,7 +398,7 @@ class SettingsDialog(QDialog):
                 return
                 
             # Create temporary pushover service for testing
-            from pushover_service import PushoverService
+            from .pushover_service import PushoverService
             test_service = PushoverService(api_token, user_key)
             
             # First validate the user key

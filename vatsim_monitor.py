@@ -21,16 +21,16 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QAction, QIcon, QPixmap, QPainter, QBrush, QPen, QColor
 from PyQt6.QtCore import Qt
 
-from config import load_config, save_config
-from utils import (
+from config.config import load_config, save_config
+from src.utils import (
     darken_color_for_notification,
     load_artcc_roster,
     get_controller_name,
     get_controller_initials,
 )
-from vatsim_worker import VATSIMWorker
-from gui_components import CustomToast, StatusDialog, SettingsDialog
-from pushover_service import create_pushover_service, get_priority_for_status, get_sound_for_status
+from src.vatsim_worker import VATSIMWorker
+from src.gui_components import CustomToast, StatusDialog, SettingsDialog
+from src.pushover_service import create_pushover_service, get_priority_for_status, get_sound_for_status
 
 
 class VATSIMMonitor(QApplication):
@@ -132,7 +132,7 @@ class VATSIMMonitor(QApplication):
         """
         try:
             # Load the original airport tower image
-            tower_path = os.path.join(os.path.dirname(__file__), "airport-tower.png")
+            tower_path = os.path.join(os.path.dirname(__file__), "assets", "airport-tower.png")
             if not os.path.exists(tower_path):
                 logging.warning(
                     f"Airport tower icon not found at {tower_path}, falling back to circle"
@@ -437,7 +437,7 @@ class VATSIMMonitor(QApplication):
                 return
 
             sound_file = notifications_config.get("sound_file", "ding.mp3")
-            sound_path = os.path.join(os.path.dirname(__file__), sound_file)
+            sound_path = os.path.join(os.path.dirname(__file__), "assets", sound_file)
             if os.path.exists(sound_path):
                 if not hasattr(self, "_vlc_instance") or self._vlc_instance is None:
                     self._vlc_instance = vlc.Instance()
