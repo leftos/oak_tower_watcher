@@ -300,7 +300,7 @@ class VATSIMMonitor(QApplication):
         self.controller_names = load_artcc_roster(roster_url)
 
     def format_supporting_below_controllers_info(self, supporting_below_controllers):
-        """Format supporting below controllers information for display"""
+        """Format supporting below controllers information for notifications (with full names)"""
         if not supporting_below_controllers:
             return ""
 
@@ -311,9 +311,9 @@ class VATSIMMonitor(QApplication):
             supporting_below_info.append(f"{callsign} ({name})")
 
         if len(supporting_below_info) == 1:
-            return f"\nSupporting Below: {supporting_below_info[0]}"
+            return f"\nBelow: {supporting_below_info[0]}"
         else:
-            return f"\nSupporting Below: {', '.join(supporting_below_info)}"
+            return f"\nBelow: {', '.join(supporting_below_info)}"
 
     def format_multiple_controllers_info(self, controllers, prefix=""):
         """Format multiple controllers information for display"""
@@ -616,7 +616,7 @@ class VATSIMMonitor(QApplication):
         if self.current_status == "main_facility_and_supporting_above_online":
             # Show first controller from each with initials
             main_text = self._format_controller_for_tooltip(self.controller_info, "Main")
-            support_text = self._format_controller_for_tooltip(self.supporting_info, "Support")
+            support_text = self._format_controller_for_tooltip(self.supporting_info, "Above")
             tooltip = f"{airport}: ONLINE (Full)\n{main_text}\n{support_text}"
         elif self.current_status == "main_facility_online":
             # Show main facility controller with initials
@@ -624,10 +624,15 @@ class VATSIMMonitor(QApplication):
             tooltip = f"{airport}: ONLINE\n{controller_text}"
         elif self.current_status == "supporting_above_online":
             # Show supporting facility with initials
-            support_text = self._format_controller_for_tooltip(self.supporting_info, "Support")
+            support_text = self._format_controller_for_tooltip(self.supporting_info, "Above")
             tooltip = f"{airport}: OFFLINE\n{support_text}"
         else:  # all_offline
             tooltip = f"{airport}: OFFLINE"
+
+        # Add supporting below controller info if available
+        if self.supporting_below_controllers:
+            below_text = self._format_controller_for_tooltip(self.supporting_below_controllers, "Below")
+            tooltip += f"\n{below_text}"
 
         self.tray_icon.setToolTip(tooltip)
 
