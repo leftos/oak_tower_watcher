@@ -92,6 +92,7 @@ This guide will help you deploy the headless VATSIM Tower Monitor on a DigitalOc
    ssh username@YOUR_DROPLET_IP
    sudo cp /tmp/*.py /opt/vatsim-monitor/app/
    sudo cp /tmp/config.json /opt/vatsim-monitor/app/
+   sudo cp /tmp/vatsim-monitor.service /tmp/
    sudo chown -R vatsim:vatsim /opt/vatsim-monitor/app/
    ```
 
@@ -124,6 +125,13 @@ This guide will help you deploy the headless VATSIM Tower Monitor on a DigitalOc
 
 1. **Install the service file**:
    ```bash
+   sudo cp /tmp/vatsim-monitor.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   ```
+   
+   **Note**: If you already installed the service file earlier, make sure to copy the updated version and reload:
+   ```bash
+   sudo systemctl stop vatsim-monitor
    sudo cp /tmp/vatsim-monitor.service /etc/systemd/system/
    sudo systemctl daemon-reload
    ```
