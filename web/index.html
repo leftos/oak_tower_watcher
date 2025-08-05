@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Services Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏢 Server Services Dashboard</h1>
+            <p>Welcome to our monitoring and service management portal</p>
+        </header>
+
+        <main>
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="service-icon">🏗️</div>
+                    <h2>OAK Tower Watcher</h2>
+                    <p>Real-time monitoring of Oakland International Airport (KOAK) tower controllers on the VATSIM network</p>
+                    <div class="service-features">
+                        <span class="feature">Live Status</span>
+                        <span class="feature">Push Notifications</span>
+                        <span class="feature">Controller Info</span>
+                    </div>
+                    <a href="oak-tower-status.html" class="btn btn-primary">View Status</a>
+                </div>
+
+                <div class="service-card">
+                    <div class="service-icon">📊</div>
+                    <h2>System Monitor</h2>
+                    <p>Server health monitoring and performance metrics</p>
+                    <div class="service-features">
+                        <span class="feature">CPU Usage</span>
+                        <span class="feature">Memory Stats</span>
+                        <span class="feature">Disk Space</span>
+                    </div>
+                    <a href="#" class="btn btn-secondary">Coming Soon</a>
+                </div>
+
+                <div class="service-card">
+                    <div class="service-icon">🔧</div>
+                    <h2>Service Management</h2>
+                    <p>Start, stop, and configure running services</p>
+                    <div class="service-features">
+                        <span class="feature">Service Control</span>
+                        <span class="feature">Configuration</span>
+                        <span class="feature">Logs</span>
+                    </div>
+                    <a href="#" class="btn btn-secondary">Coming Soon</a>
+                </div>
+
+                <div class="service-card">
+                    <div class="service-icon">📈</div>
+                    <h2>Analytics</h2>
+                    <p>Usage statistics and historical data analysis</p>
+                    <div class="service-features">
+                        <span class="feature">Usage Trends</span>
+                        <span class="feature">Reports</span>
+                        <span class="feature">Alerts</span>
+                    </div>
+                    <a href="#" class="btn btn-secondary">Coming Soon</a>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 Server Services Dashboard | Last updated: <span id="last-updated"></span></p>
+        </footer>
+    </div>
+
+    <script>
+        // Update last updated timestamp
+        document.getElementById('last-updated').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html>

@@ -13,3 +13,5 @@ logs/*
 releases/
 deployment_package/
 *.zip
+
+qdrant_storage/
