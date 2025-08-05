@@ -26,6 +26,7 @@ from utils import (
     darken_color_for_notification,
     load_artcc_roster,
     get_controller_name,
+    get_controller_initials,
 )
 from vatsim_worker import VATSIMWorker
 from gui_components import CustomToast, StatusDialog, SettingsDialog
@@ -555,58 +556,63 @@ class VATSIMMonitor(QApplication):
     def update_tray_tooltip(self):
         """Update the system tray icon tooltip with current status"""
         if not hasattr(self, "current_status"):
-            self.tray_icon.setToolTip(
-                f"VATSIM {self.display_name} Monitor - Starting..."
-            )
+            self.tray_icon.setToolTip(f"VATSIM {self.airport_code} - Starting...")
             return
 
-        if self.current_status == "main_facility_and_supporting_above_online":
-            if hasattr(self, "controller_info") and hasattr(self, "supporting_info"):
-                main_facility_info = self.format_multiple_controllers_info(
-                    self.controller_info
-                )
-                support_info = self.format_multiple_controllers_info(
-                    self.supporting_info
-                )
-                tooltip = (
-                    f"{self.display_name}: ONLINE (Full Coverage)\n"
-                    f"Main Facility: {main_facility_info}\n"
-                    f"Supporting Above: {support_info}"
-                )
-            else:
-                tooltip = f"{self.display_name}: ONLINE (Full Coverage)"
-        elif self.current_status == "main_facility_online":
-            if hasattr(self, "controller_info") and self.controller_info:
-                main_facility_info = self.format_multiple_controllers_info(
-                    self.controller_info
-                )
-                tooltip = (
-                    f"{self.display_name}: ONLINE\nController: {main_facility_info}"
-                )
-            else:
-                tooltip = f"{self.display_name}: ONLINE"
-        elif self.current_status == "supporting_above_online":
-            if hasattr(self, "supporting_info") and self.supporting_info:
-                support_info = self.format_multiple_controllers_info(
-                    self.supporting_info
-                )
-                tooltip = f"{self.display_name}: OFFLINE\nSupporting Above: {support_info} ONLINE"
-            else:
-                tooltip = f"{self.display_name}: OFFLINE (Supporting Above Online)"
-        else:  # all_offline
-            tooltip = f"{self.display_name}: OFFLINE"
+        # Use airport code instead of full display name for brevity
+        airport = self.airport_code
 
-        # Add supporting below controller info if available
-        if (
-            hasattr(self, "supporting_below_controllers")
-            and self.supporting_below_controllers
-        ):
-            supporting_below_info = self.format_supporting_below_controllers_info(
-                self.supporting_below_controllers
-            )
-            tooltip += supporting_below_info
+        if self.current_status == "main_facility_and_supporting_above_online":
+            # Show first controller from each with initials
+            main_text = self._format_controller_for_tooltip(self.controller_info, "Main")
+            support_text = self._format_controller_for_tooltip(self.supporting_info, "Support")
+            tooltip = f"{airport}: ONLINE (Full)\n{main_text}\n{support_text}"
+        elif self.current_status == "main_facility_online":
+            # Show main facility controller with initials
+            controller_text = self._format_controller_for_tooltip(self.controller_info)
+            tooltip = f"{airport}: ONLINE\n{controller_text}"
+        elif self.current_status == "supporting_above_online":
+            # Show supporting facility with initials
+            support_text = self._format_controller_for_tooltip(self.supporting_info, "Support")
+            tooltip = f"{airport}: OFFLINE\n{support_text}"
+        else:  # all_offline
+            tooltip = f"{airport}: OFFLINE"
 
         self.tray_icon.setToolTip(tooltip)
+
+    def _format_controller_for_tooltip(self, controller_info, prefix=""):
+        """Format controller info for tooltip display with operating initials"""
+        if not controller_info:
+            return f"{prefix}: None" if prefix else "None"
+
+        # Handle both list and single controller formats
+        controllers = controller_info if isinstance(controller_info, list) else [controller_info]
+        
+        if not controllers:
+            return f"{prefix}: None" if prefix else "None"
+
+        # Get first controller
+        first_controller = controllers[0]
+        callsign = first_controller.get("callsign", "Unknown")
+        
+        # Get operating initials from roster
+        initials = get_controller_initials(first_controller, self.controller_names)
+        
+        # Format the display text
+        if initials:
+            controller_text = f"{callsign} ({initials})"
+        else:
+            controller_text = callsign
+            
+        # Add count if multiple controllers
+        if len(controllers) > 1:
+            controller_text += f" +{len(controllers)-1}"
+            
+        # Add prefix if provided
+        if prefix:
+            return f"{prefix}: {controller_text}"
+        else:
+            return controller_text
 
     def tray_icon_activated(self, reason):
         """Handle tray icon activation"""

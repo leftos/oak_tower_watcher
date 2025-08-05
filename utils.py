@@ -204,15 +204,13 @@ def load_artcc_roster(roster_url):
                                                     char.isdigit()
                                                     for char in clean_name[:3]
                                                 ):
-                                                    # Convert name format to "firstname lastname"
-                                                    formatted_name = (
+                                                    # Convert name format to "firstname lastname" and extract initials
+                                                    formatted_data = (
                                                         format_controller_name(
                                                             clean_name
                                                         )
                                                     )
-                                                    controller_names[cid] = (
-                                                        formatted_name
-                                                    )
+                                                    controller_names[cid] = formatted_data
                                                     break
 
         # Also try to find div elements or other structures with controller info
@@ -235,9 +233,9 @@ def load_artcc_roster(roster_url):
                 # Clean up the name
                 clean_name = re.sub(r"\s+", " ", name).strip()
                 if clean_name and len(clean_name) > 2:
-                    # Convert name format to "firstname lastname"
-                    formatted_name = format_controller_name(clean_name)
-                    controller_names[cid] = formatted_name
+                    # Convert name format to "firstname lastname" and extract initials
+                    formatted_data = format_controller_name(clean_name)
+                    controller_names[cid] = formatted_data
 
         logging.info(
             f"Loaded {len(controller_names)} controller names from ARTCC roster"
@@ -253,16 +251,18 @@ def load_artcc_roster(roster_url):
 
 
 def format_controller_name(name):
-    """Convert 'lastname, firstname(operatinginitials)' to 'firstname lastname'"""
+    """Convert 'lastname, firstname(operatinginitials)' to 'firstname lastname' and extract initials"""
     # Check if the name matches the pattern "lastname, firstname(operatinginitials)"
-    match = re.match(r"^([^,]+),\s*([^(]+)(?:\([^)]*\))?", name)
+    match = re.match(r"^([^,]+),\s*([^(]+)(?:\(([^)]*)\))?", name)
     if match:
         lastname = match.group(1).strip()
         firstname = match.group(2).strip()
-        return f"{firstname} {lastname}"
+        initials = match.group(3).strip() if match.group(3) else None
+        formatted_name = f"{firstname} {lastname}"
+        return {"name": formatted_name, "initials": initials}
 
-    # If it doesn't match the pattern, return the original name
-    return name
+    # If it doesn't match the pattern, return the original name without initials
+    return {"name": name, "initials": None}
 
 
 def get_controller_name(controller_info, controller_names):
@@ -270,17 +270,32 @@ def get_controller_name(controller_info, controller_names):
     # First try the name from VATSIM data
     vatsim_name = controller_info.get("name", "").strip()
 
+    # Try to look up by CID in our roster first (for initials)
+    cid = str(controller_info.get("cid", ""))
+    if cid in controller_names:
+        roster_data = controller_names[cid]
+        if isinstance(roster_data, dict):
+            return roster_data["name"]
+        else:
+            # Handle legacy string format
+            return roster_data
+
     # If VATSIM name exists and doesn't look like just a number, use it
     if vatsim_name and not vatsim_name.isdigit() and len(vatsim_name) > 2:
         return vatsim_name
 
-    # Otherwise, try to look up by CID in our roster
+    # Fallback to "Unknown Controller"
+    return "Unknown Controller"
+
+
+def get_controller_initials(controller_info, controller_names):
+    """Get the operating initials of a controller from roster lookup"""
     cid = str(controller_info.get("cid", ""))
     if cid in controller_names:
-        return controller_names[cid]
-
-    # Fallback to VATSIM name or "Unknown Controller"
-    return vatsim_name if vatsim_name else "Unknown Controller"
+        roster_data = controller_names[cid]
+        if isinstance(roster_data, dict):
+            return roster_data.get("initials")
+    return None
 
 
 def calculate_time_online(logon_time_str):
