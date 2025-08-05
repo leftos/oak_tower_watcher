@@ -617,7 +617,7 @@ class VATSIMMonitor(QApplication):
             # Show first controller from each with initials
             main_text = self._format_controller_for_tooltip(self.controller_info, "Main")
             support_text = self._format_controller_for_tooltip(self.supporting_info, "Above")
-            tooltip = f"{airport}: ONLINE (Full)\n{main_text}\n{support_text}"
+            tooltip = f"{airport}: ONLINE (Full)\n{support_text}\n{main_text}"
         elif self.current_status == "main_facility_online":
             # Show main facility controller with initials
             controller_text = self._format_controller_for_tooltip(self.controller_info)
