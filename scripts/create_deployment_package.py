@@ -45,7 +45,7 @@ def create_deployment_package():
         
         # Configuration files (from config/) - maintain in config/
         ("config/config.py", "config/config.py"),
-        ("config/requirements_headless.txt", "config/requirements_headless.txt"),
+        ("requirements_headless.txt", "requirements_headless.txt"),
         ("config/vatsim-monitor.service", "config/vatsim-monitor.service"),
         
         # User configuration (from root)
