@@ -1,0 +1,3 @@
+# Core dependencies for Headless VATSIM Tower Monitor (no GUI)
+requests>=2.25.0
+beautifulsoup4>=4.9.0

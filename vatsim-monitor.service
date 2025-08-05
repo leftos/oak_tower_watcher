@@ -1,0 +1,33 @@
+[Unit]
+Description=VATSIM Tower Monitor (Headless)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=vatsim
+Group=vatsim
+WorkingDirectory=/opt/vatsim-monitor
+ExecStart=/opt/vatsim-monitor/venv/bin/python /opt/vatsim-monitor/headless_monitor.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vatsim-monitor
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/vatsim-monitor
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

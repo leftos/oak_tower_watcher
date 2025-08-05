@@ -1,0 +1,20 @@
+2025-08-05 08:59:03,293 - INFO - Loaded configuration from C:\Users\Leftos\source\repos\oak_tower_watcher\config.json
+2025-08-05 08:59:03,294 - INFO - Loading ARTCC roster...
+2025-08-05 08:59:03,812 - INFO - Loaded 106 controller names from ARTCC roster
+2025-08-05 08:59:03,812 - INFO - Pushover service initialized in NotificationManager
+2025-08-05 08:59:03,813 - INFO - Headless VATSIM Oakland Tower Monitor initialized
+2025-08-05 08:59:03,813 - INFO - Testing Pushover configuration...
+2025-08-05 08:59:04,231 - INFO - Pushover notification sent successfully: VATSIM Monitor Test
+2025-08-05 08:59:04,232 - INFO - Pushover test notification sent successfully
+2025-08-05 08:59:04,232 - INFO - Pushover test successful - notifications will be sent
+2025-08-05 08:59:04,232 - INFO - Querying VATSIM API...
+2025-08-05 08:59:04,233 - INFO - Headless VATSIM worker started
+2025-08-05 08:59:04,233 - INFO - Started VATSIM monitoring
+2025-08-05 08:59:04,233 - INFO - Headless VATSIM Oakland Tower Monitor started successfully
+2025-08-05 08:59:04,460 - INFO - Main facility and supporting above facilities OFFLINE
+2025-08-05 08:59:04,460 - INFO - Status changed from all_offline to all_offline
+2025-08-05 08:59:25,313 - INFO - Received shutdown signal, shutting down gracefully...
+2025-08-05 08:59:25,313 - INFO - Shutting down Headless VATSIM Monitor...
+2025-08-05 08:59:25,473 - INFO - Headless VATSIM worker stopped
+2025-08-05 08:59:25,474 - INFO - Headless VATSIM Monitor shutdown complete
+2025-08-05 08:59:25,474 - INFO - Shutting down Headless VATSIM Monitor...
