@@ -1,0 +1,56 @@
+{
+  "airport": {
+    "code": "KOAK",
+    "name": "Oakland International Airport",
+    "display_name": "Oakland Tower"
+  },
+  "monitoring": {
+    "check_interval": 30
+  },
+  "auto_update": {
+    "enabled": false,
+    "github_repo": "leftos/oak_tower_watcher"
+  },
+  "callsigns": {
+    "main_facility": ["^OAK_(?:\\d+_)?TWR$"],
+    "supporting_above": ["^NCT_APP$", "^OAK_\\d+_CTR$"],
+    "supporting_below": ["^OAK_(?:\\d+_)?GND$", "^OAK_(?:\\d+_)?DEL$"]
+  },
+  "api": {
+    "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",
+    "roster_url": "https://oakartcc.org/about/roster"
+  },
+  "notifications": {
+    "sound_enabled": false,
+    "sound_file": "ding.mp3",
+    "toast_duration": 3000
+  },
+  "pushover": {
+    "enabled": true,
+    "api_token": "YOUR_PUSHOVER_API_TOKEN_HERE",
+    "user_key": "YOUR_PUSHOVER_USER_KEY_HERE",
+    "priority_levels": {
+      "main_facility_and_supporting_above_online": 1,
+      "main_facility_online": 0,
+      "supporting_above_online": 0,
+      "all_offline": 0,
+      "error": -1
+    },
+    "sounds": {
+      "main_facility_and_supporting_above_online": "magic",
+      "main_facility_online": "pushover",
+      "supporting_above_online": "intermission",
+      "all_offline": "falling",
+      "error": "none"
+    }
+  },
+  "colors": {
+    "notifications": {
+      "main_facility_and_supporting_above_online": "rgb(75, 0, 130)",
+      "main_facility_online": "rgb(0, 100, 0)",
+      "supporting_above_online": "rgb(184, 134, 11)",
+      "all_offline": "rgb(139, 0, 0)",
+      "error": "rgb(64, 64, 64)"
+    }
+  }
+}

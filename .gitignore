@@ -2,8 +2,12 @@
 .mypy_cache*
 vatsim_monitor.log
 config.json
+config.my.json
 __pycache__/*
 *.pyc
+.env
+logs/*
+*.log
 
 # Release packaging
 releases/

@@ -99,7 +99,46 @@ You can customize which callsigns to monitor by editing the `config.json` file:
 
 ## Installation
 
-### Prerequisites
+### Docker Deployment (Recommended for Headless)
+
+For headless monitoring (no GUI), Docker provides the easiest cross-platform deployment:
+
+#### Quick Start with Docker
+
+1. **Install Docker**:
+   - Windows/Mac: [Docker Desktop](https://docs.docker.com/get-docker/)
+   - Linux: [Docker Engine](https://docs.docker.com/engine/install/)
+
+2. **Clone and configure**:
+   ```bash
+   git clone https://github.com/leftos/oak_tower_watcher.git
+   cd oak_tower_watcher
+   cp .env.sample .env
+   # Edit .env with your Pushover credentials
+   ```
+
+3. **Deploy**:
+   ```bash
+   # Linux/Mac
+   ./scripts/deploy_docker.sh
+   
+   # Windows
+   scripts\deploy_docker.bat
+   
+   # Or manually
+   docker-compose up -d
+   ```
+
+4. **Monitor**:
+   ```bash
+   docker-compose logs -f
+   ```
+
+See the [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT_GUIDE.md) for detailed instructions.
+
+### Traditional Python Installation
+
+#### Prerequisites
 
 - Python 3.7 or higher
 - pip (Python package installer)
@@ -474,6 +513,27 @@ For issues, feature requests, or questions:
 1. Check the troubleshooting section
 2. Review application logs
 3. Create an issue in the project repository
+
+## Deployment Options Comparison
+
+| Method | Platform | GUI | Setup Complexity | Best For |
+|--------|----------|-----|------------------|----------|
+| **Docker** | Windows, Linux, macOS | No | Low | Headless monitoring, servers |
+| **Python GUI** | Windows, Linux, macOS | Yes | Medium | Desktop use with visual interface |
+| **Systemd Service** | Linux only | No | High | Linux servers, manual setup |
+
+### Docker Advantages
+- ✅ Cross-platform (Windows, Linux, macOS)
+- ✅ Easy deployment and updates
+- ✅ Isolated environment
+- ✅ Resource limits and health checks
+- ✅ No Python/dependency management needed
+
+### Traditional Installation Advantages
+- ✅ Full GUI interface
+- ✅ System tray integration
+- ✅ Local audio notifications
+- ✅ Direct system integration
 
 ## Acknowledgments
 
