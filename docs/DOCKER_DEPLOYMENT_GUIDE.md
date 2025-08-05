@@ -189,6 +189,38 @@ Create a custom `config.json` with your airport's callsigns:
 
 ## Troubleshooting
 
+### Docker Permission Issues (Linux)
+
+If you get permission denied errors like:
+```
+permission denied while trying to connect to the Docker daemon socket
+```
+
+**Solution 1: Add user to docker group (Recommended)**
+```bash
+# Add your user to the docker group
+sudo usermod -aG docker $USER
+
+# Log out and back in, or run:
+newgrp docker
+
+# Test Docker access
+docker --version
+```
+
+**Solution 2: Use sudo (Temporary fix)**
+```bash
+# Prefix all docker commands with sudo
+sudo docker-compose up -d
+sudo docker-compose logs -f
+```
+
+**Solution 3: Fix socket permissions**
+```bash
+# Fix Docker socket permissions
+sudo chmod 666 /var/run/docker.sock
+```
+
 ### Container Won't Start
 
 1. **Check Docker logs**:
@@ -202,7 +234,7 @@ Create a custom `config.json` with your airport's callsigns:
    - Missing Pushover credentials
    - Invalid JSON in config.json
    - Port conflicts (shouldn't happen with this app)
-   - Insufficient permissions
+   - Docker permission issues (see above)
 
 ### No Notifications Received
 

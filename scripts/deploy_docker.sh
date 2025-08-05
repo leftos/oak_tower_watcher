@@ -44,6 +44,23 @@ check_prerequisites() {
         exit 1
     fi
     
+    # Test Docker access
+    if ! docker --version >/dev/null 2>&1; then
+        print_error "Docker is installed but not accessible."
+        print_warning "This is likely a permissions issue. Try one of these solutions:"
+        echo ""
+        echo "Solution 1 (Recommended): Add user to docker group"
+        echo "  sudo usermod -aG docker \$USER"
+        echo "  newgrp docker"
+        echo ""
+        echo "Solution 2: Use sudo with this script"
+        echo "  sudo $0"
+        echo ""
+        echo "Solution 3: Fix socket permissions"
+        echo "  sudo chmod 666 /var/run/docker.sock"
+        exit 1
+    fi
+    
     if ! command_exists docker-compose; then
         print_warning "docker-compose not found, trying docker compose..."
         if ! docker compose version >/dev/null 2>&1; then
