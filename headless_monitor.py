@@ -197,13 +197,22 @@ def main():
     global monitor
     
     # Configure logging for headless operation
+    handlers = [logging.StreamHandler()]
+    
+    # Try to add file handler, but don't fail if we can't write to logs directory
+    try:
+        # Ensure logs directory exists
+        os.makedirs("logs", exist_ok=True)
+        handlers.append(logging.FileHandler("logs/vatsim_monitor_headless.log"))
+        print("Logging to file: logs/vatsim_monitor_headless.log")
+    except (PermissionError, OSError) as e:
+        print(f"Warning: Cannot write to log file: {e}")
+        print("Continuing with console logging only...")
+    
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler("logs/vatsim_monitor_headless.log"),
-            logging.StreamHandler()
-        ],
+        handlers=handlers,
     )
 
     # Check for existing instance

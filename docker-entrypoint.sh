@@ -87,10 +87,15 @@ fi
 
 # Ensure logs directory exists and has correct permissions
 mkdir -p /app/logs
-# Only try to change permissions if we can (ignore errors for mounted volumes)
+# Set proper ownership and permissions for logs directory
+chown vatsim:vatsim /app/logs 2>/dev/null || true
 chmod 755 /app/logs 2>/dev/null || true
+# Ensure the user can write to the logs directory
+touch /app/logs/vatsim_monitor_headless.log 2>/dev/null || true
+chown vatsim:vatsim /app/logs/vatsim_monitor_headless.log 2>/dev/null || true
+chmod 644 /app/logs/vatsim_monitor_headless.log 2>/dev/null || true
 
 log "Configuration complete, starting monitor..."
 
-# Execute the main command
-exec "$@"
+# Switch to vatsim user and execute the main command
+exec su-exec vatsim "$@"
