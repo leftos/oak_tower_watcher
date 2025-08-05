@@ -42,10 +42,16 @@ This guide will help you deploy the headless VATSIM Tower Monitor using Docker, 
    TZ=UTC
    ```
 
-4. **Start the service**:
+4. **Build and start the service**:
    ```bash
+   # Build the image (required on first run or after code changes)
+   docker-compose build
+   
+   # Start the service
    docker-compose up -d
    ```
+   
+   **Note**: The container will automatically create a `config.json` file from the sample if one doesn't exist. Your environment variables will be injected into this configuration.
 
 5. **Check the logs**:
    ```bash
@@ -188,6 +194,68 @@ Create a custom `config.json` with your airport's callsigns:
 ```
 
 ## Troubleshooting
+
+### Line Ending Issues (Windows to Linux Deployment)
+
+If you're developing on Windows and deploying to Linux, you may encounter this error:
+```
+exec /app/docker-entrypoint.sh: no such file or directory
+```
+
+This happens because Windows uses CRLF line endings while Linux expects LF line endings.
+
+**Solution 1: Use Git for Deployment (Recommended)**
+```bash
+# On your Linux server, clone/pull the repository instead of using SCP
+git clone https://github.com/yourusername/oak_tower_watcher.git
+cd oak_tower_watcher
+
+# Or if already cloned, pull updates
+git pull origin main
+
+# Git automatically converts line endings correctly
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+**Solution 2: Use the Automated Git Deployment Script**
+```bash
+# On your Linux server, download and run the deployment script
+wget https://raw.githubusercontent.com/yourusername/oak_tower_watcher/main/scripts/deploy_docker_git.sh
+chmod +x deploy_docker_git.sh
+./deploy_docker_git.sh
+```
+
+**Solution 3: Fix Line Endings After SCP**
+If you prefer to use SCP, run this after copying files:
+```bash
+# On your Linux server, after copying files with SCP
+wget https://raw.githubusercontent.com/yourusername/oak_tower_watcher/main/scripts/fix_line_endings.sh
+chmod +x fix_line_endings.sh
+./fix_line_endings.sh /path/to/your/project
+
+# Then rebuild the container
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+**Solution 4: Manual Fix**
+```bash
+# Install dos2unix if not already installed
+sudo apt install -y dos2unix
+
+# Fix line endings for all shell scripts
+find . -name "*.sh" -exec dos2unix {} \;
+find . -name "*.sh" -exec chmod +x {} \;
+
+# Specifically fix the Docker entrypoint
+dos2unix docker-entrypoint.sh
+chmod +x docker-entrypoint.sh
+
+# Rebuild the container
+docker-compose build --no-cache
+docker-compose up -d
+```
 
 ### Docker Permission Issues (Linux)
 

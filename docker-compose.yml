@@ -17,7 +17,8 @@ services:
     
     # Mount configuration and logs
     volumes:
-      - ./config.json:/app/config.json
+      # Note: Create config.json first or remove this line to use container's built-in config
+      # - ./config.json:/app/config.json
       - ./logs:/app/logs
     
     # Resource limits (adjust as needed)

@@ -11,7 +11,15 @@ log "Starting VATSIM Tower Monitor (Headless) Docker Container"
 # Check if config.json exists, if not create from sample
 if [ ! -f "/app/config.json" ]; then
     log "No config.json found, creating from sample..."
-    cp /app/config.sample.json /app/config.json
+    if [ -f "/app/config.sample.json" ]; then
+        cp /app/config.sample.json /app/config.json
+        log "Created config.json from sample"
+    else
+        log "ERROR: config.sample.json not found!"
+        exit 1
+    fi
+else
+    log "Using existing config.json"
 fi
 
 # Override configuration with environment variables if provided
