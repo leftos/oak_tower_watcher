@@ -37,6 +37,13 @@ def create_deployment_package():
         # Entry point (from root)
         ("headless_monitor.py", "headless_monitor.py"),
         
+        # Python requirements
+        ("requirements_headless.txt", "requirements_headless.txt"),
+        
+        # Package init files (required for Python imports)
+        ("src/__init__.py", "src/__init__.py"),
+        ("config/__init__.py", "config/__init__.py"),
+        
         # Supporting modules (from src/) - maintain in src/
         ("src/headless_worker.py", "src/headless_worker.py"),
         ("src/notification_manager.py", "src/notification_manager.py"),
@@ -45,7 +52,6 @@ def create_deployment_package():
         
         # Configuration files (from config/) - maintain in config/
         ("config/config.py", "config/config.py"),
-        ("requirements_headless.txt", "requirements_headless.txt"),
         ("config/vatsim-monitor.service", "config/vatsim-monitor.service"),
         
         # User configuration (from root)
@@ -77,7 +83,6 @@ def create_deployment_package():
         for file in missing_files:
             print(f"  - {file}")
     
-    print(f"\nDirectory structure maintained - no import path changes needed!")
     print(f"\nTo deploy to your server:")
     print(f"1. Upload the entire deployment_package directory structure to your server")
     print(f"2. Follow the deployment guide in docs/DEPLOYMENT_GUIDE.md")
