@@ -124,6 +124,66 @@ You can also mount a custom `config.json` file:
 }
 ```
 
+## Auto-Start on Boot
+
+The Docker container can be configured to start automatically when your system boots. There are two approaches:
+
+### Method 1: Using Docker's Built-in Restart Policy (Recommended)
+
+The [`docker-compose.yml`](../docker-compose.yml) already includes `restart: unless-stopped`, which means:
+- The container will restart automatically if it crashes
+- The container will start when Docker starts (after system boot)
+- The container will NOT restart if you manually stop it
+
+Since Docker is already enabled to start on boot, this method works automatically with no additional setup.
+
+### Method 2: Using Systemd Service (Advanced)
+
+For more control and better integration with system services, you can use the provided systemd service:
+
+1. **Run the auto-start setup script**:
+   ```bash
+   ./scripts/setup_autostart.sh
+   ```
+
+2. **Or manually install the service**:
+   ```bash
+   # Copy the service file (it will be automatically configured for your user/path)
+   sudo cp config/vatsim-monitor-docker.service /etc/systemd/system/
+   
+   # Edit the service file to match your setup
+   sudo nano /etc/systemd/system/vatsim-monitor-docker.service
+   
+   # Enable the service
+   sudo systemctl daemon-reload
+   sudo systemctl enable vatsim-monitor-docker.service
+   ```
+
+3. **Start the service**:
+   ```bash
+   sudo systemctl start vatsim-monitor-docker.service
+   ```
+
+### Verification
+
+To verify auto-start is working:
+
+```bash
+# Check Docker service status
+sudo systemctl status docker
+
+# Check if your container is running
+docker ps
+
+# If using systemd service, check its status
+sudo systemctl status vatsim-monitor-docker.service
+
+# Test by rebooting (optional)
+sudo reboot
+```
+
+After reboot, the container should start automatically within a few minutes.
+
 ## Managing the Container
 
 ### Docker Compose Commands
