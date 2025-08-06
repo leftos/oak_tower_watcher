@@ -11,6 +11,9 @@ class OAKTowerStatus {
     }
 
     init() {
+        // Add event listeners for buttons
+        this.setupEventListeners();
+        
         // Start auto-refresh
         this.startAutoRefresh();
         
@@ -19,6 +22,20 @@ class OAKTowerStatus {
         
         // Update timestamps every second
         setInterval(() => this.updateTimestamps(), 1000);
+    }
+
+    setupEventListeners() {
+        // Force refresh button
+        const forceRefreshBtn = document.getElementById('force-refresh-btn');
+        if (forceRefreshBtn) {
+            forceRefreshBtn.addEventListener('click', () => this.forceRefresh());
+        }
+
+        // Toggle auto-refresh button
+        const toggleAutoRefreshBtn = document.getElementById('toggle-auto-refresh-btn');
+        if (toggleAutoRefreshBtn) {
+            toggleAutoRefreshBtn.addEventListener('click', () => this.toggleAutoRefresh());
+        }
     }
 
     async loadStatus() {
@@ -232,40 +249,39 @@ class OAKTowerStatus {
             this.refreshTimer = null;
         }
     }
-}
 
-// Global functions for button actions
-function forceRefresh() {
-    const refreshBtn = document.getElementById('refresh-text');
-    const originalText = refreshBtn.textContent;
-    
-    refreshBtn.textContent = '🔄 Refreshing...';
-    
-    window.oakStatus.loadStatus().then(() => {
-        refreshBtn.textContent = originalText;
+    forceRefresh() {
+        const refreshBtn = document.getElementById('refresh-text');
+        const originalText = refreshBtn.textContent;
         
-        // Show success message briefly
-        const container = document.querySelector('.status-section');
-        const successDiv = document.createElement('div');
-        successDiv.className = 'success-message';
-        successDiv.textContent = 'Status refreshed successfully';
-        container.appendChild(successDiv);
+        refreshBtn.textContent = '🔄 Refreshing...';
         
-        setTimeout(() => successDiv.remove(), 3000);
-    });
-}
+        this.loadStatus().then(() => {
+            refreshBtn.textContent = originalText;
+            
+            // Show success message briefly
+            const container = document.querySelector('.status-section');
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success-message';
+            successDiv.textContent = 'Status refreshed successfully';
+            container.appendChild(successDiv);
+            
+            setTimeout(() => successDiv.remove(), 3000);
+        });
+    }
 
-function toggleAutoRefresh() {
-    const btn = document.getElementById('auto-refresh-text');
-    
-    if (window.oakStatus.autoRefreshEnabled) {
-        window.oakStatus.autoRefreshEnabled = false;
-        window.oakStatus.stopAutoRefresh();
-        btn.textContent = '▶️ Resume Auto-refresh';
-    } else {
-        window.oakStatus.autoRefreshEnabled = true;
-        window.oakStatus.startAutoRefresh();
-        btn.textContent = '⏸️ Pause Auto-refresh';
+    toggleAutoRefresh() {
+        const btn = document.getElementById('auto-refresh-text');
+        
+        if (this.autoRefreshEnabled) {
+            this.autoRefreshEnabled = false;
+            this.stopAutoRefresh();
+            btn.textContent = '▶️ Resume Auto-refresh';
+        } else {
+            this.autoRefreshEnabled = true;
+            this.startAutoRefresh();
+            btn.textContent = '⏸️ Pause Auto-refresh';
+        }
     }
 }
 
