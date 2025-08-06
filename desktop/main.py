@@ -9,6 +9,10 @@ import signal
 import logging
 import atexit
 import os
+
+# Add parent directory to Python path to find shared and config modules
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from shared.utils import acquire_instance_lock, release_instance_lock
 from desktop.vatsim_monitor import VATSIMMonitor
 from config.config import load_config
