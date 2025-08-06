@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="settings-container">
+    <div class="settings-header">
+        <h1>OAK Tower Watcher Settings</h1>
+        <p>Configure your Pushover notifications and preferences</p>
+        <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+    </div>
+    
+    <div class="settings-card">
+        <form method="POST" class="settings-form">
+            {{ form.hidden_tag() }}
+            
+            <div class="form-section">
+                <h3>Pushover Configuration</h3>
+                <p class="form-description">
+                    Configure your Pushover API credentials to receive push notifications when controllers come online or go offline.
+                    <a href="https://pushover.net/" target="_blank">Get your Pushover credentials here</a>.
+                </p>
+                
+                <div class="form-group">
+                    {{ form.pushover_api_token.label(class="form-label") }}
+                    {{ form.pushover_api_token(class="form-input", placeholder="Your Pushover API Token") }}
+                    {% for error in form.pushover_api_token.errors %}
+                        <span class="error">{{ error }}</span>
+                    {% endfor %}
+                    <small class="form-help">This is your application's API token from Pushover</small>
+                </div>
+                
+                <div class="form-group">
+                    {{ form.pushover_user_key.label(class="form-label") }}
+                    {{ form.pushover_user_key(class="form-input", placeholder="Your Pushover User Key") }}
+                    {% for error in form.pushover_user_key.errors %}
+                        <span class="error">{{ error }}</span>
+                    {% endfor %}
+                    <small class="form-help">This is your personal user key from Pushover</small>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h3>Notification Preferences</h3>
+                
+                <div class="form-group checkbox-group">
+                    {{ form.notifications_enabled(class="form-checkbox") }}
+                    {{ form.notifications_enabled.label(class="checkbox-label") }}
+                    <small class="form-help">Enable or disable all notifications for this service</small>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+        
+        <div class="settings-info">
+            <h3>About Notifications</h3>
+            <ul>
+                <li><strong>Main Facility Online:</strong> When Oakland Tower controllers come online</li>
+                <li><strong>Supporting Controllers:</strong> When approach or ground controllers come online</li>
+                <li><strong>All Offline:</strong> When all monitored controllers go offline</li>
+                <li><strong>Errors:</strong> When there are issues with the monitoring system</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

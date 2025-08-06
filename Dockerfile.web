@@ -45,9 +45,9 @@ COPY assets/ assets/
 COPY config.sample.json .
 COPY docker-entrypoint-web.sh .
 
-# Make entrypoint script executable and create logs directory
+# Make entrypoint script executable and create logs and database directories
 RUN chmod +x docker-entrypoint-web.sh && \
-    mkdir -p logs && \
+    mkdir -p logs web/instance && \
     chown -R vatsim:vatsim /app
 
 # Switch to non-root user
@@ -67,4 +67,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 # Set entrypoint and default command
 ENTRYPOINT ["/app/docker-entrypoint-web.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "web_api:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "web.backend.app:app"]

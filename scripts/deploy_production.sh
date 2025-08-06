@@ -52,7 +52,7 @@ if ! groups $USER | grep &>/dev/null '\bdocker\b'; then
     log_warning "To fix this, run: sudo usermod -aG docker $USER && newgrp docker"
 fi
 
-log "Starting OAK Tower Watcher Production Deployment..."
+log "Starting OAK Tower Watcher Production Deployment with User Portal..."
 
 # Create necessary directories
 log "Creating necessary directories..."
@@ -60,6 +60,7 @@ mkdir -p nginx/ssl
 mkdir -p certbot/conf
 mkdir -p certbot/www
 mkdir -p logs
+mkdir -p data  # For user database persistence
 
 # Check if .env file exists
 if [ ! -f .env ]; then
@@ -67,10 +68,23 @@ if [ ! -f .env ]; then
         log "Copying .env.prod to .env..."
         cp .env.prod .env
         log_warning "Please edit .env file with your actual configuration values before continuing."
-        log_warning "Required values: DOMAIN_NAME, SSL_EMAIL, PUSHOVER_API_TOKEN, PUSHOVER_USER_KEY"
+        log_warning "Required values: DOMAIN_NAME, SSL_EMAIL, SECRET_KEY"
+        log_warning "Optional values: PUSHOVER_API_TOKEN, PUSHOVER_USER_KEY (for default notifications)"
+        read -p "Press Enter after you've configured the .env file..."
+    elif [ -f .env.prod.template ]; then
+        log "Copying .env.prod.template to .env..."
+        cp .env.prod.template .env
+        # Generate secure secret key
+        if command -v python3 &> /dev/null; then
+            SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+            sed -i "s/CHANGE-THIS-TO-A-SECURE-RANDOM-STRING-IN-PRODUCTION/$SECRET_KEY/" .env
+            log_success "Generated secure SECRET_KEY automatically"
+        fi
+        log_warning "Please edit .env file with your actual configuration values before continuing."
+        log_warning "Required values: DOMAIN_NAME, SSL_EMAIL"
         read -p "Press Enter after you've configured the .env file..."
     else
-        log_error ".env file not found. Please create one based on .env.prod"
+        log_error ".env file not found. Please create one based on .env.prod.template"
         exit 1
     fi
 fi
@@ -89,12 +103,20 @@ if [ -z "$SSL_EMAIL" ]; then
     exit 1
 fi
 
+# Check for SECRET_KEY (required for user portal)
+if [ -z "$SECRET_KEY" ] || [ "$SECRET_KEY" = "CHANGE-THIS-TO-A-SECURE-RANDOM-STRING-IN-PRODUCTION" ]; then
+    log_error "Please set a secure SECRET_KEY in your .env file for the user portal"
+    exit 1
+fi
+
 if [ -z "$PUSHOVER_API_TOKEN" ] || [ "$PUSHOVER_API_TOKEN" = "your_pushover_api_token_here" ]; then
-    log_warning "PUSHOVER_API_TOKEN not set. Notifications will be disabled."
+    log_warning "PUSHOVER_API_TOKEN not set. Default notifications will be disabled."
+    log_warning "Users can still configure their own Pushover settings in the user portal."
 fi
 
 if [ -z "$PUSHOVER_USER_KEY" ] || [ "$PUSHOVER_USER_KEY" = "your_pushover_user_key_here" ]; then
-    log_warning "PUSHOVER_USER_KEY not set. Notifications will be disabled."
+    log_warning "PUSHOVER_USER_KEY not set. Default notifications will be disabled."
+    log_warning "Users can still configure their own Pushover settings in the user portal."
 fi
 
 log "Configuration validated for domain: $DOMAIN_NAME"
@@ -206,10 +228,15 @@ log "Recent logs:"
 docker compose -f docker-compose.prod.yml logs --tail=10
 
 log_success "Production deployment completed!"
-log_success "Your OAK Tower Watcher is now running at:"
+log_success "Your OAK Tower Watcher with User Portal is now running at:"
 log_success "  HTTP:  http://$DOMAIN_NAME (redirects to HTTPS)"
 log_success "  HTTPS: https://$DOMAIN_NAME"
 log_success "  API:   https://$DOMAIN_NAME/api/status"
+log_success ""
+log_success "User Portal Features:"
+log_success "  Register: https://$DOMAIN_NAME/auth/register"
+log_success "  Login:    https://$DOMAIN_NAME/auth/login"
+log_success "  Dashboard: https://$DOMAIN_NAME/auth/dashboard"
 
 log "To manage the deployment:"
 log "  View logs:    docker compose -f docker-compose.prod.yml logs -f"
