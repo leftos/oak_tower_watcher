@@ -1,5 +1,3 @@
-- Test buik notifications
-- Allow users to configure facilities
 - Admin panel
 - Don't show spinners when reloading information in oak-tower-status unless it's taking too long
 - Remove references to "airport code" from web app

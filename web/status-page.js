@@ -1,5 +1,31 @@
 // Status page JavaScript functionality
 
+// VATSIM Controller Ratings mapping
+function translateControllerRating(ratingId) {
+    const ratingMap = {
+        '-1': "Inactive",
+        '0': "Suspended",
+        '1': "Pilot/Observer",
+        '2': "S1",  // Student Controller
+        '3': "S2",  // Tower Controller
+        '4': "S3",  // TMA Controller
+        '5': "C1",  // Enroute Controller
+        '6': "C2",  // Senior Controller
+        '7': "C3",  // Senior Controller
+        '8': "I1",  // Instructor
+        '9': "I2",  // Senior Instructor
+        '10': "I3", // Senior Instructor
+        '11': "SUP" // Supervisor
+    };
+    
+    try {
+        const id = String(ratingId);
+        return ratingMap[id] || `Unknown (${ratingId})`;
+    } catch (error) {
+        return `Invalid (${ratingId})`;
+    }
+}
+
 class OAKTowerStatus {
     constructor() {
         this.autoRefreshEnabled = true;
@@ -45,18 +71,45 @@ class OAKTowerStatus {
     }
 
     async loadStatus() {
+        // Set up delayed loading state - only show spinner if request takes too long
+        let loadingTimeout = null;
+        let showedDelayedLoading = false;
+        
         try {
-            // Show loading state
-            this.showLoadingState();
+            // Set up a delayed loading indicator - show subtle loading indicator only after 1.5 seconds
+            loadingTimeout = setTimeout(() => {
+                this.showDelayedLoadingIndicator();
+                showedDelayedLoading = true;
+            }, 1500);
             
             // For now, we'll simulate the API call with mock data
             // In a real implementation, this would call the actual API
             const status = await this.fetchStatus();
             
+            // Clear the loading timeout since we got a response
+            if (loadingTimeout) {
+                clearTimeout(loadingTimeout);
+            }
+            
+            // Hide delayed loading indicator if it was shown
+            if (showedDelayedLoading) {
+                this.hideDelayedLoadingIndicator();
+            }
+            
             this.updateUI(status);
             this.lastUpdateTime = new Date();
             
         } catch (error) {
+            // Clear the loading timeout on error
+            if (loadingTimeout) {
+                clearTimeout(loadingTimeout);
+            }
+            
+            // Hide delayed loading indicator if it was shown
+            if (showedDelayedLoading) {
+                this.hideDelayedLoadingIndicator();
+            }
+            
             console.error('Error loading status:', error);
             this.showErrorState(error.message);
         }
@@ -162,7 +215,7 @@ class OAKTowerStatus {
                     <span class="controller-callsign">${controller.callsign}</span>
                     <span class="controller-frequency">${controller.frequency}</span>
                 </div>
-                <div class="controller-name">${controller.name || controller.cid}</div>
+                <div class="controller-name">${controller.name || '(No Name Provided)'} (${translateControllerRating(controller.rating)})</div>
                 <div class="controller-details">
                     <div>CID: ${controller.cid || 'Unknown'}</div>
                     <div>Online: ${this.formatDuration(controller.logon_time)}</div>
@@ -264,6 +317,36 @@ class OAKTowerStatus {
                 </div>
             `;
         });
+    }
+
+    showDelayedLoadingIndicator() {
+        // Create a subtle loading indicator overlay without replacing content
+        let indicator = document.getElementById('delayed-loading-indicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'delayed-loading-indicator';
+            indicator.className = 'delayed-loading-overlay';
+            indicator.innerHTML = `
+                <div class="delayed-loading-content">
+                    <div class="loading-spinner-small"></div>
+                    <span>Refreshing...</span>
+                </div>
+            `;
+            
+            // Add to the main status section
+            const statusSection = document.querySelector('.status-section');
+            if (statusSection) {
+                statusSection.appendChild(indicator);
+            }
+        }
+        indicator.style.display = 'flex';
+    }
+
+    hideDelayedLoadingIndicator() {
+        const indicator = document.getElementById('delayed-loading-indicator');
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
     }
 
     showErrorState(message) {

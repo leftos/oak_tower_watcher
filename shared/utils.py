@@ -285,8 +285,7 @@ def get_controller_name(controller_info, controller_names):
     if vatsim_name and not vatsim_name.isdigit() and len(vatsim_name) > 2:
         return vatsim_name
 
-    # Fallback to CID
-    return f"{cid}"
+    return ""
 
 
 def get_controller_initials(controller_info, controller_names):
@@ -375,7 +374,7 @@ def format_controller_details(controllers: List[Dict[str, Any]], controller_name
         controller_name = None
         if controller_names:
             controller_name = get_controller_name(controller, controller_names)
-            if controller_name and controller_name != "Unknown Controller":
+            if controller_name and controller_name != "":
                 # Format as "CALLSIGN (Name)"
                 details.append(f"{callsign} ({controller_name})")
             else:
