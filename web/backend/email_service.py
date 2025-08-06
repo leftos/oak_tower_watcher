@@ -21,7 +21,7 @@ def init_mail(app):
     app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
     
     # Application-specific settings
-    app.config['MAIL_SUBJECT_PREFIX'] = '[OAK Tower Watcher] '
+    app.config['MAIL_SUBJECT_PREFIX'] = '[VATSIM Facility Watcher] '
     
     # Log configuration
     logger.info("=== SendGrid Email Configuration ===")
@@ -113,7 +113,7 @@ def send_welcome_email(user):
         # Send email
         success = send_email(
             to=user.email,
-            subject='Welcome to OAK Tower Watcher!',
+            subject='Welcome to VATSIM Facility Watcher!',
             template=html_body
         )
         

@@ -1,3 +1,2 @@
-- Forgot password
 - Test buik notifications
 - Allow users to configure facilities

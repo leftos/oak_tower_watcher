@@ -238,7 +238,7 @@ def oak_tower_settings():
         form.notifications_enabled.data = settings.notifications_enabled
     
     return render_template('auth/oak_tower_settings.html',
-                         title='OAK Tower Watcher Settings',
+                         title='VATSIM Facility Watcher Settings',
                          form=form)
 
 @auth_bp.route('/verify-email/<token>')

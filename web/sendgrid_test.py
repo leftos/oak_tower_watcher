@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     """Main test function for SendGrid"""
-    print("🌐 SendGrid Email Test for OAK Tower Watcher")
+    print("🌐 SendGrid Email Test for VATSIM Facility Watcher")
     print("=" * 50)
     
     # Check if recipient email is provided as argument

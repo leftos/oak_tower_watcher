@@ -108,8 +108,8 @@ class OAKTowerStatus {
             case 'main_facility_online':
                 indicator.classList.add('status-online');
                 indicator.textContent = '🟢';
-                title.textContent = 'Tower Online';
-                description.textContent = 'Tower controller is active';
+                title.textContent = 'Main Facility Online';
+                description.textContent = 'Main facility controller is active';
                 break;
             case 'supporting_above_online':
                 indicator.classList.add('status-partial');

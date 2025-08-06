@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OAK Tower Watcher - Status</title>
+    <title>VATSIM Facility Watcher - Status</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="status-page.css">
 </head>
@@ -13,8 +13,8 @@
             <div class="header-nav">
                 <a href="/" class="back-btn">← Back to Dashboard</a>
             </div>
-            <h1>🏗️ OAK Tower Watcher</h1>
-            <p>Real-time monitoring of Oakland International Airport (KOAK) controllers</p>
+            <h1>🏗️ VATSIM Facility Watcher</h1>
+            <p>Real-time monitoring of VATSIM network facilities and controllers</p>
         </header>
 
         <main>
@@ -38,17 +38,6 @@
             <!-- Controllers Information -->
             <section class="controllers-section">
                 <div class="controllers-grid">
-                    <!-- Main Facility Controllers -->
-                    <div class="controller-card">
-                        <h3>🏗️ Tower Controllers</h3>
-                        <div id="main-controllers" class="controller-list">
-                            <div class="loading-placeholder">
-                                <div class="loading"></div>
-                                <span>Loading controller data...</span>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Supporting Above Controllers -->
                     <div class="controller-card">
                         <h3>📡 Supporting Above</h3>
@@ -60,9 +49,20 @@
                         </div>
                     </div>
 
+                    <!-- Main Facility Controllers -->
+                    <div class="controller-card">
+                        <h3>🏗️ Main Facilities</h3>
+                        <div id="main-controllers" class="controller-list">
+                            <div class="loading-placeholder">
+                                <div class="loading"></div>
+                                <span>Loading controller data...</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Supporting Below Controllers -->
                     <div class="controller-card">
-                        <h3>🛬 Ground/Delivery</h3>
+                        <h3>🛬 Supporting Below</h3>
                         <div id="supporting-below-controllers" class="controller-list">
                             <div class="loading-placeholder">
                                 <div class="loading"></div>
@@ -112,14 +112,14 @@
 
                     <div class="info-card">
                         <h3>ℹ️ About</h3>
-                        <p>This service monitors VATSIM for Oakland International Airport (KOAK) tower controllers and provides real-time status updates. The system checks for active controllers every 30 seconds and can send notifications when status changes occur.</p>
+                        <p>This service monitors VATSIM network facilities and controllers, providing real-time status updates. The system checks for active controllers every 30 seconds and can send notifications when status changes occur.</p>
                     </div>
                 </div>
             </section>
         </main>
 
         <footer>
-            <p>&copy; 2024 OAK Tower Watcher | VATSIM Network Monitor</p>
+            <p>&copy; 2024 VATSIM Facility Watcher | VATSIM Network Monitor</p>
         </footer>
     </div>
 

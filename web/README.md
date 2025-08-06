@@ -1,6 +1,6 @@
-# OAK Tower Watcher - Web Implementation
+# VATSIM Facility Watcher - Web Implementation
 
-The **Web Implementation** provides a comprehensive Flask-based web interface for the OAK Tower Watcher system with full user authentication, notification management, and API endpoints.
+The **Web Implementation** provides a comprehensive Flask-based web interface for the VATSIM Facility Watcher system with full user authentication, notification management, and API endpoints.
 
 ## Overview
 
@@ -319,4 +319,4 @@ For issues specific to the web implementation:
 4. Check database connectivity
 5. Validate email service configuration
 
-The web implementation provides the most feature-complete interface for the OAK Tower Watcher system, suitable for multi-user deployments and remote access scenarios.
+The web implementation provides the most feature-complete interface for the VATSIM Facility Watcher system, suitable for multi-user deployments and remote access scenarios.
