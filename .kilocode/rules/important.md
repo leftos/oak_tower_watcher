@@ -10,3 +10,6 @@ Put documentation under /docs/.
 Testing of the web app in development can happen through /web/run_app.py.
 
 After changes to a docker image, 'docker compose restart' will NOT create a new container if the image changed. You need to use 'docker compose up' instead.
+
+If you can't find a file or folder, say an ls or cd command fails, use pwd to check which folder you're in right now, instead of assuming.
+Try to keep track of which folder you're in so you don't keep adding a cd to a subfolder at the start of every subsequent command, only to have it fail.

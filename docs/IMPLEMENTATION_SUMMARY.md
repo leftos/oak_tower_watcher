@@ -26,7 +26,7 @@ Successfully implemented complete separation between development and production 
 ### 3. Production Docker Configuration
 - **File:** [`docker-compose.prod.yml`](../docker-compose.prod.yml)
 - **Updates:**
-  - Added `prod_data` volume for database persistence
+  - Added `data` volume for database persistence
   - Added environment variables for `APP_ENV=production`
   - Added `SECRET_KEY` and `DATABASE_URL` configuration
   - Maintained existing `logs` volume for log persistence
@@ -49,19 +49,23 @@ Successfully implemented complete separation between development and production 
 
 ```
 oak_tower_watcher/
-├── dev_logs/                    # Development logs (✅ Created)
-├── dev_data/                    # Development database (✅ Created)
-├── prod_data/                   # Production database (Docker volume)
-├── logs/                        # Production logs (Docker volume)
+├── web/
+│   └── per_env/
+│       ├── dev/
+│       │   ├── logs/           # Development logs (✅ Moved)
+│       │   └── data/           # Development database (✅ Moved)
+│       └── prod/
+│           ├── logs/           # Production logs (✅ Moved)
+│           └── data/           # Production database (✅ Moved)
 ├── config/
-│   └── env_config.py           # Environment configuration (✅ Created)
+│   └── env_config.py           # Environment configuration (✅ Updated)
 ├── scripts/
 │   ├── setup_dev_env.sh        # Development setup (✅ Created)
 │   ├── run_dev.sh              # Development runner (✅ Created)
 │   └── test_dev_setup.py       # Setup tester (✅ Created)
 ├── docs/
-│   ├── ENVIRONMENT_SEPARATION.md  # Documentation (✅ Created)
-│   └── IMPLEMENTATION_SUMMARY.md  # This file (✅ Created)
+│   ├── ENVIRONMENT_SEPARATION.md  # Documentation (✅ Updated)
+│   └── IMPLEMENTATION_SUMMARY.md  # This file (✅ Updated)
 ├── .env.development            # Dev environment vars (✅ Created)
 └── .env.prod.template          # Prod template (✅ Created)
 ```
@@ -69,16 +73,16 @@ oak_tower_watcher/
 ## Environment Separation Details
 
 ### Development Environment
-- **Database:** `sqlite:///dev_data/users_dev.db`
-- **Logs:** `dev_logs/web_app_dev.log`
+- **Database:** `sqlite:///web/per_env/dev/data/users.db`
+- **Logs:** `web/per_env/dev/logs/web_app.log`
 - **Server:** `http://127.0.0.1:5000`
 - **Debug:** Enabled
 - **Console Logging:** Enabled
 - **SQL Logging:** Enabled when DEBUG=true
 
 ### Production Environment
-- **Database:** `sqlite:///prod_data/users.db` (or external DB)
-- **Logs:** `logs/web_app.log`
+- **Database:** `sqlite:///web/per_env/prod/data/users.db` (or external DB)
+- **Logs:** `web/per_env/prod/logs/web_app.log`
 - **Server:** `http://0.0.0.0:8080` (via Docker)
 - **Debug:** Disabled
 - **Console Logging:** Disabled
@@ -92,8 +96,8 @@ All tests passed successfully:
 🔍 Testing OAK Tower Watcher Development Environment Setup
 ============================================================
 🧪 Testing directory structure...
-  ✅ dev_logs/ exists
-  ✅ dev_data/ exists
+  ✅ web/per_env/dev/logs/ exists
+  ✅ web/per_env/dev/data/ exists
 
 🧪 Testing environment configuration...
   ✅ .env.development exists
@@ -102,7 +106,7 @@ All tests passed successfully:
   ✅ SECRET_KEY configured
 
 🧪 Testing database configuration...
-  ✅ Database configured for development: sqlite:///dev_data/users_dev.db
+  ✅ Database configured for development: sqlite:///web/per_env/dev/data/users.db
 
 🧪 Testing application import...
   ✅ Environment configuration working

@@ -1,0 +1,14 @@
+# Desktop GUI VATSIM Tower Monitor Dependencies
+
+# GUI Framework
+PyQt6>=6.5.0
+
+# Image Processing 
+Pillow>=10.0.0
+
+# Audio Playback
+python-vlc>=3.0.18122
+
+# Shared Dependencies (also needed by desktop)
+requests>=2.31.0
+beautifulsoup4>=4.12.2

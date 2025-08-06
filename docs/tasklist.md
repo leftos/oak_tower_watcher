@@ -1,3 +1,5 @@
+- index.html shows "Login | Register" even when logged in
 - Forgot password
 - Test buik notifications
 - Allow users to configure facilities
+- Refused to execute inline event handler because it violates the following Content Security Policy directive: "script-src 'self'". Either the 'unsafe-inline' keyword, a hash ('sha256-...'), or a nonce ('nonce-...') is required to enable inline execution. Note that hashes do not apply to event handlers, style attributes and javascript: navigations unless the 'unsafe-hashes' keyword is present.

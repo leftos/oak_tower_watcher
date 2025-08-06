@@ -42,7 +42,7 @@ class EnvironmentConfig:
                     db_path = os.path.join(project_root, path_part)
                     db_uri = f'sqlite:///{db_path}'
             elif not db_uri:  # Default if DATABASE_URL is not set at all
-                db_path = os.path.join(project_root, "prod_data", "users.db")
+                db_path = os.path.join(project_root, "web", "per_env", "prod", "data", "users.db")
                 db_uri = f'sqlite:///{db_path}'
 
             return {
@@ -54,7 +54,7 @@ class EnvironmentConfig:
             default_db_uri = os.environ.get('DATABASE_URL')
             if not default_db_uri:
                 # Use absolute path for SQLite in development
-                default_db_uri = f'sqlite:///{os.path.join(project_root, "dev_data", "users_dev.db")}'
+                default_db_uri = f'sqlite:///{os.path.join(project_root, "web", "per_env", "dev", "data", "users.db")}'
             
             return {
                 'uri': default_db_uri,
@@ -69,7 +69,7 @@ class EnvironmentConfig:
         if self.is_production():
             return {
                 'level': logging.INFO,
-                'dir': os.path.join(project_root, 'logs'),
+                'dir': os.path.join(project_root, 'web', 'per_env', 'prod', 'logs'),
                 'filename': 'web_app.log',
                 'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                 'console_output': False,  # Disable console output in production
@@ -79,8 +79,8 @@ class EnvironmentConfig:
         else:
             return {
                 'level': logging.DEBUG if os.environ.get('DEBUG', 'False').lower() == 'true' else logging.INFO,
-                'dir': os.path.join(project_root, 'dev_logs'),
-                'filename': 'web_app_dev.log',
+                'dir': os.path.join(project_root, 'web', 'per_env', 'dev', 'logs'),
+                'filename': 'web_app.log',
                 'format': '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
                 'console_output': True,  # Enable console output in development
                 'max_bytes': 5 * 1024 * 1024,  # 5MB
@@ -139,6 +139,9 @@ class EnvironmentConfig:
         db_uri = db_config['uri']
         if db_uri.startswith('sqlite:///'):
             db_path = db_uri.replace('sqlite:///', '')
+            absolute_db_path = os.path.abspath(db_path)
+            logging.info(f"Database URI: {db_uri}")
+            logging.info(f"Database absolute path: {absolute_db_path}")
             db_dir = os.path.dirname(db_path)
             if db_dir and not os.path.exists(db_dir):
                 os.makedirs(db_dir, exist_ok=True)

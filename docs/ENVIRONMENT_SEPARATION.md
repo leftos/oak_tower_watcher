@@ -20,10 +20,14 @@ The application automatically detects the environment using these environment va
 
 ```
 oak_tower_watcher/
-├── dev_logs/           # Development logs (created automatically)
-├── dev_data/           # Development database files (created automatically)
-├── logs/               # Production logs (Docker volume)
-├── prod_data/          # Production database files (Docker volume)
+├── web/
+│   └── per_env/
+│       ├── dev/
+│       │   ├── logs/   # Development logs (created automatically)
+│       │   └── data/   # Development database files (created automatically)
+│       └── prod/
+│           ├── logs/   # Production logs (Docker volume)
+│           └── data/   # Production database files (Docker volume)
 ├── config/
 │   ├── config.py       # Application configuration
 │   └── env_config.py   # Environment-specific configuration
@@ -57,8 +61,8 @@ oak_tower_watcher/
 
 ### Configuration
 
-- **Database:** `sqlite:///dev_data/users_dev.db`
-- **Logs:** `dev_logs/web_app_dev.log`
+- **Database:** `sqlite:///web/per_env/dev/data/users.db`
+- **Logs:** `web/per_env/dev/logs/web_app.log`
 - **Server:** `http://127.0.0.1:5000`
 - **Debug Mode:** Enabled
 - **Console Logging:** Enabled
@@ -72,7 +76,7 @@ Development environment variables are stored in `.env.development`:
 APP_ENV=development
 FLASK_ENV=development
 DEBUG=true
-DATABASE_URL=sqlite:///dev_data/users_dev.db
+DATABASE_URL=sqlite:///web/per_env/dev/data/users.db
 SECRET_KEY=dev-secret-key-change-in-production-[timestamp]
 HOST=127.0.0.1
 PORT=5000
@@ -99,8 +103,8 @@ PORT=5000
 
 ### Configuration
 
-- **Database:** `sqlite:///prod_data/users.db` (or external database)
-- **Logs:** `logs/web_app.log` (with rotation)
+- **Database:** `sqlite:///web/per_env/prod/data/users.db` (or external database)
+- **Logs:** `web/per_env/prod/logs/web_app.log` (with rotation)
 - **Server:** `http://0.0.0.0:8080` (behind nginx)
 - **Debug Mode:** Disabled
 - **Console Logging:** Disabled
@@ -114,7 +118,7 @@ Production environment variables are loaded from `.env.prod`:
 APP_ENV=production
 FLASK_ENV=production
 SECRET_KEY=your-super-secret-production-key
-DATABASE_URL=sqlite:///prod_data/users.db
+DATABASE_URL=sqlite:///web/per_env/prod/data/users.db
 HOST=0.0.0.0
 PORT=8080
 # ... other production settings
@@ -123,7 +127,7 @@ PORT=8080
 ## Database Separation
 
 ### Development Database
-- **Location:** `dev_data/users_dev.db`
+- **Location:** `web/per_env/dev/data/users.db`
 - **Type:** SQLite (default)
 - **Features:** 
   - Track modifications enabled for debugging
@@ -131,7 +135,7 @@ PORT=8080
   - Automatic table creation
 
 ### Production Database
-- **Location:** `prod_data/users.db` (SQLite) or external database
+- **Location:** `web/per_env/prod/data/users.db` (SQLite) or external database
 - **Type:** SQLite, PostgreSQL, or MySQL
 - **Features:**
   - Track modifications disabled for performance
@@ -142,7 +146,7 @@ PORT=8080
 
 **SQLite (default):**
 ```bash
-DATABASE_URL=sqlite:///prod_data/users.db
+DATABASE_URL=sqlite:///web/per_env/prod/data/users.db
 ```
 
 **PostgreSQL:**
@@ -158,14 +162,14 @@ DATABASE_URL=mysql://username:password@localhost:3306/oak_tower_watcher
 ## Log Separation
 
 ### Development Logs
-- **Directory:** `dev_logs/`
-- **File:** `web_app_dev.log`
+- **Directory:** `web/per_env/dev/logs/`
+- **File:** `web_app.log`
 - **Format:** Includes filename and line numbers for debugging
 - **Console Output:** Enabled
 - **Rotation:** 5MB max, 3 backup files
 
 ### Production Logs
-- **Directory:** `logs/`
+- **Directory:** `web/per_env/prod/logs/`
 - **File:** `web_app.log`
 - **Format:** Standard production format
 - **Console Output:** Disabled
@@ -193,14 +197,12 @@ The `.gitignore` file excludes environment-specific files:
 
 ```gitignore
 # Development environment
-dev_logs/
-dev_data/
+web/per_env/dev/
 .env.development
 *.dev.db
 
 # Production environment
-logs/
-prod_data/
+web/per_env/prod/
 .env.prod
 ```
 
@@ -258,8 +260,8 @@ If you have an existing setup without environment separation:
 
 3. **For production, copy data to new locations:**
    ```bash
-   mkdir -p prod_data
-   cp users.db.backup prod_data/users.db
+   mkdir -p web/per_env/prod/data
+   cp users.db.backup web/per_env/prod/data/users.db
    ```
 
 4. **Update your deployment scripts to use the new Docker configuration**

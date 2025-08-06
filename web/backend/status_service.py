@@ -9,13 +9,14 @@ import os
 import sys
 from datetime import datetime
 
-# Add the project root to Python path
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, project_root)
+# Import shared components using new structure
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from config.config import load_config
-from src.vatsim_core import VATSIMCore
-from src.utils import load_artcc_roster, get_controller_name
+from shared.vatsim_core import VATSIMCore
+from shared.utils import load_artcc_roster, get_controller_name
 
 class StatusAPI:
     def __init__(self):

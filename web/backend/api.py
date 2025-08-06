@@ -5,12 +5,11 @@ from flask_login import login_required, current_user
 import sys
 import os
 
-# Add the project root to Python path for importing src modules
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, project_root)
+# Import shared components using new structure
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from src.pushover_service import PushoverService
-from src.bulk_notification_service import BulkNotificationService
+from shared.pushover_service import PushoverService
+from shared.bulk_notification_service import BulkNotificationService
 from .status_service import status_api
 
 api_bp = Blueprint('api', __name__)

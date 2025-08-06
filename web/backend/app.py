@@ -14,14 +14,15 @@ from flask_cors import CORS
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 
-# Add the project root to Python path
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, project_root)
+# Import shared components using new structure
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from config.config import load_config
 from config.env_config import env_config
-from src.vatsim_core import VATSIMCore
-from src.utils import load_artcc_roster, get_controller_name
+from shared.vatsim_core import VATSIMCore
+from shared.utils import load_artcc_roster, get_controller_name
 from .models import db, User
 from .auth import auth_bp
 from .email_service import init_mail
@@ -65,7 +66,7 @@ def create_app():
     # Initialize Flask-Login
     login_manager = LoginManager()
     login_manager.init_app(app)
-    login_manager.login_view = 'auth.login'
+    login_manager.login_view = 'auth.login'  # type: ignore
     login_manager.login_message = 'Please log in to access this page.'
     
     @login_manager.user_loader
@@ -95,8 +96,12 @@ def create_app():
             db.create_all()
             app.logger.info("Database tables created successfully")
         except Exception as e:
-            app.logger.error(f"Error creating database tables: {e}")
-            raise
+            # Check if it's just a "table already exists" error, which is fine
+            if "already exists" in str(e).lower():
+                app.logger.info(f"Database tables already exist: {e}")
+            else:
+                app.logger.error(f"Error creating database tables: {e}")
+                raise
     
     @app.route('/')
     @rate_limit(max_requests=30, window_minutes=5)  # More lenient for homepage

@@ -1,0 +1,56 @@
+services:
+  vatsim-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vatsim-tower-monitor
+    restart: unless-stopped
+    
+    # Environment variables (can be overridden with .env file)
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=UTC
+      # Pushover configuration (set these in .env file)
+      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
+      # Optional overrides
+      - CHECK_INTERVAL=${CHECK_INTERVAL:-30}
+      - AIRPORT_CODE=${AIRPORT_CODE:-KOAK}
+    
+    # Mount configuration and logs
+    volumes:
+      # Note: Create config.json first or remove this line to use container's built-in config
+      # - ../config/config.json:/app/config.json
+      - ../web/per_env/prod/logs:/app/logs
+    
+    # Environment file location
+    env_file:
+      - ../env/.env
+    
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('/tmp/vatsim_monitor_headless.lock') else 1)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Network mode (default bridge is fine for outbound-only service)
+    network_mode: bridge
