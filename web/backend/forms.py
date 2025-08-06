@@ -44,3 +44,20 @@ class UserSettingsForm(FlaskForm):
     ])
     notifications_enabled = BooleanField('Enable Notifications', default=True)
     submit = SubmitField('Save Settings')
+
+class PasswordResetRequestForm(FlaskForm):
+    """Password reset request form"""
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    submit = SubmitField('Send Password Reset Email')
+
+class PasswordResetForm(FlaskForm):
+    """Password reset form with new password"""
+    password = PasswordField('New Password', validators=[
+        DataRequired(),
+        Length(min=8, message='Password must be at least 8 characters long')
+    ])
+    password2 = PasswordField('Repeat New Password', validators=[
+        DataRequired(),
+        EqualTo('password', message='Passwords must match')
+    ])
+    submit = SubmitField('Reset Password')

@@ -7,8 +7,8 @@ import logging
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from .models import db, User, UserSettings
-from .forms import LoginForm, RegistrationForm, UserSettingsForm
-from .email_service import send_verification_email, send_welcome_email
+from .forms import LoginForm, RegistrationForm, UserSettingsForm, PasswordResetRequestForm, PasswordResetForm
+from .email_service import send_verification_email, send_welcome_email, send_password_reset_email
 from .security import email_verification_required
 
 # Configure logger for auth module
@@ -340,3 +340,120 @@ def resend_verification():
         db.session.rollback()
         flash('An error occurred. Please try again.')
         return render_template('auth/resend_verification.html', title='Resend Verification')
+
+@auth_bp.route('/reset-password', methods=['GET', 'POST'])
+def reset_password_request():
+    """Request password reset"""
+    logger.info(f"Password reset request - Method: {request.method}, IP: {request.remote_addr}")
+    
+    if current_user.is_authenticated:
+        logger.info(f"Authenticated user accessing password reset: {current_user.email}")
+        return redirect(url_for('auth.dashboard'))
+    
+    form = PasswordResetRequestForm()
+    
+    if request.method == 'GET':
+        logger.info("Serving password reset request form")
+        return render_template('auth/reset_password_request.html', title='Reset Password', form=form)
+    
+    # POST request - process password reset request
+    logger.info("Processing password reset request form submission")
+    
+    if not form.validate_on_submit():
+        logger.warning(f"Password reset request form validation failed. Errors: {form.errors}")
+        return render_template('auth/reset_password_request.html', title='Reset Password', form=form)
+    
+    email = form.email.data
+    logger.info(f"Password reset request for email: {email}")
+    
+    try:
+        user = User.query.filter_by(email=email).first()
+        
+        if user and user.email_verified and user.is_active:
+            # Send password reset email
+            logger.debug(f"Sending password reset email to: {email}")
+            if send_password_reset_email(user):
+                db.session.commit()  # Save the reset token
+                logger.info(f"Password reset email sent to: {email}")
+            else:
+                logger.warning(f"Failed to send password reset email to: {email}")
+        else:
+            # Log different reasons but don't reveal to user
+            if not user:
+                logger.info(f"Password reset requested for non-existent user: {email}")
+            elif not user.email_verified:
+                logger.info(f"Password reset requested for unverified user: {email}")
+            elif not user.is_active:
+                logger.info(f"Password reset requested for inactive user: {email}")
+        
+        # Always show the same message for security (don't reveal if email exists)
+        flash('If an account with that email address exists, you will receive a password reset email shortly.')
+        return redirect(url_for('auth.login'))
+        
+    except Exception as e:
+        logger.error(f"Error processing password reset request for {email}: {str(e)}", exc_info=True)
+        db.session.rollback()
+        flash('An error occurred. Please try again.')
+        return render_template('auth/reset_password_request.html', title='Reset Password', form=form)
+
+@auth_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password_confirm(token):
+    """Confirm password reset with token"""
+    logger.info(f"Password reset confirmation - Token: {token[:10]}..., Method: {request.method}")
+    
+    if current_user.is_authenticated:
+        logger.info(f"Authenticated user accessing password reset confirmation: {current_user.email}")
+        return redirect(url_for('auth.dashboard'))
+    
+    # Find user with this reset token
+    try:
+        user = User.query.filter_by(password_reset_token=token).first()
+        
+        if not user:
+            logger.warning(f"Invalid password reset token: {token[:10]}...")
+            flash('Invalid or expired password reset link.')
+            return redirect(url_for('auth.reset_password_request'))
+        
+        logger.debug(f"Found user for password reset: {user.email}")
+        
+        # Check if token is valid and not expired
+        if not user.verify_password_reset_token(token):
+            logger.warning(f"Password reset token verification failed for: {user.email}")
+            # Clear expired token
+            user.password_reset_token = None
+            user.password_reset_sent_at = None
+            db.session.commit()
+            flash('Your password reset link has expired. Please request a new one.')
+            return redirect(url_for('auth.reset_password_request'))
+        
+        form = PasswordResetForm()
+        
+        if request.method == 'GET':
+            logger.info(f"Serving password reset form for user: {user.email}")
+            return render_template('auth/reset_password_confirm.html',
+                                 title='Reset Password', form=form, token=token)
+        
+        # POST request - process password reset
+        logger.info(f"Processing password reset confirmation for user: {user.email}")
+        
+        if not form.validate_on_submit():
+            logger.warning(f"Password reset form validation failed. Errors: {form.errors}")
+            return render_template('auth/reset_password_confirm.html',
+                                 title='Reset Password', form=form, token=token)
+        
+        # Reset the password
+        if user.reset_password(token, form.password.data):
+            db.session.commit()
+            logger.info(f"Password reset successfully for user: {user.email}")
+            flash('Your password has been reset successfully! You can now log in with your new password.')
+            return redirect(url_for('auth.login'))
+        else:
+            logger.error(f"Password reset failed for user: {user.email}")
+            flash('Password reset failed. Please try again or request a new reset link.')
+            return redirect(url_for('auth.reset_password_request'))
+        
+    except Exception as e:
+        logger.error(f"Error during password reset confirmation: {str(e)}", exc_info=True)
+        db.session.rollback()
+        flash('An error occurred during password reset. Please try again.')
+        return redirect(url_for('auth.reset_password_request'))

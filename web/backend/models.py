@@ -31,6 +31,10 @@ class User(UserMixin, db.Model):
     email_verification_token = db.Column(db.String(255), unique=True, nullable=True)
     email_verification_sent_at = db.Column(db.DateTime, nullable=True)
     
+    # Password reset fields
+    password_reset_token = db.Column(db.String(255), unique=True, nullable=True)
+    password_reset_sent_at = db.Column(db.DateTime, nullable=True)
+    
     # Relationship to user settings
     settings = db.relationship('UserSettings', backref='user', lazy=True, cascade='all, delete-orphan')
     
@@ -151,6 +155,81 @@ class User(UserMixin, db.Model):
     def can_login(self):
         """Check if user can log in (email must be verified)"""
         return self.is_active and self.email_verified
+    
+    def generate_password_reset_token(self):
+        """Generate a new password reset token"""
+        try:
+            logger.debug(f"Generating password reset token for user: {self.email}")
+            self.password_reset_token = secrets.token_urlsafe(32)
+            self.password_reset_sent_at = datetime.utcnow()
+            logger.debug(f"Password reset token generated for user: {self.email}")
+            return self.password_reset_token
+        except Exception as e:
+            logger.error(f"Error generating password reset token for user {self.email}: {str(e)}", exc_info=True)
+            raise
+    
+    def verify_password_reset_token(self, token):
+        """Verify password reset token"""
+        try:
+            logger.debug(f"Verifying password reset token for user: {self.email}")
+            
+            if not self.password_reset_token:
+                logger.warning(f"No password reset token found for user: {self.email}")
+                return False
+            
+            if self.password_reset_token != token:
+                logger.warning(f"Invalid password reset token for user: {self.email}")
+                return False
+            
+            if self.is_password_reset_expired():
+                logger.warning(f"Password reset token expired for user: {self.email}")
+                return False
+            
+            logger.info(f"Password reset token verified successfully for user: {self.email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error verifying password reset token for user {self.email}: {str(e)}", exc_info=True)
+            return False
+    
+    def is_password_reset_expired(self):
+        """Check if the password reset token has expired (24 hours)"""
+        try:
+            if not self.password_reset_sent_at:
+                return True
+            
+            expiry_time = self.password_reset_sent_at + timedelta(hours=24)
+            is_expired = datetime.utcnow() > expiry_time
+            
+            logger.debug(f"Password reset token expired check for user {self.email}: {is_expired}")
+            return is_expired
+            
+        except Exception as e:
+            logger.error(f"Error checking password reset expiry for user {self.email}: {str(e)}", exc_info=True)
+            return True
+    
+    def reset_password(self, token, new_password):
+        """Reset password using token"""
+        try:
+            logger.debug(f"Attempting to reset password for user: {self.email}")
+            
+            if not self.verify_password_reset_token(token):
+                logger.warning(f"Password reset failed - invalid token for user: {self.email}")
+                return False
+            
+            # Set new password
+            self.set_password(new_password)
+            
+            # Clear password reset token
+            self.password_reset_token = None
+            self.password_reset_sent_at = None
+            
+            logger.info(f"Password reset successfully for user: {self.email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error resetting password for user {self.email}: {str(e)}", exc_info=True)
+            return False
     
     def __repr__(self):
         return f'<User {self.email}>'

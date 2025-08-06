@@ -127,3 +127,37 @@ def send_welcome_email(user):
     except Exception as e:
         logger.error(f"❌ Error sending welcome email to {user.email}: {str(e)}", exc_info=True)
         return False
+
+def send_password_reset_email(user):
+    """Send password reset email to user"""
+    try:
+        logger.info(f"📧 Sending password reset email to: {user.email}")
+        
+        # Generate password reset token
+        token = user.generate_password_reset_token()
+        
+        # Create password reset URL
+        reset_url = url_for('auth.reset_password_confirm', token=token, _external=True)
+        
+        # Render email template
+        html_body = render_template('email/password_reset.html',
+                                  user=user,
+                                  reset_url=reset_url)
+        
+        # Send email
+        success = send_email(
+            to=user.email,
+            subject='Password Reset Request',
+            template=html_body
+        )
+        
+        if success:
+            logger.info(f"✅ Password reset email sent successfully to: {user.email}")
+        else:
+            logger.error(f"❌ Failed to send password reset email to: {user.email}")
+        
+        return success
+        
+    except Exception as e:
+        logger.error(f"❌ Error sending password reset email to {user.email}: {str(e)}", exc_info=True)
+        return False
