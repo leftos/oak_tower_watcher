@@ -136,9 +136,9 @@ class OAKTowerStatus {
     }
 
     updateControllers(status) {
-        this.updateControllerSection('main-controllers', status.mainControllers, 'No tower controllers online');
-        this.updateControllerSection('supporting-above-controllers', status.supportingAbove, 'No supporting controllers online');
-        this.updateControllerSection('supporting-below-controllers', status.supportingBelow, 'No ground/delivery controllers online');
+        this.updateControllerSection('main-controllers', status.mainControllers, 'No main facility controllers online');
+        this.updateControllerSection('supporting-above-controllers', status.supportingAbove, 'No supporting above controllers online');
+        this.updateControllerSection('supporting-below-controllers', status.supportingBelow, 'No supporting below controllers online');
     }
 
     updateControllerSection(elementId, controllers, emptyMessage) {
