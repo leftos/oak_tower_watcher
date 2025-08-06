@@ -107,7 +107,7 @@ def create_app():
     @rate_limit(max_requests=30, window_minutes=5)  # More lenient for homepage
     def index():
         """Serve the homepage"""
-        return send_from_directory('../', 'index.html')
+        return render_template('index.html')
 
     @app.route('/robots.txt')
     def robots_txt():
