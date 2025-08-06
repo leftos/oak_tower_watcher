@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from .utils import get_controller_name, get_controller_initials
 from .pushover_service import create_pushover_service, get_priority_for_status, get_sound_for_status
+from .bulk_notification_service import BulkNotificationService
 
 
 class NotificationManager:
@@ -24,10 +25,17 @@ class NotificationManager:
             "display_name", f"{self.airport_code} Main Facility"
         )
         
-        # Setup Pushover service
+        # Setup Pushover service for single-user notifications (legacy)
         self.pushover_service = create_pushover_service(config)
         if self.pushover_service:
             logging.info("Pushover service initialized in NotificationManager")
+        
+        # Setup bulk notification service for database users
+        self.bulk_notification_service = BulkNotificationService()
+        if self.bulk_notification_service.enabled:
+            logging.info("Bulk notification service initialized in NotificationManager")
+        else:
+            logging.warning("Bulk notification service not available - database user notifications disabled")
 
     def format_supporting_below_controllers_info(self, supporting_below_controllers):
         """Format supporting below controllers information for notifications (with full names)"""
@@ -159,8 +167,52 @@ class NotificationManager:
             return title, message, "error"
 
     def send_pushover_notification(self, title: str, message: str, status: str):
-        """Send a Pushover notification if configured"""
-        if not self.pushover_service:
+        """Send a Pushover notification if configured (legacy single-user)"""
+        success = False
+        
+        # Send to legacy single-user Pushover service if configured
+        if self.pushover_service:
+            try:
+                # Get priority and sound based on status
+                priority = get_priority_for_status(status)
+                sound = get_sound_for_status(status)
+                
+                # Override with config values if available
+                pushover_config = self.config.get("pushover", {})
+                priority_levels = pushover_config.get("priority_levels", {})
+                sounds = pushover_config.get("sounds", {})
+                
+                if status in priority_levels:
+                    priority = priority_levels[status]
+                if status in sounds:
+                    sound = sounds[status]
+
+                # Send the notification
+                result = self.pushover_service.send_notification(
+                    message=message,
+                    title=title,
+                    priority=priority,
+                    sound=sound
+                )
+                
+                if result["success"]:
+                    logging.info(f"Legacy Pushover notification sent: {title}")
+                    success = True
+                else:
+                    logging.error(f"Legacy Pushover notification failed: {result['error']}")
+                    
+            except Exception as e:
+                logging.error(f"Error sending legacy Pushover notification: {e}")
+        
+        # Send to all database users with bulk notification service
+        self.send_bulk_pushover_notification(title, message, status)
+        
+        return success
+
+    def send_bulk_pushover_notification(self, title: str, message: str, status: str):
+        """Send Pushover notifications to all users in database with valid credentials"""
+        if not self.bulk_notification_service or not self.bulk_notification_service.enabled:
+            logging.debug("Bulk notification service not available - skipping database user notifications")
             return False
 
         try:
@@ -178,44 +230,76 @@ class NotificationManager:
             if status in sounds:
                 sound = sounds[status]
 
-            # Send the notification
-            result = self.pushover_service.send_notification(
-                message=message,
+            # Send bulk notification to all database users
+            result = self.bulk_notification_service.send_bulk_notification(
                 title=title,
+                message=message,
                 priority=priority,
-                sound=sound
+                sound=sound,
+                service_name='oak_tower_watcher'
             )
             
-            if result["success"]:
-                logging.info(f"Pushover notification sent: {title}")
+            if result['success']:
+                sent_count = result.get('sent_count', 0)
+                failed_count = result.get('failed_count', 0)
+                if sent_count > 0:
+                    logging.info(f"Bulk Pushover notifications sent to {sent_count} users: {title}")
+                if failed_count > 0:
+                    logging.warning(f"Failed to send bulk notifications to {failed_count} users")
                 return True
             else:
-                logging.error(f"Pushover notification failed: {result['error']}")
+                logging.error(f"Bulk Pushover notification failed: {result.get('error', 'Unknown error')}")
                 return False
                 
         except Exception as e:
-            logging.error(f"Error sending Pushover notification: {e}")
+            logging.error(f"Error sending bulk Pushover notifications: {e}")
             return False
 
     def test_pushover(self):
-        """Test Pushover notification"""
-        if not self.pushover_service:
-            logging.error("Pushover service not configured")
-            return False
-            
-        try:
-            result = self.pushover_service.send_test_notification()
-            
-            if result["success"]:
-                logging.info("Pushover test notification sent successfully")
-                return True
-            else:
-                logging.error(f"Pushover test failed: {result['error']}")
-                return False
+        """Test Pushover notification (both legacy and bulk)"""
+        legacy_success = False
+        bulk_success = False
+        
+        # Test legacy Pushover service
+        if self.pushover_service:
+            try:
+                result = self.pushover_service.send_test_notification()
                 
-        except Exception as e:
-            logging.error(f"Pushover test error: {e}")
-            return False
+                if result["success"]:
+                    logging.info("Legacy Pushover test notification sent successfully")
+                    legacy_success = True
+                else:
+                    logging.error(f"Legacy Pushover test failed: {result['error']}")
+                    
+            except Exception as e:
+                logging.error(f"Legacy Pushover test error: {e}")
+        else:
+            logging.info("Legacy Pushover service not configured")
+        
+        # Test bulk notification service
+        if self.bulk_notification_service and self.bulk_notification_service.enabled:
+            try:
+                result = self.bulk_notification_service.test_bulk_notification()
+                
+                if result['success']:
+                    sent_count = result.get('sent_count', 0)
+                    failed_count = result.get('failed_count', 0)
+                    if sent_count > 0:
+                        logging.info(f"Bulk Pushover test notifications sent to {sent_count} users")
+                        bulk_success = True
+                    else:
+                        logging.info("No users found with valid Pushover settings for bulk test")
+                    if failed_count > 0:
+                        logging.warning(f"Failed to send bulk test notifications to {failed_count} users")
+                else:
+                    logging.error(f"Bulk Pushover test failed: {result.get('error', 'Unknown error')}")
+                    
+            except Exception as e:
+                logging.error(f"Bulk Pushover test error: {e}")
+        else:
+            logging.info("Bulk notification service not available")
+        
+        return legacy_success or bulk_success
 
     def update_controller_names(self, controller_names):
         """Update the controller names dictionary"""

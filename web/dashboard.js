@@ -2,78 +2,83 @@
 document.addEventListener('DOMContentLoaded', function() {
     const testBtn = document.getElementById('test-pushover-btn');
     
+    // Individual test pushover functionality
     if (testBtn) {
         testBtn.addEventListener('click', async function() {
-            // Disable button and show loading state
-            const originalText = testBtn.textContent;
-            testBtn.disabled = true;
-            testBtn.textContent = 'Sending...';
-            testBtn.classList.remove('btn-success');
-            testBtn.classList.add('btn-secondary');
-            
-            try {
-                const response = await fetch('/api/test-pushover', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'same-origin'  // Include session cookies
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    // Success - show green and success message
-                    testBtn.textContent = '✓ Sent!';
-                    testBtn.classList.remove('btn-secondary');
-                    testBtn.classList.add('btn-success');
-                    
-                    // Show success message
-                    showNotification(result.message, 'success');
-                    
-                    // Reset button after 3 seconds
-                    setTimeout(() => {
-                        testBtn.textContent = originalText;
-                        testBtn.disabled = false;
-                    }, 3000);
-                } else {
-                    // Error - show red and error message
-                    testBtn.textContent = '✗ Failed';
-                    testBtn.classList.remove('btn-secondary');
-                    testBtn.classList.add('btn-danger');
-                    
-                    // Show error message
-                    showNotification(result.message || result.error, 'error');
-                    
-                    // Reset button after 3 seconds
-                    setTimeout(() => {
-                        testBtn.textContent = originalText;
-                        testBtn.classList.remove('btn-danger');
-                        testBtn.classList.add('btn-success');
-                        testBtn.disabled = false;
-                    }, 3000);
-                }
-            } catch (error) {
-                console.error('Error testing pushover:', error);
-                
-                // Network error - show red and error message
-                testBtn.textContent = '✗ Error';
-                testBtn.classList.remove('btn-secondary');
-                testBtn.classList.add('btn-danger');
-                
-                showNotification('Network error occurred while testing notification', 'error');
-                
-                // Reset button after 3 seconds
-                setTimeout(() => {
-                    testBtn.textContent = originalText;
-                    testBtn.classList.remove('btn-danger');
-                    testBtn.classList.add('btn-success');
-                    testBtn.disabled = false;
-                }, 3000);
-            }
+            await handleIndividualPushoverTest(testBtn);
         });
     }
 });
+
+async function handleIndividualPushoverTest(testBtn) {
+    // Disable button and show loading state
+    const originalText = testBtn.textContent;
+    testBtn.disabled = true;
+    testBtn.textContent = 'Sending...';
+    testBtn.classList.remove('btn-success');
+    testBtn.classList.add('btn-secondary');
+    
+    try {
+        const response = await fetch('/api/test-pushover', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin'  // Include session cookies
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Success - show green and success message
+            testBtn.textContent = '✓ Sent!';
+            testBtn.classList.remove('btn-secondary');
+            testBtn.classList.add('btn-success');
+            
+            // Show success message
+            showNotification(result.message, 'success');
+            
+            // Reset button after 3 seconds
+            setTimeout(() => {
+                testBtn.textContent = originalText;
+                testBtn.disabled = false;
+            }, 3000);
+        } else {
+            // Error - show red and error message
+            testBtn.textContent = '✗ Failed';
+            testBtn.classList.remove('btn-secondary');
+            testBtn.classList.add('btn-danger');
+            
+            // Show error message
+            showNotification(result.message || result.error, 'error');
+            
+            // Reset button after 3 seconds
+            setTimeout(() => {
+                testBtn.textContent = originalText;
+                testBtn.classList.remove('btn-danger');
+                testBtn.classList.add('btn-success');
+                testBtn.disabled = false;
+            }, 3000);
+        }
+    } catch (error) {
+        console.error('Error testing pushover:', error);
+        
+        // Network error - show red and error message
+        testBtn.textContent = '✗ Error';
+        testBtn.classList.remove('btn-secondary');
+        testBtn.classList.add('btn-danger');
+        
+        showNotification('Network error occurred while testing notification', 'error');
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            testBtn.textContent = originalText;
+            testBtn.classList.remove('btn-danger');
+            testBtn.classList.add('btn-success');
+            testBtn.disabled = false;
+        }, 3000);
+    }
+}
 
 function showNotification(message, type) {
     // Create notification element

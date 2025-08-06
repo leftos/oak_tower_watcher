@@ -431,6 +431,138 @@
     border-bottom: none;
 }
 
+/* Bulk Notifications Styles */
+.bulk-notifications-section {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.bulk-notifications-section h3 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.bulk-notification-stats {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.user-stats-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.user-stat-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    background-color: white;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.user-email {
+    font-weight: 500;
+    margin-right: 0.5rem;
+}
+
+.user-service {
+    color: #7f8c8d;
+    margin-right: 0.5rem;
+}
+
+.user-status {
+    margin-left: auto;
+    font-size: 0.75rem;
+}
+
+.bulk-notification-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.notification-results {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.bulk-results-summary {
+    margin-bottom: 1rem;
+}
+
+.bulk-results-summary h4 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.bulk-results-details {
+    margin-top: 1rem;
+}
+
+.bulk-results-details h5 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.bulk-results-details ul {
+    list-style: none;
+    padding: 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.bulk-results-details li {
+    padding: 0.25rem 0;
+    font-size: 0.875rem;
+}
+
+.result-success {
+    color: #155724;
+}
+
+.result-error {
+    color: #721c24;
+}
+
+/* Additional button styles for bulk notifications */
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.btn-warning:hover {
+    background-color: #e0a800;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
 /* Footer */
 .footer {
     background-color: #2c3e50;
