@@ -6,7 +6,8 @@ Only includes what's needed to query users for notifications
 
 import os
 import logging
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, text
@@ -77,6 +78,23 @@ class MinimalUserFacilityRegex(Base):
     
     # Relationship to user settings
     user_settings = relationship('MinimalUserSettings', back_populates='facility_regexes')
+
+class MinimalUserFacilityStatusCache(Base):
+    """Minimal UserFacilityStatusCache model for status caching"""
+    __tablename__ = 'user_facility_status_cache'
+    
+    id = Column(Integer, primary_key=True)
+    user_settings_id = Column(Integer, ForeignKey('user_settings.id'), nullable=False)
+    status = Column(String(100), nullable=False)
+    main_controllers = Column(String(2000))  # JSON string
+    supporting_above = Column(String(2000))  # JSON string
+    supporting_below = Column(String(2000))  # JSON string
+    last_checked_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship to user settings
+    user_settings = relationship('MinimalUserSettings')
 
 class DatabaseInterface:
     """Minimal database interface for bulk notifications"""
@@ -167,3 +185,183 @@ class DatabaseInterface:
         except Exception as e:
             logging.error(f"Database connection test failed: {e}")
             return False
+    
+    def get_cached_status(self, user_settings_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get cached facility status for a user
+        
+        Args:
+            user_settings_id: The user settings ID
+            
+        Returns:
+            Dictionary with cached status data or None if not found
+        """
+        if not self.enabled or not self.session_factory:
+            return None
+        
+        try:
+            session = self.session_factory()
+            
+            cache_entry = session.query(MinimalUserFacilityStatusCache).filter_by(
+                user_settings_id=user_settings_id
+            ).first()
+            
+            if not cache_entry:
+                session.close()
+                return None
+            
+            # Parse JSON data
+            main_controllers = json.loads(cache_entry.main_controllers) if cache_entry.main_controllers else []
+            supporting_above = json.loads(cache_entry.supporting_above) if cache_entry.supporting_above else []
+            supporting_below = json.loads(cache_entry.supporting_below) if cache_entry.supporting_below else []
+            
+            result = {
+                'status': cache_entry.status,
+                'main_controllers': main_controllers,
+                'supporting_above': supporting_above,
+                'supporting_below': supporting_below,
+                'last_checked_at': cache_entry.last_checked_at
+            }
+            
+            session.close()
+            logging.debug(f"Retrieved cached status for user_settings_id {user_settings_id}: {cache_entry.status}")
+            return result
+            
+        except Exception as e:
+            logging.error(f"Error getting cached status for user_settings_id {user_settings_id}: {e}")
+            return None
+    
+    def update_cached_status(
+        self,
+        user_settings_id: int,
+        status: str,
+        main_controllers: List[Dict[str, Any]],
+        supporting_above: List[Dict[str, Any]],
+        supporting_below: List[Dict[str, Any]]
+    ) -> bool:
+        """
+        Update cached facility status for a user
+        
+        Args:
+            user_settings_id: The user settings ID
+            status: Status string
+            main_controllers: List of main controller data
+            supporting_above: List of supporting above controller data
+            supporting_below: List of supporting below controller data
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.enabled or not self.session_factory:
+            return False
+        
+        try:
+            session = self.session_factory()
+            
+            # Convert lists to JSON strings
+            main_json = json.dumps(main_controllers) if main_controllers else None
+            above_json = json.dumps(supporting_above) if supporting_above else None
+            below_json = json.dumps(supporting_below) if supporting_below else None
+            
+            # Check if entry exists
+            cache_entry = session.query(MinimalUserFacilityStatusCache).filter_by(
+                user_settings_id=user_settings_id
+            ).first()
+            
+            current_time = datetime.utcnow()
+            
+            if cache_entry:
+                # Update existing entry
+                cache_entry.status = status
+                cache_entry.main_controllers = main_json
+                cache_entry.supporting_above = above_json
+                cache_entry.supporting_below = below_json
+                cache_entry.last_checked_at = current_time
+                cache_entry.updated_at = current_time
+            else:
+                # Create new entry
+                cache_entry = MinimalUserFacilityStatusCache()
+                cache_entry.user_settings_id = user_settings_id
+                cache_entry.status = status
+                cache_entry.main_controllers = main_json
+                cache_entry.supporting_above = above_json
+                cache_entry.supporting_below = below_json
+                cache_entry.last_checked_at = current_time
+                cache_entry.created_at = current_time
+                cache_entry.updated_at = current_time
+                session.add(cache_entry)
+            
+            session.commit()
+            session.close()
+            
+            logging.debug(f"Updated cached status for user_settings_id {user_settings_id}: {status}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error updating cached status for user_settings_id {user_settings_id}: {e}")
+            return False
+    
+    def clear_cached_status(self, user_settings_id: int) -> bool:
+        """
+        Clear cached facility status for a user (e.g., when they change facility patterns)
+        
+        Args:
+            user_settings_id: The user settings ID
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.enabled or not self.session_factory:
+            return False
+        
+        try:
+            session = self.session_factory()
+            
+            # Delete cache entry
+            deleted = session.query(MinimalUserFacilityStatusCache).filter_by(
+                user_settings_id=user_settings_id
+            ).delete()
+            
+            session.commit()
+            session.close()
+            
+            logging.debug(f"Cleared cached status for user_settings_id {user_settings_id} (deleted {deleted} entries)")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error clearing cached status for user_settings_id {user_settings_id}: {e}")
+            return False
+    
+    def cleanup_old_cache_entries(self, days_old: int = 30) -> int:
+        """
+        Clean up old cache entries
+        
+        Args:
+            days_old: Delete entries older than this many days
+            
+        Returns:
+            Number of entries deleted
+        """
+        if not self.enabled or not self.session_factory:
+            return 0
+        
+        try:
+            session = self.session_factory()
+            
+            cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+            
+            deleted = session.query(MinimalUserFacilityStatusCache).filter(
+                MinimalUserFacilityStatusCache.last_checked_at < cutoff_date
+            ).delete()
+            
+            session.commit()
+            session.close()
+            
+            if deleted > 0:
+                logging.info(f"Cleaned up {deleted} old cache entries (older than {days_old} days)")
+            
+            return deleted
+            
+        except Exception as e:
+            logging.error(f"Error cleaning up old cache entries: {e}")
+            return 0

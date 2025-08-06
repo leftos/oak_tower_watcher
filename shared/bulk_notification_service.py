@@ -137,16 +137,16 @@ class BulkNotificationService:
 
     def send_personalized_bulk_notification(
         self,
-        status_change: str,
+        status_change: Optional[str] = None,  # Made optional for backward compatibility
         priority: int = 0,
         sound: Optional[str] = None,
         service_name: str = 'oak_tower_watcher'
     ) -> Dict[str, Any]:
         """
-        Send personalized notifications to users based on their facility configurations
+        Send personalized notifications to users based on their facility configurations and status transitions
         
         Args:
-            status_change: Type of status change ('main_online', 'supporting_online', 'all_offline', etc.)
+            status_change: Type of status change (deprecated - now determines transitions automatically)
             priority: Pushover priority level (-2 to 2)
             sound: Notification sound
             service_name: Service name to filter users by
@@ -167,6 +167,7 @@ class BulkNotificationService:
         try:
             from config.config import load_config
             from shared.vatsim_core import VATSIMCore
+            from shared.notification_manager import NotificationManager
         except ImportError as e:
             logging.error(f"Failed to import required modules: {e}")
             return {
@@ -193,23 +194,37 @@ class BulkNotificationService:
         failed_count = 0
         details = []
         
-        # Load base config for fallback
+        # Load base config
         base_config = load_config()
         
         for user in users:
             try:
+                user_settings_id = user.get('user_id')  # Using user_id as settings identifier
+                
+                # Skip if user_settings_id is None
+                if not user_settings_id:
+                    logging.warning(f"No user_settings_id found for user {user.get('user_email', 'unknown')}")
+                    continue
+                
                 # Get user's facility patterns
                 user_patterns = user.get('facility_patterns', {})
                 
                 # Create user-specific config or use default
+                user_config = base_config.copy()
                 if any(user_patterns.values()):  # User has custom patterns
-                    user_config = base_config.copy()
                     user_config['callsigns'] = user_patterns
                     vatsim_core = VATSIMCore(user_config)
                     config_type = "custom"
                 else:  # Use default patterns
-                    vatsim_core = VATSIMCore(base_config)
+                    vatsim_core = VATSIMCore(user_config)
                     config_type = "default"
+                
+                # Create NotificationManager for transition logic
+                notification_manager = NotificationManager(user_config)
+                
+                # Get cached previous status for this user
+                cached_status = self.db_interface.get_cached_status(user_settings_id)
+                previous_status = cached_status['status'] if cached_status else 'all_offline'
                 
                 # Check current status with user's configuration
                 status_result = vatsim_core.check_status()
@@ -218,33 +233,63 @@ class BulkNotificationService:
                     logging.warning(f"Failed to get status for user {user['user_email']}: {status_result.get('error', 'Unknown error')}")
                     continue
                 
-                # Determine if this user should be notified based on their status
-                should_notify = False
-                title = ""
-                message = ""
-                
                 current_status = status_result['status']
                 main_controllers = status_result.get('main_controllers', [])
                 supporting_above = status_result.get('supporting_above', [])
                 supporting_below = status_result.get('supporting_below', [])
                 
-                if current_status in ['main_facility_and_supporting_above_online', 'main_facility_online', 'supporting_above_online', 'all_offline']:
+                # Update cached status in database
+                self.db_interface.update_cached_status(
+                    user_settings_id=user_settings_id,
+                    status=current_status,
+                    main_controllers=main_controllers,
+                    supporting_above=supporting_above,
+                    supporting_below=supporting_below
+                )
+                
+                # Check if status has changed and send transition notification if needed
+                should_notify = False
+                title = ""
+                message = ""
+                
+                if previous_status != current_status:
+                    # Status changed - use transition notification
                     should_notify = True
-                    
-                    # Use shared notification formatting function
-                    notification_data = format_push_notification(
+                    transition_result = notification_manager.get_transition_notification(
+                        previous_status=previous_status,
                         current_status=current_status,
-                        main_controllers=main_controllers,
-                        supporting_above=supporting_above,
-                        supporting_below=supporting_below,
-                        include_priority_sound=False,
-                        is_test=False
+                        controller_info=main_controllers,
+                        supporting_info=supporting_above,
+                        supporting_below_controllers=supporting_below
                     )
                     
-                    title = notification_data['title']
-                    message = notification_data['message']
+                    if transition_result:
+                        title, message, toast_type = transition_result
+                        logging.debug(f"Transition notification for user {user['user_email']}: {previous_status} -> {current_status}")
+                    else:
+                        # Fallback to status-based notification
+                        notification_data = format_push_notification(
+                            current_status=current_status,
+                            main_controllers=main_controllers,
+                            supporting_above=supporting_above,
+                            supporting_below=supporting_below,
+                            include_priority_sound=False,
+                            is_test=False
+                        )
+                        title = notification_data['title']
+                        message = notification_data['message']
+                else:
+                    # Status hasn't changed - no notification needed
+                    details.append({
+                        'user_email': user['user_email'],
+                        'status': 'skipped',
+                        'message': f'No status change - {current_status} ({config_type} config)',
+                        'previous_status': previous_status,
+                        'current_status': current_status,
+                        'config_type': config_type
+                    })
                 
-                if should_notify:                    
+                if should_notify:
                     # Create PushoverService instance for this user
                     pushover_service = PushoverService(
                         api_token=user['pushover_api_token'],
@@ -261,38 +306,31 @@ class BulkNotificationService:
                     
                     if result['success']:
                         sent_count += 1
-                        logging.debug(f"Personalized notification sent to user {user['user_email']} (status: {current_status}, config: {config_type})")
+                        logging.info(f"Transition notification sent to user {user['user_email']}: {previous_status} -> {current_status}")
                         details.append({
                             'user_email': user['user_email'],
                             'status': 'sent',
-                            'message': f'Success - {current_status} ({config_type} config)',
+                            'message': f'Transition: {previous_status} -> {current_status} ({config_type} config)',
+                            'previous_status': previous_status,
                             'current_status': current_status,
                             'config_type': config_type
                         })
                     else:
                         failed_count += 1
-                        logging.warning(f"Failed to send personalized notification to user {user['user_email']}: {result.get('error', 'Unknown error')}")
+                        logging.warning(f"Failed to send transition notification to user {user['user_email']}: {result.get('error', 'Unknown error')}")
                         details.append({
                             'user_email': user['user_email'],
                             'status': 'failed',
                             'message': result.get('error', 'Unknown error'),
+                            'previous_status': previous_status,
                             'current_status': current_status,
                             'config_type': config_type
                         })
-                else:
-                    # User doesn't need notification for current status
-                    details.append({
-                        'user_email': user['user_email'],
-                        'status': 'skipped',
-                        'message': f'No notification needed - {current_status} ({config_type} config)',
-                        'current_status': current_status,
-                        'config_type': config_type
-                    })
                     
             except Exception as e:
                 failed_count += 1
                 error_msg = str(e)
-                logging.error(f"Error processing personalized notification for user {user['user_email']}: {error_msg}")
+                logging.error(f"Error processing transition notification for user {user['user_email']}: {error_msg}")
                 details.append({
                     'user_email': user['user_email'],
                     'status': 'error',
@@ -300,11 +338,11 @@ class BulkNotificationService:
                 })
         
         # Log summary
-        logging.info(f"Personalized bulk notification complete - Sent: {sent_count}, Failed: {failed_count}")
+        logging.info(f"Transition-aware bulk notification complete - Sent: {sent_count}, Failed: {failed_count}")
         
         return {
             'success': True,
-            'message': f'Personalized bulk notification complete',
+            'message': f'Transition-aware bulk notification complete',
             'sent_count': sent_count,
             'failed_count': failed_count,
             'details': details
