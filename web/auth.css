@@ -543,6 +543,7 @@
 
 .btn-success:hover {
     background-color: #218838;
+    transform: translateY(-2px);
 }
 
 .btn-warning {
