@@ -36,6 +36,12 @@ class OAKTowerStatus {
         if (toggleAutoRefreshBtn) {
             toggleAutoRefreshBtn.addEventListener('click', () => this.toggleAutoRefresh());
         }
+
+        // Test notification button
+        const testNotificationBtn = document.getElementById('test-notification-btn');
+        if (testNotificationBtn) {
+            testNotificationBtn.addEventListener('click', () => this.testStatusNotification());
+        }
     }
 
     async loadStatus() {
@@ -88,6 +94,7 @@ class OAKTowerStatus {
         this.updateMainStatus(status);
         this.updateControllers(status);
         this.updateServiceStats(status);
+        this.updateUserConfigStatus(status);
     }
 
     updateMainStatus(status) {
@@ -103,7 +110,7 @@ class OAKTowerStatus {
                 indicator.classList.add('status-online');
                 indicator.textContent = '🟣';
                 title.textContent = 'Full Coverage Online';
-                description.textContent = 'Tower and supporting facilities are active';
+                description.textContent = 'Main facility and supporting facilities are active';
                 break;
             case 'main_facility_online':
                 indicator.classList.add('status-online');
@@ -115,7 +122,7 @@ class OAKTowerStatus {
                 indicator.classList.add('status-partial');
                 indicator.textContent = '🟡';
                 title.textContent = 'Supporting Facility Online';
-                description.textContent = 'Tower offline, but supporting facility active';
+                description.textContent = 'Main facility offline, but supporting facility active';
                 break;
             case 'all_offline':
                 indicator.classList.add('status-offline');
@@ -155,7 +162,7 @@ class OAKTowerStatus {
                     <span class="controller-callsign">${controller.callsign}</span>
                     <span class="controller-frequency">${controller.frequency}</span>
                 </div>
-                <div class="controller-name">${controller.name || 'Unknown Controller'}</div>
+                <div class="controller-name">${controller.name || controller.cid}</div>
                 <div class="controller-details">
                     <div>CID: ${controller.cid || 'Unknown'}</div>
                     <div>Online: ${this.formatDuration(controller.logon_time)}</div>
@@ -171,6 +178,61 @@ class OAKTowerStatus {
             document.getElementById('check-interval').textContent = `${status.config.check_interval} seconds`;
         } else {
             document.getElementById('check-interval').textContent = '30 seconds';
+        }
+    }
+
+    updateUserConfigStatus(status) {
+        // Check if there's an existing user config indicator
+        let configIndicator = document.getElementById('user-config-indicator');
+        
+        if (status.using_user_config) {
+            // Create or update the indicator if user config is being used
+            if (!configIndicator) {
+                configIndicator = document.createElement('div');
+                configIndicator.id = 'user-config-indicator';
+                configIndicator.className = 'user-config-badge';
+                
+                // Insert after the service stats
+                const serviceStatsCard = document.querySelector('.info-card');
+                if (serviceStatsCard && serviceStatsCard.parentNode) {
+                    const newCard = document.createElement('div');
+                    newCard.className = 'info-card user-config-card';
+                    newCard.appendChild(configIndicator);
+                    serviceStatsCard.parentNode.insertBefore(newCard, serviceStatsCard.nextSibling);
+                }
+            }
+            
+            configIndicator.innerHTML = `
+                <h3>🎯 Personal Configuration Active</h3>
+                <div class="user-config-info">
+                    <p><strong>You're using your custom facility patterns!</strong></p>
+                    <div class="pattern-summary">
+                        <div class="pattern-group">
+                            <strong>Main Facility:</strong>
+                            <span class="pattern-count">${status.facility_patterns?.main_facility?.length || 0} patterns</span>
+                        </div>
+                        <div class="pattern-group">
+                            <strong>Supporting Above:</strong>
+                            <span class="pattern-count">${status.facility_patterns?.supporting_above?.length || 0} patterns</span>
+                        </div>
+                        <div class="pattern-group">
+                            <strong>Supporting Below:</strong>
+                            <span class="pattern-count">${status.facility_patterns?.supporting_below?.length || 0} patterns</span>
+                        </div>
+                    </div>
+                    <div class="config-actions">
+                        <a href="/auth/settings/oak_tower_watcher" class="btn btn-secondary">⚙️ Edit Configuration</a>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Remove the indicator if using default config
+            if (configIndicator) {
+                const parentCard = configIndicator.closest('.user-config-card');
+                if (parentCard) {
+                    parentCard.remove();
+                }
+            }
         }
     }
 
@@ -282,6 +344,79 @@ class OAKTowerStatus {
             this.startAutoRefresh();
             btn.textContent = '⏸️ Pause Auto-refresh';
         }
+    }
+
+    async testStatusNotification() {
+        const testBtn = document.getElementById('test-notification-text');
+        const originalText = testBtn.textContent;
+        
+        testBtn.textContent = '📤 Sending...';
+        
+        try {
+            const response = await fetch('/api/test-status-notification', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Show success message
+                this.showMessage('success', 'Test notification sent successfully! Check your device.', {
+                    status: result.status,
+                    controllers: result.controllers,
+                    using_user_config: result.using_user_config
+                });
+                
+                console.log('Test status notification sent successfully');
+            } else {
+                // Show error message
+                this.showMessage('error', result.message || 'Failed to send test notification');
+            }
+            
+        } catch (error) {
+            console.error('Error sending test notification:', error);
+            this.showMessage('error', 'Network error: Unable to send test notification');
+        } finally {
+            testBtn.textContent = originalText;
+        }
+    }
+
+    showMessage(type, message, details = null) {
+        const container = document.querySelector('.status-section');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message-notification ${type}-message`;
+        
+        let messageContent = message;
+        
+        if (details && type === 'success') {
+            messageContent += `<br><small>Status: ${details.status || 'Unknown'}`;
+            if (details.controllers) {
+                const totalControllers = (details.controllers.main || 0) +
+                                       (details.controllers.supporting_above || 0) +
+                                       (details.controllers.supporting_below || 0);
+                messageContent += ` | ${totalControllers} controllers online`;
+            }
+            if (details.using_user_config) {
+                messageContent += ` | Using custom config`;
+            }
+            messageContent += '</small>';
+        }
+        
+        messageDiv.innerHTML = messageContent;
+        container.appendChild(messageDiv);
+        
+        // Auto-remove message after 5 seconds
+        setTimeout(() => {
+            if (messageDiv.parentNode) {
+                messageDiv.remove();
+            }
+        }, 5000);
+        
+        // Add fade-in animation
+        setTimeout(() => messageDiv.classList.add('message-fade-in'), 100);
     }
 }
 

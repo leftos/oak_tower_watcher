@@ -9,6 +9,7 @@ import os
 import sys
 from typing import List, Dict, Any, Optional
 from .pushover_service import PushoverService
+from .utils import format_push_notification
 
 # Add the project root to the path to import web modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -49,7 +50,7 @@ class BulkNotificationService:
             service_name: The service name to filter by
             
         Returns:
-            List of user notification settings
+            List of user notification settings with facility patterns
         """
         if not self.enabled or not self.app:
             return []
@@ -67,15 +68,18 @@ class BulkNotificationService:
                     UserSettings.pushover_user_key != ''
                 ).all()
                 
-                # Convert to list of dictionaries
+                # Convert to list of dictionaries with facility patterns
                 user_settings = []
                 for setting in settings:
+                    facility_patterns = setting.get_all_facility_patterns()
+                    
                     user_settings.append({
                         'user_id': setting.user_id,
                         'user_email': setting.user.email if setting.user else 'unknown',
                         'pushover_api_token': setting.pushover_api_token,
                         'pushover_user_key': setting.pushover_user_key,
-                        'service_name': setting.service_name
+                        'service_name': setting.service_name,
+                        'facility_patterns': facility_patterns
                     })
                 
                 logging.info(f"Found {len(user_settings)} users with valid Pushover settings")
@@ -180,6 +184,185 @@ class BulkNotificationService:
         return {
             'success': True,
             'message': f'Bulk notification complete',
+            'sent_count': sent_count,
+            'failed_count': failed_count,
+            'details': details
+        }
+
+    def send_personalized_bulk_notification(
+        self,
+        status_change: str,
+        priority: int = 0,
+        sound: Optional[str] = None,
+        service_name: str = 'oak_tower_watcher'
+    ) -> Dict[str, Any]:
+        """
+        Send personalized notifications to users based on their facility configurations
+        
+        Args:
+            status_change: Type of status change ('main_online', 'supporting_online', 'all_offline', etc.)
+            priority: Pushover priority level (-2 to 2)
+            sound: Notification sound
+            service_name: Service name to filter users by
+            
+        Returns:
+            Dictionary with results summary
+        """
+        if not self.enabled:
+            return {
+                'success': False,
+                'error': 'Bulk notification service not available',
+                'sent_count': 0,
+                'failed_count': 0,
+                'details': []
+            }
+        
+        # Import here to avoid circular imports
+        try:
+            from config.config import load_config
+            from shared.vatsim_core import VATSIMCore
+        except ImportError as e:
+            logging.error(f"Failed to import required modules: {e}")
+            return {
+                'success': False,
+                'error': 'Required modules not available',
+                'sent_count': 0,
+                'failed_count': 0,
+                'details': []
+            }
+        
+        users = self.get_notification_users(service_name)
+        
+        if not users:
+            logging.info("No users found with valid Pushover settings - skipping personalized bulk notification")
+            return {
+                'success': True,
+                'message': 'No users to notify',
+                'sent_count': 0,
+                'failed_count': 0,
+                'details': []
+            }
+        
+        sent_count = 0
+        failed_count = 0
+        details = []
+        
+        # Load base config for fallback
+        base_config = load_config()
+        
+        for user in users:
+            try:
+                # Get user's facility patterns
+                user_patterns = user.get('facility_patterns', {})
+                
+                # Create user-specific config or use default
+                if any(user_patterns.values()):  # User has custom patterns
+                    user_config = base_config.copy()
+                    user_config['callsigns'] = user_patterns
+                    vatsim_core = VATSIMCore(user_config)
+                    config_type = "custom"
+                else:  # Use default patterns
+                    vatsim_core = VATSIMCore(base_config)
+                    config_type = "default"
+                
+                # Check current status with user's configuration
+                status_result = vatsim_core.check_status()
+                
+                if not status_result['success']:
+                    logging.warning(f"Failed to get status for user {user['user_email']}: {status_result.get('error', 'Unknown error')}")
+                    continue
+                
+                # Determine if this user should be notified based on their status
+                should_notify = False
+                title = ""
+                message = ""
+                
+                current_status = status_result['status']
+                main_controllers = status_result.get('main_controllers', [])
+                supporting_above = status_result.get('supporting_above', [])
+                supporting_below = status_result.get('supporting_below', [])
+                
+                if current_status in ['main_facility_and_supporting_above_online', 'main_facility_online', 'supporting_above_online', 'all_offline']:
+                    should_notify = True
+                    
+                    # Use shared notification formatting function
+                    notification_data = format_push_notification(
+                        current_status=current_status,
+                        main_controllers=main_controllers,
+                        supporting_above=supporting_above,
+                        supporting_below=supporting_below,
+                        include_priority_sound=False,
+                        is_test=False
+                    )
+                    
+                    title = notification_data['title']
+                    message = notification_data['message']
+                
+                if should_notify:
+                    # Add configuration info to message
+                    if config_type == "custom":
+                        message += f"\n\n📍 Using your custom facility configuration"
+                    
+                    # Create PushoverService instance for this user
+                    pushover_service = PushoverService(
+                        api_token=user['pushover_api_token'],
+                        user_key=user['pushover_user_key']
+                    )
+                    
+                    # Send notification
+                    result = pushover_service.send_notification(
+                        message=message,
+                        title=title,
+                        priority=priority,
+                        sound=sound
+                    )
+                    
+                    if result['success']:
+                        sent_count += 1
+                        logging.debug(f"Personalized notification sent to user {user['user_email']} (status: {current_status}, config: {config_type})")
+                        details.append({
+                            'user_email': user['user_email'],
+                            'status': 'sent',
+                            'message': f'Success - {current_status} ({config_type} config)',
+                            'current_status': current_status,
+                            'config_type': config_type
+                        })
+                    else:
+                        failed_count += 1
+                        logging.warning(f"Failed to send personalized notification to user {user['user_email']}: {result.get('error', 'Unknown error')}")
+                        details.append({
+                            'user_email': user['user_email'],
+                            'status': 'failed',
+                            'message': result.get('error', 'Unknown error'),
+                            'current_status': current_status,
+                            'config_type': config_type
+                        })
+                else:
+                    # User doesn't need notification for current status
+                    details.append({
+                        'user_email': user['user_email'],
+                        'status': 'skipped',
+                        'message': f'No notification needed - {current_status} ({config_type} config)',
+                        'current_status': current_status,
+                        'config_type': config_type
+                    })
+                    
+            except Exception as e:
+                failed_count += 1
+                error_msg = str(e)
+                logging.error(f"Error processing personalized notification for user {user['user_email']}: {error_msg}")
+                details.append({
+                    'user_email': user['user_email'],
+                    'status': 'error',
+                    'message': error_msg
+                })
+        
+        # Log summary
+        logging.info(f"Personalized bulk notification complete - Sent: {sent_count}, Failed: {failed_count}")
+        
+        return {
+            'success': True,
+            'message': f'Personalized bulk notification complete',
             'sent_count': sent_count,
             'failed_count': failed_count,
             'details': details

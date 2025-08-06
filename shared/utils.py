@@ -9,6 +9,7 @@ import sys
 import logging
 import re
 import requests
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 from bs4 import BeautifulSoup, Tag
 
@@ -284,8 +285,8 @@ def get_controller_name(controller_info, controller_names):
     if vatsim_name and not vatsim_name.isdigit() and len(vatsim_name) > 2:
         return vatsim_name
 
-    # Fallback to "Unknown Controller"
-    return "Unknown Controller"
+    # Fallback to CID
+    return f"{cid}"
 
 
 def get_controller_initials(controller_info, controller_names):
@@ -347,3 +348,153 @@ def calculate_time_online(logon_time_str):
     except (ValueError, TypeError) as e:
         logging.warning(f"Could not parse logon time '{logon_time_str}': {e}")
         return "Unknown"
+
+
+def format_controller_details(controllers: List[Dict[str, Any]], controller_names: Optional[Dict[str, Any]] = None) -> str:
+    """
+    Format a list of controllers with callsigns and names where available.
+    
+    Args:
+        controllers: List of controller dictionaries
+        controller_names: Optional dictionary mapping CIDs to controller names
+        
+    Returns:
+        Formatted string with controller details
+    """
+    if not controllers:
+        return "None"
+        
+    controller_names = controller_names or {}
+    details = []
+    
+    for controller in controllers:
+        callsign = controller.get('callsign', 'Unknown')
+        cid = controller.get('cid', '')
+        
+        # Try to get controller name
+        controller_name = None
+        if controller_names:
+            controller_name = get_controller_name(controller, controller_names)
+            if controller_name and controller_name != "Unknown Controller":
+                # Format as "CALLSIGN (Name)"
+                details.append(f"{callsign} ({controller_name})")
+            else:
+                # No name from roster, try CID
+                if cid:
+                    details.append(f"{callsign} ({cid})")
+                else:
+                    details.append(callsign)
+        else:
+            # Check if there's a name in the controller data itself
+            vatsim_name = controller.get('name', '').strip()
+            if vatsim_name and not vatsim_name.isdigit() and len(vatsim_name) > 2:
+                details.append(f"{callsign} ({vatsim_name})")
+            else:
+                # No name available, show CID if we have it
+                if cid:
+                    details.append(f"{callsign} ({cid})")
+                else:
+                    details.append(callsign)
+    
+    return ", ".join(details)
+
+
+def format_push_notification(
+    current_status: str,
+    main_controllers: Optional[List[Dict[str, Any]]] = None,
+    supporting_above: Optional[List[Dict[str, Any]]] = None,
+    supporting_below: Optional[List[Dict[str, Any]]] = None,
+    include_priority_sound: bool = False,
+    is_test: bool = False,
+    controller_names: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Format push notification title, message, priority and sound based on status.
+    
+    Args:
+        current_status: The current facility status
+        main_controllers: List of main facility controllers
+        supporting_above: List of supporting above controllers
+        supporting_below: List of supporting below controllers
+        include_priority_sound: Whether to include priority and sound in response
+        is_test: Whether this is a test notification
+        controller_names: Optional dictionary mapping CIDs to controller names
+    
+    Returns:
+        Dictionary containing title, message, and optionally priority/sound
+    """
+    main_controllers = main_controllers or []
+    supporting_above = supporting_above or []
+    supporting_below = supporting_below or []
+    
+    result = {}
+    
+    # Format controller details
+    main_details = format_controller_details(main_controllers, controller_names)
+    supporting_above_details = format_controller_details(supporting_above, controller_names)
+    supporting_below_details = format_controller_details(supporting_below, controller_names)
+    
+    # Format based on current status
+    if current_status == 'main_facility_and_supporting_above_online':
+        result['title'] = "🟣 Full Coverage Active!"
+        message_parts = [
+            "Main facility and supporting controllers are now online.",
+            f"Main: {main_details}",
+            f"Supporting Above: {supporting_above_details}"
+        ]
+        if supporting_below:
+            message_parts.append(f"Supporting Below: {supporting_below_details}")
+        result['message'] = "\n".join(message_parts)
+        if include_priority_sound:
+            result['priority'] = 1
+            result['sound'] = "magic"
+            
+    elif current_status == 'main_facility_online':
+        result['title'] = "🟢 Main Facility Online!"
+        message_parts = [
+            "Main facility controllers are now active.",
+            f"Controllers: {main_details}"
+        ]
+        if supporting_below:
+            message_parts.append(f"Supporting Below: {supporting_below_details}")
+        result['message'] = "\n".join(message_parts)
+        if include_priority_sound:
+            result['priority'] = 0
+            result['sound'] = "pushover"
+            
+    elif current_status == 'supporting_above_online':
+        result['title'] = "🟡 Supporting Facility Online"
+        message_parts = [
+            "Supporting controllers are active (main facility offline).",
+            f"Supporting Above: {supporting_above_details}"
+        ]
+        if supporting_below:
+            message_parts.append(f"Supporting Below: {supporting_below_details}")
+        result['message'] = "\n".join(message_parts)
+        if include_priority_sound:
+            result['priority'] = 0
+            result['sound'] = "intermission"
+            
+    elif current_status == 'all_offline':
+        result['title'] = "🔴 All Facilities Offline"
+        result['message'] = "All monitored controllers have gone offline."
+        if include_priority_sound:
+            result['priority'] = 0
+            result['sound'] = "falling"
+            
+    else:
+        # Fallback for unknown statuses (mainly for test notifications)
+        result['title'] = "🔍 Status Test Notification"
+        message_parts = [f"Current status: {current_status or 'Unknown'}"]
+        if main_controllers:
+            message_parts.append(f"Main: {main_details}")
+        if supporting_above:
+            message_parts.append(f"Supporting Above: {supporting_above_details}")
+        if supporting_below:
+            message_parts.append(f"Supporting Below: {supporting_below_details}")
+        result['message'] = "\n".join(message_parts)
+        if include_priority_sound:
+            result['priority'] = -1
+            result['sound'] = "none"
+    
+    return result

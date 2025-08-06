@@ -12,6 +12,85 @@
         <form method="POST" class="settings-form">
             {{ form.hidden_tag() }}
             
+            <!-- Facility Configuration Section -->
+            <div class="form-section">
+                <h3>Facility Configuration</h3>
+                <p class="form-description">
+                    Configure which VATSIM facilities you want to monitor using regular expressions.
+                    Each pattern should match controller callsigns you're interested in.
+                    <a href="https://regex101.com/" target="_blank" rel="noopener noreferrer" class="regex-help-link">
+                        🔗 Test your patterns with Regex101
+                    </a>
+                </p>
+                
+                <!-- Main Facility Patterns -->
+                <div class="form-group">
+                    {{ form.main_facility_patterns.label(class="form-label") }}
+                    <div class="regex-help">
+                        <small class="form-help">
+                            Main facility controllers (e.g., Tower). One pattern per line.
+                            <br><strong>Examples:</strong>
+                            <code>^OAK_(?:\d+_)?TWR$</code> (matches OAK_TWR, OAK_1_TWR, etc.)
+                        </small>
+                    </div>
+                    {{ form.main_facility_patterns(class="form-textarea regex-input", placeholder="^OAK_(?:\\d+_)?TWR$", rows="3") }}
+                    {% for error in form.main_facility_patterns.errors %}
+                        <span class="error">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                
+                <!-- Supporting Above Patterns -->
+                <div class="form-group">
+                    {{ form.supporting_above_patterns.label(class="form-label") }}
+                    <div class="regex-help">
+                        <small class="form-help">
+                            Supporting controllers above main facility (e.g., Approach, Center). One pattern per line.
+                            <br><strong>Examples:</strong>
+                            <code>^NCT_APP$</code>, <code>^OAK_\d+_CTR$</code>
+                        </small>
+                    </div>
+                    {{ form.supporting_above_patterns(class="form-textarea regex-input", placeholder="^NCT_APP$\n^OAK_\\d+_CTR$", rows="3") }}
+                    {% for error in form.supporting_above_patterns.errors %}
+                        <span class="error">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                
+                <!-- Supporting Below Patterns -->
+                <div class="form-group">
+                    {{ form.supporting_below_patterns.label(class="form-label") }}
+                    <div class="regex-help">
+                        <small class="form-help">
+                            Supporting controllers below main facility (e.g., Ground, Delivery). One pattern per line.
+                            <br><strong>Examples:</strong>
+                            <code>^OAK_(?:\d+_)?GND$</code>, <code>^OAK_(?:\d+_)?DEL$</code>
+                        </small>
+                    </div>
+                    {{ form.supporting_below_patterns(class="form-textarea regex-input", placeholder="^OAK_(?:\\d+_)?GND$\n^OAK_(?:\\d+_)?DEL$", rows="3") }}
+                    {% for error in form.supporting_below_patterns.errors %}
+                        <span class="error">{{ error }}</span>
+                    {% endfor %}
+                </div>
+                
+                <!-- Regex Help Section -->
+                <div class="regex-tips">
+                    <h4>📚 Regex Pattern Tips</h4>
+                    <ul class="tips-list">
+                        <li><strong>^</strong> - Start of string anchor</li>
+                        <li><strong>$</strong> - End of string anchor</li>
+                        <li><strong>\d</strong> - Any digit (0-9)</li>
+                        <li><strong>+</strong> - One or more occurrences</li>
+                        <li><strong>?</strong> - Zero or one occurrence</li>
+                        <li><strong>(?:\d+_)?</strong> - Optional digit(s) followed by underscore</li>
+                        <li><strong>|</strong> - OR operator (match either pattern)</li>
+                    </ul>
+                    <p class="common-patterns">
+                        <strong>Common patterns:</strong>
+                        <code>^[A-Z]{3}_TWR$</code> (any 3-letter airport tower),
+                        <code>^OAK_.*$</code> (any OAK position)
+                    </p>
+                </div>
+            </div>
+            
             <div class="form-section">
                 <h3>Pushover Configuration</h3>
                 <p class="form-description">
@@ -57,10 +136,18 @@
         <div class="settings-info">
             <h3>About Notifications</h3>
             <ul>
-                <li><strong>Main Facility Online:</strong> When facility controllers come online</li>
-                <li><strong>Supporting Controllers:</strong> When supporting controllers come online</li>
-                <li><strong>All Offline:</strong> When all monitored controllers go offline</li>
+                <li><strong>Main Facility Online:</strong> When your configured main facility controllers come online</li>
+                <li><strong>Supporting Controllers:</strong> When your configured supporting controllers come online</li>
+                <li><strong>All Offline:</strong> When all your monitored controllers go offline</li>
                 <li><strong>Errors:</strong> When there are issues with the monitoring system</li>
+            </ul>
+            
+            <h3>Default Configuration</h3>
+            <p>If you don't configure custom patterns, the system will use these defaults for Oakland Tower:</p>
+            <ul>
+                <li><strong>Main:</strong> <code>^OAK_(?:\d+_)?TWR$</code></li>
+                <li><strong>Above:</strong> <code>^NCT_APP$</code>, <code>^OAK_\d+_CTR$</code></li>
+                <li><strong>Below:</strong> <code>^OAK_(?:\d+_)?GND$</code>, <code>^OAK_(?:\d+_)?DEL$</code></li>
             </ul>
         </div>
     </div>

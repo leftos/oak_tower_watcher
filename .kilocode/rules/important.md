@@ -13,3 +13,5 @@ After changes to a docker image, 'docker compose restart' will NOT create a new 
 
 If you can't find a file or folder, say an ls or cd command fails, use pwd to check which folder you're in right now, instead of assuming.
 Try to keep track of which folder you're in so you don't keep adding a cd to a subfolder at the start of every subsequent command, only to have it fail.
+
+Don't use inline scripts. Keep in mind: 'Refused to execute inline event handler because it violates the following Content Security Policy directive: "script-src 'self'". Either the 'unsafe-inline' keyword, a hash ('sha256-...'), or a nonce ('nonce-...') is required to enable inline execution. Note that hashes do not apply to event handlers, style attributes and javascript: navigations unless the 'unsafe-hashes' keyword is present.'

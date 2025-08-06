@@ -7,7 +7,7 @@ import logging
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from .models import db, User, UserSettings
-from .forms import LoginForm, RegistrationForm, UserSettingsForm, PasswordResetRequestForm, PasswordResetForm
+from .forms import LoginForm, RegistrationForm, UserSettingsForm, PasswordResetRequestForm, PasswordResetForm, FacilityConfigForm
 from .email_service import send_verification_email, send_welcome_email, send_password_reset_email
 from .security import email_verification_required
 
@@ -134,7 +134,8 @@ def register():
     try:
         # Create new user (email_verified defaults to False)
         logger.debug(f"Creating new user: {email}")
-        user = User(email=email)
+        user = User()
+        user.email = email
         user.set_password(form.password.data)
         
         # Add user to session and flush to get the ID
@@ -144,11 +145,10 @@ def register():
         
         # Create default settings for OAK Tower Watcher
         logger.debug(f"Creating default settings for user: {email}")
-        default_settings = UserSettings(
-            user_id=user.id,
-            service_name='oak_tower_watcher',
-            notifications_enabled=True
-        )
+        default_settings = UserSettings()
+        default_settings.user_id = user.id
+        default_settings.service_name = 'oak_tower_watcher'
+        default_settings.notifications_enabled = True
         db.session.add(default_settings)
         db.session.commit()
         logger.info(f"User and default settings created successfully for: {email}")
@@ -196,11 +196,10 @@ def dashboard():
     oak_settings = current_user.get_service_settings('oak_tower_watcher')
     if not oak_settings:
         # Create default settings if they don't exist
-        oak_settings = UserSettings(
-            user_id=current_user.id,
-            service_name='oak_tower_watcher',
-            notifications_enabled=True
-        )
+        oak_settings = UserSettings()
+        oak_settings.user_id = current_user.id
+        oak_settings.service_name = 'oak_tower_watcher'
+        oak_settings.notifications_enabled = True
         db.session.add(oak_settings)
         db.session.commit()
     
@@ -215,27 +214,56 @@ def oak_tower_settings():
     """OAK Tower Watcher settings page"""
     settings = current_user.get_service_settings('oak_tower_watcher')
     if not settings:
-        settings = UserSettings(
-            user_id=current_user.id,
-            service_name='oak_tower_watcher',
-            notifications_enabled=True
-        )
+        settings = UserSettings()
+        settings.user_id = current_user.id
+        settings.service_name = 'oak_tower_watcher'
+        settings.notifications_enabled = True
         db.session.add(settings)
         db.session.commit()
     
-    form = UserSettingsForm()
+    form = FacilityConfigForm()
     
     if form.validate_on_submit():
-        settings.pushover_api_token = form.pushover_api_token.data
-        settings.pushover_user_key = form.pushover_user_key.data
-        settings.notifications_enabled = form.notifications_enabled.data
-        db.session.commit()
-        flash('Your settings have been updated!')
-        return redirect(url_for('auth.dashboard'))
+        try:
+            logger.debug(f"Processing facility config form for user: {current_user.email}")
+            
+            # Update pushover settings
+            settings.pushover_api_token = form.pushover_api_token.data
+            settings.pushover_user_key = form.pushover_user_key.data
+            settings.notifications_enabled = form.notifications_enabled.data
+            
+            # Update facility patterns
+            main_patterns = form.get_patterns_list('main_facility_patterns')
+            supporting_above_patterns = form.get_patterns_list('supporting_above_patterns')
+            supporting_below_patterns = form.get_patterns_list('supporting_below_patterns')
+            
+            settings.set_facility_patterns('main_facility', main_patterns)
+            settings.set_facility_patterns('supporting_above', supporting_above_patterns)
+            settings.set_facility_patterns('supporting_below', supporting_below_patterns)
+            
+            db.session.commit()
+            logger.info(f"Configuration updated successfully for user: {current_user.email}")
+            flash('Your configuration has been updated!')
+            return redirect(url_for('auth.dashboard'))
+            
+        except Exception as e:
+            logger.error(f"Error updating configuration for user {current_user.email}: {str(e)}", exc_info=True)
+            db.session.rollback()
+            flash('An error occurred while saving your configuration. Please try again.')
+            
     elif request.method == 'GET':
+        # Load existing settings into form
         form.pushover_api_token.data = settings.pushover_api_token
         form.pushover_user_key.data = settings.pushover_user_key
         form.notifications_enabled.data = settings.notifications_enabled
+        
+        # Load existing facility patterns
+        facility_patterns = settings.get_all_facility_patterns()
+        form.set_patterns_from_list('main_facility_patterns', facility_patterns.get('main_facility', []))
+        form.set_patterns_from_list('supporting_above_patterns', facility_patterns.get('supporting_above', []))
+        form.set_patterns_from_list('supporting_below_patterns', facility_patterns.get('supporting_below', []))
+        
+        logger.debug(f"Loaded facility config for user: {current_user.email}")
     
     return render_template('auth/oak_tower_settings.html',
                          title='VATSIM Facility Watcher Settings',

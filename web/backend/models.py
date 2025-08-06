@@ -247,8 +247,85 @@ class UserSettings(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Relationships
+    facility_regexes = db.relationship('UserFacilityRegex', backref='user_settings', lazy=True, cascade='all, delete-orphan')
+    
     # Unique constraint to ensure one setting per user per service
     __table_args__ = (db.UniqueConstraint('user_id', 'service_name', name='unique_user_service'),)
     
+    def get_facility_patterns(self, facility_type):
+        """Get facility regex patterns for a specific type"""
+        try:
+            patterns = UserFacilityRegex.query.filter_by(
+                user_settings_id=self.id,
+                facility_type=facility_type
+            ).order_by(UserFacilityRegex.sort_order).all()
+            
+            return [pattern.regex_pattern for pattern in patterns]
+            
+        except Exception as e:
+            logger.error(f"Error getting facility patterns for user settings ID {self.id}, type {facility_type}: {str(e)}", exc_info=True)
+            return []
+    
+    def get_all_facility_patterns(self):
+        """Get all facility regex patterns organized by type"""
+        try:
+            return {
+                'main_facility': self.get_facility_patterns('main_facility'),
+                'supporting_above': self.get_facility_patterns('supporting_above'),
+                'supporting_below': self.get_facility_patterns('supporting_below')
+            }
+        except Exception as e:
+            logger.error(f"Error getting all facility patterns for user settings ID {self.id}: {str(e)}", exc_info=True)
+            return {
+                'main_facility': [],
+                'supporting_above': [],
+                'supporting_below': []
+            }
+    
+    def set_facility_patterns(self, facility_type, patterns):
+        """Set facility regex patterns for a specific type"""
+        try:
+            logger.debug(f"Setting facility patterns for user settings ID {self.id}, type {facility_type}")
+            
+            # Delete existing patterns for this type
+            UserFacilityRegex.query.filter_by(
+                user_settings_id=self.id,
+                facility_type=facility_type
+            ).delete()
+            
+            # Add new patterns
+            for i, pattern in enumerate(patterns):
+                if pattern.strip():  # Only add non-empty patterns
+                    regex = UserFacilityRegex()
+                    regex.user_settings_id = self.id
+                    regex.facility_type = facility_type
+                    regex.regex_pattern = pattern.strip()
+                    regex.sort_order = i
+                    db.session.add(regex)
+            
+            db.session.commit()
+            logger.debug(f"Successfully set {len(patterns)} facility patterns for user settings ID {self.id}, type {facility_type}")
+            
+        except Exception as e:
+            logger.error(f"Error setting facility patterns for user settings ID {self.id}, type {facility_type}: {str(e)}", exc_info=True)
+            db.session.rollback()
+            raise
+    
     def __repr__(self):
-        return f'<UserSettings {self.user.email}:{self.service_name}>'
+        return f'<UserSettings ID={self.id}:{self.service_name}>'
+
+
+class UserFacilityRegex(db.Model):
+    """User-specific facility regex patterns"""
+    __tablename__ = 'user_facility_regexes'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_settings_id = db.Column(db.Integer, db.ForeignKey('user_settings.id'), nullable=False)
+    facility_type = db.Column(db.String(50), nullable=False)  # 'main_facility', 'supporting_above', 'supporting_below'
+    regex_pattern = db.Column(db.String(255), nullable=False)
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<UserFacilityRegex {self.facility_type}:{self.regex_pattern}>'

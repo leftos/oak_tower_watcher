@@ -1,5 +1,72 @@
 /* Status page specific styles */
 
+/* User Configuration Badge */
+.user-config-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+}
+
+.user-config-card h3 {
+    color: white;
+    margin-bottom: 1rem;
+}
+
+.user-config-badge {
+    padding: 1rem;
+}
+
+.user-config-info {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 0.5rem;
+}
+
+.pattern-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.pattern-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.pattern-count {
+    font-weight: bold;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+}
+
+.config-actions {
+    text-align: center;
+    margin-top: 1rem;
+}
+
+.config-actions .btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.config-actions .btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
 .header-nav {
     text-align: left;
     margin-bottom: 20px;
@@ -322,6 +389,25 @@
     border-radius: 8px;
     border: 1px solid #f5c6cb;
     margin: 20px 0;
+}
+
+/* Notification Messages */
+.message-notification {
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 6px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.message-notification.message-fade-in {
+    opacity: 1;
+}
+
+.message-notification small {
+    opacity: 0.8;
+    font-size: 12px;
 }
 
 .success-message {
