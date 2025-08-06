@@ -9,7 +9,7 @@ import os
 import sys
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
-from flask import Flask, jsonify, send_from_directory, render_template, request
+from flask import Flask, jsonify, send_from_directory, render_template, request, abort
 from flask_cors import CORS
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
@@ -26,6 +26,7 @@ from .models import db, User
 from .auth import auth_bp
 from .email_service import init_mail
 from .api import api_bp
+from .security import init_security, rate_limit
  
 def create_app():
     """Application factory with environment-specific configuration"""
@@ -78,6 +79,9 @@ def create_app():
     # Configure environment-specific logging
     configure_logging(app, log_config)
     
+    # Initialize security middleware
+    init_security(app)
+    
     # Log environment information
     env_info = env_config.get_environment_info()
     app.logger.info(f"Application started in {env_info['environment']} environment")
@@ -95,20 +99,56 @@ def create_app():
             raise
     
     @app.route('/')
+    @rate_limit(max_requests=30, window_minutes=5)  # More lenient for homepage
     def index():
         """Serve the homepage"""
         return send_from_directory('../', 'index.html')
 
+    @app.route('/robots.txt')
+    def robots_txt():
+        """Serve robots.txt to discourage bots"""
+        return send_from_directory('../', 'robots.txt')
+
     @app.route('/<path:filename>')
+    @rate_limit(max_requests=20, window_minutes=5)  # Rate limit static files
     def serve_static(filename):
-        """Serve static files from web directory"""
-        # Check if it's a template file that should be rendered
+        """Serve static files from web directory - with security restrictions"""
+        # Security: Block common attack paths
+        forbidden_patterns = [
+            '.env', 'config', 'backup', '.git', '.htaccess', '.htpasswd',
+            'wp-admin', 'wp-login', 'phpmyadmin', 'admin', 'server-status',
+            'xmlrpc', '.well-known'
+        ]
+        
+        filename_lower = filename.lower()
+        for pattern in forbidden_patterns:
+            if pattern in filename_lower:
+                app.logger.warning(f"Blocked access to forbidden file: {filename} from IP: {request.remote_addr}")
+                abort(403)
+        
+        # Only serve known safe file types
+        allowed_extensions = [
+            '.html', '.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.ico',
+            '.svg', '.woff', '.woff2', '.ttf', '.eot', '.map'
+        ]
+        
+        if not any(filename_lower.endswith(ext) for ext in allowed_extensions):
+            app.logger.warning(f"Blocked access to disallowed file type: {filename} from IP: {request.remote_addr}")
+            abort(404)  # Return 404 instead of revealing file structure
+        
+        # Check if it's a template file that should be rendered (only for HTML)
         if filename.endswith('.html') and filename != 'index.html':
             try:
                 return render_template(filename)
-            except:
-                pass
-        return send_from_directory('../', filename)
+            except Exception as e:
+                app.logger.warning(f"Template rendering failed for {filename}: {str(e)}")
+                abort(404)
+        
+        try:
+            return send_from_directory('../', filename)
+        except Exception as e:
+            app.logger.warning(f"Static file serving failed for {filename}: {str(e)}")
+            abort(404)
     return app
 
 

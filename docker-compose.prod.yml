@@ -65,6 +65,9 @@ services:
       - GUNICORN_BIND=0.0.0.0:8080
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=${DATABASE_URL:-sqlite:///prod_data/users.db}
+      # Email Configuration - SendGrid
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - MAIL_DEFAULT_SENDER=${MAIL_DEFAULT_SENDER}
     
     volumes:
       - ./logs:/app/logs

@@ -1,0 +1,31 @@
+User-agent: *
+Disallow: /auth/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /config/
+Disallow: /.env
+Disallow: /.git/
+Disallow: /backup/
+Disallow: /logs/
+Disallow: /tmp/
+Disallow: /var/
+Disallow: /etc/
+Disallow: /usr/
+Disallow: /proc/
+Disallow: /dns-query
+Disallow: /query
+Disallow: /resolve
+
+# Allow access to public pages
+Allow: /
+Allow: /*.css
+Allow: /*.js
+Allow: /*.png
+Allow: /*.jpg
+Allow: /*.gif
+Allow: /*.ico
+
+# Crawl delay to reduce server load
+Crawl-delay: 10
+
+# No sitemap currently available
