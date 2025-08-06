@@ -136,14 +136,18 @@ def create_app():
             app.logger.warning(f"Blocked access to disallowed file type: {filename} from IP: {request.remote_addr}")
             abort(404)  # Return 404 instead of revealing file structure
         
-        # Check if it's a template file that should be rendered (only for HTML)
-        if filename.endswith('.html') and filename != 'index.html':
+        # Check if file exists in templates directory for rendering
+        template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
+        template_path = os.path.join(template_dir, filename)
+        
+        if filename.endswith('.html') and filename != 'index.html' and os.path.exists(template_path):
             try:
                 return render_template(filename)
             except Exception as e:
                 app.logger.warning(f"Template rendering failed for {filename}: {str(e)}")
                 abort(404)
         
+        # Serve as static file
         try:
             return send_from_directory('../', filename)
         except Exception as e:
