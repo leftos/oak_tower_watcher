@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="verification-icon">
+            ✉️
+        </div>
+        <h2>Email Verification Required</h2>
+        <p>You must verify your email address before accessing your dashboard and other features.</p>
+        
+        <div class="verification-info">
+            <p><strong>Your email:</strong> {{ user_email }}</p>
+            <p>Please check your inbox (including spam folder) for a verification email and click the verification link.</p>
+        </div>
+        
+        <div class="verification-actions">
+            <p>Didn't receive the email?</p>
+            <a href="{{ url_for('auth.resend_verification') }}" class="btn btn-primary">
+                Resend Verification Email
+            </a>
+        </div>
+        
+        <div class="auth-links">
+            <p><a href="{{ url_for('auth.logout') }}">Sign Out</a></p>
+        </div>
+    </div>
+</div>
+
+<style>
+.verification-icon {
+    font-size: 4rem;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.verification-info {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin: 1.5rem 0;
+}
+
+.verification-info p {
+    margin: 0.5rem 0;
+}
+
+.verification-actions {
+    text-align: center;
+    margin: 2rem 0;
+}
+
+.verification-actions p {
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+</style>
+{% endblock %}

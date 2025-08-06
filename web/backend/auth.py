@@ -9,6 +9,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from .models import db, User, UserSettings
 from .forms import LoginForm, RegistrationForm, UserSettingsForm
 from .email_service import send_verification_email, send_welcome_email
+from .security import email_verification_required
 
 # Configure logger for auth module
 logger = logging.getLogger(__name__)
@@ -188,6 +189,7 @@ def logout():
 
 @auth_bp.route('/dashboard')
 @login_required
+@email_verification_required
 def dashboard():
     """User dashboard"""
     # Get user's OAK Tower Watcher settings
@@ -208,6 +210,7 @@ def dashboard():
 
 @auth_bp.route('/settings/oak_tower_watcher', methods=['GET', 'POST'])
 @login_required
+@email_verification_required
 def oak_tower_settings():
     """OAK Tower Watcher settings page"""
     settings = current_user.get_service_settings('oak_tower_watcher')

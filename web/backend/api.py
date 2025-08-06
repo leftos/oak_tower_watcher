@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from shared.pushover_service import PushoverService
 from shared.bulk_notification_service import BulkNotificationService
 from .status_service import status_api
+from .security import email_verification_required
 
 api_bp = Blueprint('api', __name__)
 
@@ -59,6 +60,7 @@ def get_config():
 
 @api_bp.route('/test-pushover', methods=['POST'])
 @login_required
+@email_verification_required
 def test_pushover():
     """Send a test Pushover notification using user's credentials"""
     try:
@@ -126,6 +128,7 @@ def test_pushover():
 
 @api_bp.route('/test-bulk-pushover', methods=['POST'])
 @login_required
+@email_verification_required
 def test_bulk_pushover():
     """Test bulk Pushover notifications to all users with valid credentials"""
     try:
@@ -192,6 +195,7 @@ def test_bulk_pushover():
 
 @api_bp.route('/bulk-notification-stats', methods=['GET'])
 @login_required
+@email_verification_required
 def bulk_notification_stats():
     """Get statistics about users with valid Pushover settings"""
     try:

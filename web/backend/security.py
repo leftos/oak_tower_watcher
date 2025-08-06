@@ -8,7 +8,8 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import request, jsonify, abort, current_app
+from flask import request, jsonify, abort, current_app, redirect, url_for, render_template
+from flask_login import current_user
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,39 @@ SUSPICIOUS_USER_AGENTS = [
     'masscan',
     'zmap',
 ]
+
+def email_verification_required(f):
+    """
+    Decorator to ensure user has verified their email address before accessing protected routes.
+    This provides an additional layer of security beyond the login check.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check if user is authenticated first
+        if not current_user.is_authenticated:
+            # Let Flask-Login's @login_required handle this
+            return f(*args, **kwargs)
+        
+        # Check if email is verified
+        if not current_user.email_verified:
+            logger.warning(f"Unverified user attempted to access protected route: {current_user.email} -> {request.endpoint}")
+            
+            # For API endpoints, return JSON error
+            if request.endpoint and (request.endpoint.startswith('api.') or request.path.startswith('/api/')):
+                return jsonify({
+                    "error": "Email verification required",
+                    "message": "Please verify your email address before accessing this feature.",
+                    "requires_verification": True,
+                    "timestamp": datetime.now().isoformat()
+                }), 403
+            
+            # For web endpoints, redirect to verification required page
+            return render_template('auth/email_verification_required.html',
+                                 title='Email Verification Required',
+                                 user_email=current_user.email)
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 def is_suspicious_request():
     """Check if the current request looks suspicious"""
