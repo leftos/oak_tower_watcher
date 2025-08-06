@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1>Welcome, {{ current_user.email }}!</h1>
+        <p>Manage your service settings and preferences</p>
+    </div>
+    
+    <div class="services-grid">
+        <div class="service-card">
+            <div class="service-icon">🏗️</div>
+            <h2>OAK Tower Watcher</h2>
+            <p>Real-time monitoring of Oakland International Airport (KOAK) tower controllers</p>
+            
+            <div class="service-status">
+                {% if oak_settings.pushover_api_token and oak_settings.pushover_user_key %}
+                    <span class="status-badge status-configured">✓ Configured</span>
+                {% else %}
+                    <span class="status-badge status-pending">⚠ Setup Required</span>
+                {% endif %}
+                
+                {% if oak_settings.notifications_enabled %}
+                    <span class="status-badge status-enabled">🔔 Notifications On</span>
+                {% else %}
+                    <span class="status-badge status-disabled">🔕 Notifications Off</span>
+                {% endif %}
+            </div>
+            
+            <div class="service-info">
+                <p><strong>Pushover API:</strong> 
+                    {% if oak_settings.pushover_api_token %}
+                        Configured
+                    {% else %}
+                        Not configured
+                    {% endif %}
+                </p>
+                <p><strong>User Key:</strong> 
+                    {% if oak_settings.pushover_user_key %}
+                        Configured
+                    {% else %}
+                        Not configured
+                    {% endif %}
+                </p>
+            </div>
+            
+            <div class="service-actions">
+                <a href="{{ url_for('auth.oak_tower_settings') }}" class="btn btn-primary">Configure Settings</a>
+                <a href="/oak-tower-status.html" class="btn btn-secondary">View Status</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="account-info">
+        <h3>Account Information</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <label>Email:</label>
+                <span>{{ current_user.email }}</span>
+            </div>
+            <div class="info-item">
+                <label>Member since:</label>
+                <span>{{ current_user.created_at.strftime('%B %d, %Y') }}</span>
+            </div>
+            {% if current_user.last_login %}
+            <div class="info-item">
+                <label>Last login:</label>
+                <span>{{ current_user.last_login.strftime('%B %d, %Y at %I:%M %p') }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

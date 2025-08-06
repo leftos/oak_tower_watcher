@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Services Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="auth.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-brand">🏢 Server Services Dashboard</a>
+            <div class="nav-links">
+                <a href="/auth/login">Login</a>
+                <a href="/auth/register">Register</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>🏢 Server Services Dashboard</h1>
+            <p>Welcome to our monitoring and service management portal</p>
+            <p><strong>New!</strong> <a href="/auth/register">Create an account</a> to configure personalized notifications and settings for each service.</p>
+        </header>
+
+        <main>
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="service-icon">🏗️</div>
+                    <h2>OAK Tower Watcher</h2>
+                    <p>Real-time monitoring of Oakland International Airport (KOAK) tower controllers on the VATSIM network</p>
+                    <div class="service-features">
+                        <span class="feature">Live Status</span>
+                        <span class="feature">Push Notifications</span>
+                        <span class="feature">Controller Info</span>
+                    </div>
+                    <div class="service-actions">
+                        <a href="oak-tower-status.html" class="btn btn-primary">View Status</a>
+                        <a href="/auth/login" class="btn btn-secondary">Configure Notifications</a>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2024 Server Services Dashboard | Last updated: <span id="last-updated"></span></p>
+        </footer>
+    </div>
+
+    <script>
+        // Update last updated timestamp
+        document.getElementById('last-updated').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html>
