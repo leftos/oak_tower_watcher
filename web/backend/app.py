@@ -22,6 +22,7 @@ from src.vatsim_core import VATSIMCore
 from src.utils import load_artcc_roster, get_controller_name
 from .models import db, User
 from .auth import auth_bp
+from .email_service import init_mail
 
 def create_app():
     """Application factory"""
@@ -38,6 +39,7 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     CORS(app)
+    init_mail(app)
     
     # Initialize Flask-Login
     login_manager = LoginManager()

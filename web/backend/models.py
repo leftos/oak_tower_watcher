@@ -7,7 +7,8 @@ import logging
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
 
 # Configure logger for models module
 logger = logging.getLogger(__name__)
@@ -24,6 +25,11 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     is_active = db.Column(db.Boolean, default=True)
+    
+    # Email verification fields
+    email_verified = db.Column(db.Boolean, default=False, nullable=False)
+    email_verification_token = db.Column(db.String(255), unique=True, nullable=True)
+    email_verification_sent_at = db.Column(db.DateTime, nullable=True)
     
     # Relationship to user settings
     settings = db.relationship('UserSettings', backref='user', lazy=True, cascade='all, delete-orphan')
@@ -84,6 +90,67 @@ class User(UserMixin, db.Model):
         except Exception as e:
             logger.error(f"Error getting service settings for user {self.email}, service {service_name}: {str(e)}", exc_info=True)
             return None
+    
+    def generate_verification_token(self):
+        """Generate a new email verification token"""
+        try:
+            logger.debug(f"Generating verification token for user: {self.email}")
+            self.email_verification_token = secrets.token_urlsafe(32)
+            self.email_verification_sent_at = datetime.utcnow()
+            logger.debug(f"Verification token generated for user: {self.email}")
+            return self.email_verification_token
+        except Exception as e:
+            logger.error(f"Error generating verification token for user {self.email}: {str(e)}", exc_info=True)
+            raise
+    
+    def verify_email(self, token):
+        """Verify email with the provided token"""
+        try:
+            logger.debug(f"Verifying email token for user: {self.email}")
+            
+            if not self.email_verification_token:
+                logger.warning(f"No verification token found for user: {self.email}")
+                return False
+            
+            if self.email_verification_token != token:
+                logger.warning(f"Invalid verification token for user: {self.email}")
+                return False
+            
+            if self.is_verification_expired():
+                logger.warning(f"Verification token expired for user: {self.email}")
+                return False
+            
+            # Mark email as verified and clear token
+            self.email_verified = True
+            self.email_verification_token = None
+            self.email_verification_sent_at = None
+            
+            logger.info(f"Email verified successfully for user: {self.email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error verifying email for user {self.email}: {str(e)}", exc_info=True)
+            return False
+    
+    def is_verification_expired(self):
+        """Check if the verification token has expired (48 hours)"""
+        try:
+            if not self.email_verification_sent_at:
+                return True
+            
+            expiry_time = self.email_verification_sent_at + timedelta(hours=48)
+            is_expired = datetime.utcnow() > expiry_time
+            
+            logger.debug(f"Verification token expired check for user {self.email}: {is_expired}")
+            return is_expired
+            
+        except Exception as e:
+            logger.error(f"Error checking verification expiry for user {self.email}: {str(e)}", exc_info=True)
+            return True
+    
+    def can_login(self):
+        """Check if user can log in (email must be verified)"""
+        return self.is_active and self.email_verified
     
     def __repr__(self):
         return f'<User {self.email}>'

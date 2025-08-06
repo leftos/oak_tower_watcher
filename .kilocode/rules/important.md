@@ -5,3 +5,5 @@
 Organize files in folders as much as possible. 
 Avoid clutter in the root folder. 
 Put documentation under /docs/.
+
+Testing of the web app can happen through /web/run_app.py.

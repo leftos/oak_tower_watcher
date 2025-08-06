@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to OAK Tower Watcher</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .email-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        .title {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .success-badge {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #28a745;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .cta-button:hover {
+            background-color: #218838;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .feature-list {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .feature-list h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .feature-list ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .feature-list li {
+            margin-bottom: 8px;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .next-steps {
+            background-color: #e3f2fd;
+            border: 1px solid #bbdefb;
+            color: #0d47a1;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .next-steps h3 {
+            margin-top: 0;
+            color: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="logo">🏗️</div>
+            <h1 class="title">OAK Tower Watcher</h1>
+        </div>
+        
+        <div class="content">
+            <div class="success-badge">
+                ✅ Email Verified Successfully!
+            </div>
+            
+            <h2>Welcome to OAK Tower Watcher!</h2>
+            
+            <p>Hello {{ user.email }},</p>
+            
+            <p>Congratulations! Your email address has been successfully verified and your account is now active. You're all set to start monitoring Oakland International Airport (KOAK) tower controllers.</p>
+            
+            <div class="feature-list">
+                <h3>🎯 What you can do now:</h3>
+                <ul>
+                    <li><strong>Real-time Monitoring:</strong> View current tower controller status</li>
+                    <li><strong>Push Notifications:</strong> Get instant alerts via Pushover when controllers come online or go offline</li>
+                    <li><strong>Customizable Settings:</strong> Configure your notification preferences</li>
+                    <li><strong>Historical Data:</strong> Access controller activity patterns</li>
+                </ul>
+            </div>
+            
+            <div class="next-steps">
+                <h3>🚀 Next Steps:</h3>
+                <ol>
+                    <li>Log in to your dashboard</li>
+                    <li>Configure your Pushover API credentials for notifications</li>
+                    <li>Customize your notification preferences</li>
+                    <li>Start monitoring KOAK tower activity!</li>
+                </ol>
+            </div>
+            
+            <div class="button-container">
+                <a href="{{ url_for('auth.login', _external=True) }}" class="cta-button">Access Your Dashboard</a>
+            </div>
+            
+            <p>If you have any questions or need help getting started, feel free to reach out to our support team.</p>
+            
+            <p>Thank you for joining OAK Tower Watcher!</p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>OAK Tower Watcher</strong><br>
+            Real-time monitoring of Oakland International Airport (KOAK) tower controllers</p>
+            
+            <p>This is an automated email. Please do not reply to this message.</p>
+        </div>
+    </div>
+</body>
+</html>

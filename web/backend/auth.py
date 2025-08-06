@@ -8,6 +8,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from .models import db, User, UserSettings
 from .forms import LoginForm, RegistrationForm, UserSettingsForm
+from .email_service import send_verification_email, send_welcome_email
 
 # Configure logger for auth module
 logger = logging.getLogger(__name__)
@@ -59,6 +60,12 @@ def login():
             logger.warning(f"Login failed - User account disabled: {email}")
             flash('Account is disabled. Please contact support.')
             return redirect(url_for('auth.login'))
+        
+        # Check if email is verified
+        if not user.email_verified:
+            logger.warning(f"Login failed - Email not verified for user: {email}")
+            flash('Please verify your email address before logging in. Check your inbox for the verification email.')
+            return render_template('auth/login.html', title='Sign In', form=form, show_resend_link=True, user_email=email)
         
         # Check password
         logger.debug(f"Checking password for user: {email}")
@@ -124,7 +131,7 @@ def register():
     logger.info(f"Registration attempt for email: {email}")
     
     try:
-        # Create new user
+        # Create new user (email_verified defaults to False)
         logger.debug(f"Creating new user: {email}")
         user = User(email=email)
         user.set_password(form.password.data)
@@ -144,8 +151,16 @@ def register():
         db.session.commit()
         logger.info(f"Default settings created for user: {email}")
         
-        flash('Congratulations, you are now registered!')
-        logger.info(f"Registration completed successfully for: {email}")
+        # Send verification email
+        logger.debug(f"Sending verification email to: {email}")
+        if send_verification_email(user):
+            db.session.commit()  # Save the verification token
+            flash('Registration successful! Please check your email and click the verification link to activate your account.')
+            logger.info(f"Registration completed and verification email sent for: {email}")
+        else:
+            flash('Registration successful, but there was an issue sending the verification email. Please contact support.')
+            logger.warning(f"Registration completed but verification email failed for: {email}")
+        
         return redirect(url_for('auth.login'))
         
     except Exception as e:
@@ -218,6 +233,106 @@ def oak_tower_settings():
         form.pushover_user_key.data = settings.pushover_user_key
         form.notifications_enabled.data = settings.notifications_enabled
     
-    return render_template('auth/oak_tower_settings.html', 
-                         title='OAK Tower Watcher Settings', 
+    return render_template('auth/oak_tower_settings.html',
+                         title='OAK Tower Watcher Settings',
                          form=form)
+
+@auth_bp.route('/verify-email/<token>')
+def verify_email(token):
+    """Verify email address with token"""
+    logger.info(f"Email verification attempt with token: {token[:10]}...")
+    
+    try:
+        # Find user with this verification token
+        user = User.query.filter_by(email_verification_token=token).first()
+        
+        if not user:
+            logger.warning(f"Invalid verification token: {token[:10]}...")
+            flash('Invalid or expired verification link.')
+            return redirect(url_for('auth.login'))
+        
+        logger.debug(f"Found user for verification: {user.email}")
+        
+        # Check if already verified
+        if user.email_verified:
+            logger.info(f"User already verified: {user.email}")
+            flash('Your email is already verified. You can log in now.')
+            return redirect(url_for('auth.login'))
+        
+        # Verify the email
+        if user.verify_email(token):
+            db.session.commit()
+            logger.info(f"Email verification successful for: {user.email}")
+            
+            # Send welcome email
+            send_welcome_email(user)
+            
+            flash('Email verified successfully! You can now log in to your account.')
+            return redirect(url_for('auth.login'))
+        else:
+            logger.warning(f"Email verification failed for: {user.email}")
+            
+            # Check if token expired and delete user if so
+            if user.is_verification_expired():
+                logger.info(f"Verification expired, deleting user: {user.email}")
+                db.session.delete(user)
+                db.session.commit()
+                flash('Your verification link has expired. Please register again.')
+                return redirect(url_for('auth.register'))
+            else:
+                flash('Email verification failed. Please try again or contact support.')
+                return redirect(url_for('auth.login'))
+        
+    except Exception as e:
+        logger.error(f"Error during email verification: {str(e)}", exc_info=True)
+        db.session.rollback()
+        flash('An error occurred during verification. Please try again.')
+        return redirect(url_for('auth.login'))
+
+@auth_bp.route('/resend-verification', methods=['GET', 'POST'])
+def resend_verification():
+    """Resend verification email"""
+    if request.method == 'GET':
+        return render_template('auth/resend_verification.html', title='Resend Verification')
+    
+    # POST request
+    email = request.form.get('email', '').strip().lower()
+    logger.info(f"Resend verification request for: {email}")
+    
+    if not email:
+        flash('Please enter your email address.')
+        return render_template('auth/resend_verification.html', title='Resend Verification')
+    
+    try:
+        user = User.query.filter_by(email=email).first()
+        
+        if not user:
+            # Don't reveal if email exists or not for security
+            flash('If an account with that email exists and is not yet verified, a new verification email has been sent.')
+            return redirect(url_for('auth.login'))
+        
+        if user.email_verified:
+            flash('This email address is already verified. You can log in now.')
+            return redirect(url_for('auth.login'))
+        
+        # Check if verification period expired and delete user if so
+        if user.is_verification_expired():
+            logger.info(f"User verification period expired, deleting account: {email}")
+            db.session.delete(user)
+            db.session.commit()
+            flash('Your registration has expired. Please register again.')
+            return redirect(url_for('auth.register'))
+        
+        # Send new verification email
+        if send_verification_email(user):
+            db.session.commit()  # Save the new verification token
+            logger.info(f"Verification email resent to: {email}")
+        
+        flash('If an account with that email exists and is not yet verified, a new verification email has been sent.')
+        return redirect(url_for('auth.login'))
+        
+    except Exception as e:
+        logger.error(f"Error resending verification email: {str(e)}", exc_info=True)
+        db.session.rollback()
+        flash('An error occurred. Please try again.')
+        return render_template('auth/resend_verification.html', title='Resend Verification')
