@@ -53,10 +53,36 @@ def create_app():
     app.register_blueprint(auth_bp, url_prefix='/auth')
     
     # Configure logging
+    log_level = logging.DEBUG if os.environ.get('DEBUG', 'False').lower() == 'true' else logging.INFO
+    
+    # Create logs directory if it doesn't exist
+    log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Configure logging with both file and console output
     logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s"
+        level=log_level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler(os.path.join(log_dir, 'web_app.log')),
+            logging.StreamHandler()
+        ]
     )
+    
+    # Set specific log levels for different modules
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Reduce Flask request logging noise
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)  # Reduce SQLAlchemy noise
+    
+    app.logger.info("Logging configured successfully")
+    
+    # Initialize database tables
+    with app.app_context():
+        try:
+            db.create_all()
+            app.logger.info("Database tables created successfully")
+        except Exception as e:
+            app.logger.error(f"Error creating database tables: {e}")
+            raise
     
     return app
 
@@ -192,6 +218,7 @@ def get_config():
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors"""
+    app.logger.warning(f"404 Error - Path: {request.path}, Method: {request.method}, IP: {request.remote_addr}")
     return jsonify({
         "error": "Not found",
         "message": "The requested resource was not found",
@@ -201,6 +228,31 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     """Handle 500 errors"""
+    app.logger.error(f"500 Error - Path: {request.path}, Method: {request.method}, IP: {request.remote_addr}, Error: {str(error)}", exc_info=True)
+    
+    # Roll back any pending database transactions
+    try:
+        db.session.rollback()
+    except Exception as rollback_error:
+        app.logger.error(f"Error during database rollback: {str(rollback_error)}")
+    
+    return jsonify({
+        "error": "Internal server error",
+        "message": "An unexpected error occurred",
+        "timestamp": datetime.now().isoformat()
+    }), 500
+
+@app.errorhandler(Exception)
+def handle_exception(error):
+    """Handle all unhandled exceptions"""
+    app.logger.error(f"Unhandled Exception - Path: {request.path}, Method: {request.method}, IP: {request.remote_addr}, Error: {str(error)}", exc_info=True)
+    
+    # Roll back any pending database transactions
+    try:
+        db.session.rollback()
+    except Exception as rollback_error:
+        app.logger.error(f"Error during database rollback: {str(rollback_error)}")
+    
     return jsonify({
         "error": "Internal server error",
         "message": "An unexpected error occurred",

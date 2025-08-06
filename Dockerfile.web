@@ -48,7 +48,8 @@ COPY docker-entrypoint-web.sh .
 # Make entrypoint script executable and create logs and database directories
 RUN chmod +x docker-entrypoint-web.sh && \
     mkdir -p logs web/instance && \
-    chown -R vatsim:vatsim /app
+    chown -R vatsim:vatsim /app && \
+    chmod 755 logs web/instance
 
 # Switch to non-root user
 USER vatsim

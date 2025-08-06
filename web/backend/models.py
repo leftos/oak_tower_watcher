@@ -3,10 +3,14 @@
 Database models for OAK Tower Watcher user portal
 """
 
+import logging
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+
+# Configure logger for models module
+logger = logging.getLogger(__name__)
 
 db = SQLAlchemy()
 
@@ -26,23 +30,60 @@ class User(UserMixin, db.Model):
     
     def set_password(self, password):
         """Set password hash"""
-        self.password_hash = generate_password_hash(password)
+        try:
+            logger.debug(f"Setting password hash for user: {self.email}")
+            self.password_hash = generate_password_hash(password)
+            logger.debug(f"Password hash set successfully for user: {self.email}")
+        except Exception as e:
+            logger.error(f"Error setting password hash for user {self.email}: {str(e)}", exc_info=True)
+            raise
     
     def check_password(self, password):
         """Check password against hash"""
-        return check_password_hash(self.password_hash, password)
+        try:
+            logger.debug(f"Checking password for user: {self.email}")
+            
+            if not self.password_hash:
+                logger.warning(f"No password hash found for user: {self.email}")
+                return False
+            
+            if not password:
+                logger.warning(f"Empty password provided for user: {self.email}")
+                return False
+            
+            result = check_password_hash(self.password_hash, password)
+            logger.debug(f"Password check result for user {self.email}: {'VALID' if result else 'INVALID'}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error checking password for user {self.email}: {str(e)}", exc_info=True)
+            return False
     
     def update_last_login(self):
         """Update last login timestamp"""
-        self.last_login = datetime.utcnow()
-        db.session.commit()
+        try:
+            logger.debug(f"Updating last login timestamp for user: {self.email}")
+            self.last_login = datetime.utcnow()
+            db.session.commit()
+            logger.debug(f"Last login timestamp updated successfully for user: {self.email}")
+        except Exception as e:
+            logger.error(f"Error updating last login for user {self.email}: {str(e)}", exc_info=True)
+            db.session.rollback()
+            raise
     
     def get_service_settings(self, service_name):
         """Get settings for a specific service"""
-        return UserSettings.query.filter_by(
-            user_id=self.id, 
-            service_name=service_name
-        ).first()
+        try:
+            logger.debug(f"Getting service settings for user {self.email}, service: {service_name}")
+            settings = UserSettings.query.filter_by(
+                user_id=self.id,
+                service_name=service_name
+            ).first()
+            logger.debug(f"Service settings {'found' if settings else 'not found'} for user {self.email}, service: {service_name}")
+            return settings
+        except Exception as e:
+            logger.error(f"Error getting service settings for user {self.email}, service {service_name}: {str(e)}", exc_info=True)
+            return None
     
     def __repr__(self):
         return f'<User {self.email}>'
