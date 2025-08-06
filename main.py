@@ -8,10 +8,14 @@ import sys
 import signal
 import logging
 import atexit
+import os
 from src.utils import acquire_instance_lock, release_instance_lock
 from vatsim_monitor import VATSIMMonitor
 from config.config import load_config
 from src.updater import check_for_updates
+
+# Ensure logs directory exists
+os.makedirs("logs", exist_ok=True)
 
 # Configure logging
 logging.basicConfig(
