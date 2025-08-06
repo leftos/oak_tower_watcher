@@ -32,13 +32,13 @@ def init_mail(app):
     logger.info("Email service initialized")
 
 def send_async_email(app, msg):
-    """Send email asynchronously"""
-    try:
-        with app.app_context():
+    """Send email asynchronously in a specific app context"""
+    with app.app_context():
+        try:
             mail.send(msg)
             logger.info(f"Email sent successfully to {msg.recipients}")
-    except Exception as e:
-        logger.error(f"Failed to send email to {msg.recipients}: {str(e)}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Failed to send email to {msg.recipients}: {str(e)}", exc_info=True)
 
 def send_email(to, subject, template, **kwargs):
     """Send email with HTML template"""

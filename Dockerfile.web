@@ -25,6 +25,7 @@ RUN groupadd -r vatsim && useradd -r -g vatsim vatsim
 # Install curl for health checks
 RUN apt-get update && apt-get install -y \
     curl \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -47,12 +48,8 @@ COPY docker-entrypoint-web.sh .
 
 # Make entrypoint script executable and create logs and database directories
 RUN chmod +x docker-entrypoint-web.sh && \
-    mkdir -p logs web/instance && \
-    chown -R vatsim:vatsim /app && \
-    chmod 755 logs web/instance
+    chown vatsim:vatsim /app
 
-# Switch to non-root user
-USER vatsim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
@@ -68,4 +65,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 # Set entrypoint and default command
 ENTRYPOINT ["/app/docker-entrypoint-web.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "web.backend.app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "web.backend.app:app"]

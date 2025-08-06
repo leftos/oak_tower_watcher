@@ -221,3 +221,13 @@ config/production.py
 config/local.py
 .secrets
 secrets.json
+# Development environment
+dev_logs/
+dev_data/
+.env.development
+*.dev.db
+# Production environment
+logs/
+prod_data/
+.env.production
+*.prod.db

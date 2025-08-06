@@ -136,9 +136,10 @@ def register():
         user = User(email=email)
         user.set_password(form.password.data)
         
+        # Add user to session and flush to get the ID
         db.session.add(user)
-        db.session.commit()
-        logger.info(f"User created successfully: {email}, ID: {user.id}")
+        db.session.flush()  # This assigns the user.id without committing
+        logger.info(f"User created with ID: {user.id}")
         
         # Create default settings for OAK Tower Watcher
         logger.debug(f"Creating default settings for user: {email}")
@@ -149,7 +150,7 @@ def register():
         )
         db.session.add(default_settings)
         db.session.commit()
-        logger.info(f"Default settings created for user: {email}")
+        logger.info(f"User and default settings created successfully for: {email}")
         
         # Send verification email
         logger.debug(f"Sending verification email to: {email}")

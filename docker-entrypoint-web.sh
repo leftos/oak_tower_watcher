@@ -6,32 +6,27 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
 
-log "Starting VATSIM Tower Monitor Web Interface..."
+log "Entrypoint: Starting web-api service setup..."
 
-# Create config.json from sample if it doesn't exist
-if [ ! -f config.json ]; then
-    log "Creating config.json from sample..."
-    cp config.sample.json config.json
+# This script runs as root. We set correct ownership of mounted volumes.
+log "Ensuring correct ownership for mounted volumes: /app/logs and /app/prod_data..."
+mkdir -p /app/logs /app/prod_data
+chown -R vatsim:vatsim /app/logs /app/prod_data
+
+# Create config.json from sample if it doesn't exist and set ownership
+if [ ! -f /app/config.json ]; then
+    log "config.json not found. Creating from sample..."
+    cp /app/config.sample.json /app/config.json
+    chown vatsim:vatsim /app/config.json
 fi
 
-# Ensure logs directory exists
-mkdir -p logs
-
 # Set default values for Gunicorn if not provided
-export GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
+export GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
 export GUNICORN_BIND=${GUNICORN_BIND:-0.0.0.0:8080}
 export GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-120}
 
-log "Configuration:"
-log "  Workers: $GUNICORN_WORKERS"
-log "  Bind: $GUNICORN_BIND"
-log "  Timeout: $GUNICORN_TIMEOUT"
-log "  Flask Environment: ${FLASK_ENV:-development}"
+log "Configuration complete. Starting application as 'vatsim' user..."
 
-# Wait a moment for any dependencies
-sleep 2
-
-log "Starting web service..."
-
-# Execute the command passed to the container
-exec "$@"
+# Drop privileges and execute the main command (from CMD) as the 'vatsim' user.
+# 'gosu' will be installed in the Dockerfile.
+exec gosu vatsim "$@"

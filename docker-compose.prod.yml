@@ -10,13 +10,18 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=UTC
-      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-}
-      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-}
+      - APP_ENV=production
+      - FLASK_ENV=production
+      - PUSHOVER_API_TOKEN=${PUSHOVER_API_TOKEN:-""}
+      - PUSHOVER_USER_KEY=${PUSHOVER_USER_KEY:-""}
       - CHECK_INTERVAL=${CHECK_INTERVAL:-30}
       - AIRPORT_CODE=${AIRPORT_CODE:-KOAK}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///prod_data/users.db}
     
     volumes:
       - ./logs:/app/logs
+      - ./prod_data:/app/prod_data
     
     deploy:
       resources:
@@ -54,22 +59,34 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=UTC
+      - APP_ENV=production
       - FLASK_ENV=production
       - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
       - GUNICORN_BIND=0.0.0.0:8080
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///prod_data/users.db}
     
     volumes:
       - ./logs:/app/logs
+      - ./prod_data:/app/prod_data
     
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
           cpus: '1.0'
         reservations:
-          memory: 128M
+          memory: 256M
           cpus: '0.2'
-    
+
+    command: >
+      gunicorn --bind ${GUNICORN_BIND:-0.0.0.0:8080}
+               --workers ${GUNICORN_WORKERS:-2}
+               --timeout ${GUNICORN_TIMEOUT:-120}
+               --access-logfile '-'
+               --error-logfile '-'
+               'web.backend.app:app'
+     
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 30s
@@ -120,13 +137,13 @@ services:
   certbot:
     image: certbot/certbot
     container_name: vatsim-certbot
-    restart: "no"
+    restart: on-failure
     
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
     
-    command: certonly --webroot --webroot-path=/var/www/certbot --email ${SSL_EMAIL} --agree-tos --no-eff-email -d ${DOMAIN_NAME}
+    command: certonly --webroot -w /var/www/certbot --non-interactive --agree-tos --email ${SSL_EMAIL} -d ${DOMAIN_NAME} --staple-ocsp
 
 networks:
   app-network:
