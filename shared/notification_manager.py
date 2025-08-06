@@ -230,10 +230,9 @@ class NotificationManager:
             if status in sounds:
                 sound = sounds[status]
 
-            # Send bulk notification to all database users
-            result = self.bulk_notification_service.send_bulk_notification(
-                title=title,
-                message=message,
+            # Send personalized bulk notification to all database users based on their facility patterns
+            result = self.bulk_notification_service.send_personalized_bulk_notification(
+                status_change=status,
                 priority=priority,
                 sound=sound,
                 service_name='oak_tower_watcher'

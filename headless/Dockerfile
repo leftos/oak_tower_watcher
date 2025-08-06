@@ -35,12 +35,14 @@ COPY headless/main.py .
 COPY headless/worker.py .
 COPY shared/ shared/
 COPY config/ config/
+COPY web/ web/
 COPY headless/docker-entrypoint.sh .
 
 # Make entrypoint script executable and create logs directory
 RUN chmod +x docker-entrypoint.sh && \
     mkdir -p logs && \
-    chown -R vatsim:vatsim /app
+    chown -R vatsim:vatsim /app && \
+    chmod -R 755 /app
 
 # Switch to non-root user
 USER vatsim

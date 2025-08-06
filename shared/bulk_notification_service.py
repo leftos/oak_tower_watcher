@@ -5,42 +5,23 @@ Handles sending notifications to all users in the database with valid Pushover c
 """
 
 import logging
-import os
-import sys
 from typing import List, Dict, Any, Optional
 from .pushover_service import PushoverService
 from .utils import format_push_notification
-
-# Add the project root to the path to import web modules
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-try:
-    from web.backend.models import db, UserSettings
-    from web.backend.app import create_app
-    WEB_MODULES_AVAILABLE = True
-except ImportError:
-    WEB_MODULES_AVAILABLE = False
-    logging.warning("Web modules not available - bulk notifications to database users will be disabled")
+from .database_interface import DatabaseInterface
 
 
 class BulkNotificationService:
     """Service for sending notifications to all users with valid Pushover credentials"""
     
-    def __init__(self):
-        self.app = None
-        self.enabled = False
+    def __init__(self, database_url: Optional[str] = None):
+        self.db_interface = DatabaseInterface(database_url)
+        self.enabled = self.db_interface.enabled
         
-        if WEB_MODULES_AVAILABLE:
-            try:
-                # Create Flask app context for database access
-                self.app = create_app()
-                self.enabled = True
-                logging.info("Bulk notification service initialized successfully")
-            except Exception as e:
-                logging.error(f"Failed to initialize bulk notification service: {e}")
-                self.enabled = False
+        if self.enabled:
+            logging.info("Bulk notification service initialized successfully")
         else:
-            logging.warning("Web modules not available - bulk notifications disabled")
+            logging.warning("Bulk notification service disabled - database interface not available")
     
     def get_notification_users(self, service_name: str = 'oak_tower_watcher') -> List[Dict[str, Any]]:
         """
@@ -52,42 +33,7 @@ class BulkNotificationService:
         Returns:
             List of user notification settings with facility patterns
         """
-        if not self.enabled or not self.app:
-            return []
-        
-        try:
-            with self.app.app_context():
-                # Query for users with valid Pushover settings and notifications enabled
-                settings = UserSettings.query.filter_by(
-                    service_name=service_name,
-                    notifications_enabled=True
-                ).filter(
-                    UserSettings.pushover_api_token.isnot(None),
-                    UserSettings.pushover_user_key.isnot(None),
-                    UserSettings.pushover_api_token != '',
-                    UserSettings.pushover_user_key != ''
-                ).all()
-                
-                # Convert to list of dictionaries with facility patterns
-                user_settings = []
-                for setting in settings:
-                    facility_patterns = setting.get_all_facility_patterns()
-                    
-                    user_settings.append({
-                        'user_id': setting.user_id,
-                        'user_email': setting.user.email if setting.user else 'unknown',
-                        'pushover_api_token': setting.pushover_api_token,
-                        'pushover_user_key': setting.pushover_user_key,
-                        'service_name': setting.service_name,
-                        'facility_patterns': facility_patterns
-                    })
-                
-                logging.info(f"Found {len(user_settings)} users with valid Pushover settings")
-                return user_settings
-                
-        except Exception as e:
-            logging.error(f"Error querying notification users: {e}")
-            return []
+        return self.db_interface.get_notification_users(service_name)
     
     def send_bulk_notification(
         self,
@@ -298,11 +244,7 @@ class BulkNotificationService:
                     title = notification_data['title']
                     message = notification_data['message']
                 
-                if should_notify:
-                    # Add configuration info to message
-                    if config_type == "custom":
-                        message += f"\n\n📍 Using your custom facility configuration"
-                    
+                if should_notify:                    
                     # Create PushoverService instance for this user
                     pushover_service = PushoverService(
                         api_token=user['pushover_api_token'],

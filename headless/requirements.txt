@@ -1,3 +1,6 @@
 # Core dependencies for Headless VATSIM Tower Monitor (no GUI)
 requests>=2.31.0
 beautifulsoup4>=4.12.2
+
+# Minimal database dependencies for bulk notifications
+SQLAlchemy==2.0.23

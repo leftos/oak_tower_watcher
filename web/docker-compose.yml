@@ -12,6 +12,8 @@ services:
       - TZ=UTC
       - APP_ENV=production
       - FLASK_ENV=production
+      # Database configuration for bulk notifications
+      - DATABASE_URL=sqlite:////app/web/per_env/prod/data/users.db
     
     env_file:
       - ../env/.env
@@ -19,6 +21,8 @@ services:
     volumes:
       - ./per_env/prod/logs:/app/web/per_env/prod/logs
       - ./per_env/prod/data:/app/web/per_env/prod/data
+      # Share web directory for database and static files access
+      - .:/app/web
     
     deploy:
       resources:

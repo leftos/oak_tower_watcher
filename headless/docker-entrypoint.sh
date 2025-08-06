@@ -85,6 +85,23 @@ with open('/app/config.json', 'w') as f:
 "
 fi
 
+# Configure database environment for bulk notifications
+if [ -n "$DATABASE_URL" ]; then
+    log "Setting up database environment for bulk notifications"
+    export DATABASE_URL="$DATABASE_URL"
+    export FLASK_APP="web.backend.app"
+    export PYTHONPATH="/app:/app/web:$PYTHONPATH"
+    
+    # Fix ownership of web directory if needed
+    if [ -d "/app/web" ]; then
+        log "Fixing ownership of web directory..."
+        chown -R vatsim:vatsim /app/web 2>/dev/null || true
+        chmod -R 755 /app/web 2>/dev/null || true
+    fi
+    
+    log "Database URL configured: ${DATABASE_URL}"
+fi
+
 # Ensure logs directory exists and has correct permissions
 mkdir -p /app/logs
 # Set proper ownership and permissions for logs directory
