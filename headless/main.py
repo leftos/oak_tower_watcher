@@ -11,62 +11,16 @@ import logging
 import atexit
 import time
 import os
+import sys
 from datetime import datetime
-from shared.utils import load_artcc_roster
+
+# Add parent directory to path for shared imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from shared.utils import load_artcc_roster, acquire_instance_lock, release_instance_lock
 from config.config import load_config
 from worker import HeadlessVATSIMWorker
 from shared.notification_manager import NotificationManager
-
-# Headless-specific instance locking (uses /tmp for lock file)
-if sys.platform != "win32":
-    import fcntl
-
-_lock_file = None
-
-def acquire_headless_instance_lock():
-    """Acquire an exclusive lock to prevent multiple instances (headless version)"""
-    global _lock_file
-    lock_file_path = "/tmp/vatsim_monitor_headless.lock"
-
-    try:
-        _lock_file = open(lock_file_path, "w")
-        
-        if sys.platform != "win32":
-            fcntl.flock(_lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        else:
-            # Windows fallback - just check if file exists
-            if os.path.exists(lock_file_path):
-                _lock_file.close()
-                return False
-                
-        _lock_file.write(str(os.getpid()))
-        _lock_file.flush()
-        return True
-    except IOError:
-        if _lock_file:
-            _lock_file.close()
-        return False
-    except Exception as e:
-        logging.error(f"Error acquiring instance lock: {e}")
-        if _lock_file:
-            _lock_file.close()
-        return False
-
-def release_headless_instance_lock():
-    """Release the instance lock (headless version)"""
-    global _lock_file
-    if _lock_file:
-        try:
-            if sys.platform != "win32":
-                fcntl.flock(_lock_file.fileno(), fcntl.LOCK_UN)
-            _lock_file.close()
-            lock_file_path = "/tmp/vatsim_monitor_headless.lock"
-            if os.path.exists(lock_file_path):
-                os.remove(lock_file_path)
-        except Exception as e:
-            logging.error(f"Error releasing instance lock: {e}")
-        finally:
-            _lock_file = None
 
 
 class HeadlessVATSIMMonitor:
@@ -203,7 +157,7 @@ def signal_handler(sig, frame):
     logging.info("Received shutdown signal, shutting down gracefully...")
     if monitor is not None:
         monitor.shutdown()
-    release_headless_instance_lock()
+    release_instance_lock()
     sys.exit(0)
 
 
@@ -232,13 +186,13 @@ def main():
     )
 
     # Check for existing instance
-    if not acquire_headless_instance_lock():
+    if not acquire_instance_lock():
         print("Another instance of Headless VATSIM Monitor is already running.")
         logging.info("Another instance detected, exiting...")
         sys.exit(0)
 
     # Register cleanup function to release lock on exit
-    atexit.register(release_headless_instance_lock)
+    atexit.register(release_instance_lock)
 
     # Set up signal handlers for graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
@@ -278,7 +232,7 @@ def main():
     finally:
         if monitor is not None:
             monitor.shutdown()
-        release_headless_instance_lock()
+        release_instance_lock()
 
 
 if __name__ == "__main__":
