@@ -554,7 +554,118 @@ class OAKTowerStatus {
     }
 }
 
+// Cookie utility functions
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
+function setCookie(name, value, days) {
+    const date = new Date();
+    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+    const expires = `expires=${date.toUTCString()}`;
+    document.cookie = `${name}=${value};${expires};path=/`;
+}
+
+// First Visit Modal Handler
+class FirstVisitModal {
+    constructor() {
+        this.modal = document.getElementById('firstVisitModal');
+        this.authMessage = document.getElementById('authMessage');
+        this.modalActions = document.getElementById('modalActions');
+        this.cookieName = 'oak_tower_first_visit_shown';
+        this.userAuthenticated = false;
+        this.outsideClickListenerAdded = false;
+    }
+
+    async checkAndShow() {
+        // Check if we've already shown the modal
+        const hasSeenModal = getCookie(this.cookieName);
+        if (hasSeenModal === 'true') {
+            return;
+        }
+
+        // Check authentication status from the API
+        try {
+            const response = await fetch('/api/cached-status');
+            if (response.ok) {
+                const data = await response.json();
+                this.userAuthenticated = data.user_authenticated || false;
+            }
+        } catch (error) {
+            console.error('Error checking auth status:', error);
+        }
+
+        // Show the modal
+        this.show();
+    }
+
+    show() {
+        // Update content based on authentication status
+        if (this.userAuthenticated) {
+            this.authMessage.innerHTML = `
+                <p><strong>You're signed in!</strong> You can customize which facilities to monitor in your settings.</p>
+            `;
+            this.modalActions.innerHTML = `
+                <a href="/auth/settings/oak_tower_watcher" class="btn btn-primary">⚙️ Customize Settings</a>
+                <button class="btn btn-dismiss" id="dismissModalBtn">Dismiss</button>
+            `;
+        } else {
+            this.authMessage.innerHTML = `
+                <p><strong>Want to customize?</strong> Sign in or register to set your own facilities to monitor and receive notifications when controllers come online!</p>
+            `;
+            this.modalActions.innerHTML = `
+                <a href="/auth/register" class="btn btn-primary">📝 Register</a>
+                <a href="/auth/login" class="btn btn-secondary">🔑 Sign In</a>
+                <button class="btn btn-dismiss" id="dismissModalBtn">Dismiss</button>
+            `;
+        }
+
+        // Show the modal
+        this.modal.classList.add('show');
+        
+        // Use setTimeout to ensure DOM is updated before adding event listeners
+        setTimeout(() => {
+            // Add event listener to dismiss button
+            const dismissBtn = document.getElementById('dismissModalBtn');
+            if (dismissBtn) {
+                dismissBtn.addEventListener('click', () => this.dismiss());
+            }
+            
+            // Add event listener to close button
+            const closeBtn = document.getElementById('modalCloseBtn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => this.dismiss());
+            }
+        }, 0);
+        
+        // Add event listener to close modal when clicking outside (only once)
+        if (!this.outsideClickListenerAdded) {
+            this.modal.addEventListener('click', (e) => {
+                if (e.target === this.modal) {
+                    this.dismiss();
+                }
+            });
+            this.outsideClickListenerAdded = true;
+        }
+    }
+
+    dismiss() {
+        // Hide the modal
+        this.modal.classList.remove('show');
+        
+        // Set cookie to remember we've shown it
+        setCookie(this.cookieName, 'true', 365); // Remember for 1 year
+    }
+}
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', () => {
     window.oakStatus = new OAKTowerStatus();
+    
+    // Initialize and check first visit modal
+    window.firstVisitModal = new FirstVisitModal();
+    window.firstVisitModal.checkAndShow();
 });

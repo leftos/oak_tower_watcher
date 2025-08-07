@@ -122,6 +122,32 @@
         </footer>
     </div>
 
+    <!-- First Visit Modal -->
+    <div id="firstVisitModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" id="modalCloseBtn" aria-label="Close modal">&times;</button>
+            <div class="modal-header">
+                <div class="modal-icon">🏗️</div>
+                <h2>Welcome to VATSIM Facility Watcher!</h2>
+            </div>
+            <div class="modal-body">
+                <p>This page monitors VATSIM air traffic control facilities in real-time.</p>
+                
+                <div class="highlight">
+                    <strong>Default Configuration:</strong><br>
+                    For demonstration purposes, this page is set to monitor <strong>OAK_TWR</strong> (Oakland Tower) and its supporting facilities above and below.
+                </div>
+                
+                <p id="authMessage">
+                    <!-- This will be populated by JavaScript based on auth status -->
+                </p>
+            </div>
+            <div class="modal-actions" id="modalActions">
+                <!-- Buttons will be populated by JavaScript based on auth status -->
+            </div>
+        </div>
+    </div>
+
     <script src="status-page.js"></script>
 </body>
 </html>
