@@ -21,7 +21,7 @@ services:
     volumes:
       # Note: Create config.json first or remove this line to use container's built-in config
       # - ../config/config.json:/app/config.json
-      - ../web/per_env/prod/logs:/app/logs
+      - logs:/app/logs
     
     # Environment file location
     env_file:
@@ -54,3 +54,7 @@ services:
     
     # Network mode (default bridge is fine for outbound-only service)
     network_mode: bridge
+
+# Named volumes for logs
+volumes:
+  logs:
