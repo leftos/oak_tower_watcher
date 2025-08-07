@@ -345,6 +345,7 @@
 .actions-list .btn {
     width: 100%;
     justify-content: center;
+    font-weight: normal;
 }
 
 /* Responsive adjustments */

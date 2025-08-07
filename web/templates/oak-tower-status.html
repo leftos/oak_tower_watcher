@@ -113,9 +113,11 @@
                     <div class="info-card">
                         <h3>🔧 Actions</h3>
                         <div class="actions-list">
-                            <button id="force-refresh-btn" class="btn btn-primary">
-                                <span id="refresh-text">🔄 Refresh Display</span>
-                            </button>
+                            {% if current_user.is_authenticated %}
+                                <a href="{{ url_for('auth.oak_tower_settings') }}" class="btn btn-secondary">
+                                    ⚙️ Configure Facilities
+                                </a>
+                            {% endif %}
                             <button id="test-notification-btn" class="btn btn-success">
                                 <span id="test-notification-text">🔔 Test Status Notification</span>
                             </button>
