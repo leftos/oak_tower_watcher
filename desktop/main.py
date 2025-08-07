@@ -73,7 +73,7 @@ def main():
 
         app = VATSIMMonitor(sys.argv)
 
-        logging.info(f"Starting VATSIM {app.display_name} Monitor...")
+        logging.info(f"Starting VATSIM Facility Watcher...")
 
         # Start monitoring automatically
         app.start_monitoring()
