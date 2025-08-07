@@ -1,4 +1,2 @@
 - Admin panel
-- Don't show spinners when reloading information in oak-tower-status unless it's taking too long
-- Remove references to "airport code" from web app
-- Replace "main facility" words with the actual main facility callsign, and "supporting above", and "supporting below"
+- Down for maintenance

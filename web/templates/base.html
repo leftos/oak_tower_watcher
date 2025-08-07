@@ -6,6 +6,7 @@
     <title>{% if title %}{{ title }} - {% endif %}VATSIM Facility Watcher</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='auth.css') }}">
+    {% block head %}{% endblock %}
 </head>
 <body>
     <nav class="navbar">

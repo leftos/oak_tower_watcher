@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}User Details - {{ user.email }} - Admin Panel{% endblock %}
+
+{% block head %}
+<style>
+    .admin-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+    .admin-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .admin-header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+    }
+    .admin-nav {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .admin-nav a {
+        background: #3498db;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        text-decoration: none;
+        border-radius: 5px;
+        transition: background 0.3s;
+    }
+    .admin-nav a:hover {
+        background: #2980b9;
+    }
+    .user-overview {
+        background: white;
+        border-radius: 10px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .user-info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .info-item {
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #3498db;
+    }
+    .info-item.banned {
+        border-left-color: #e74c3c;
+        background: #fdf2f2;
+    }
+    .info-item.active {
+        border-left-color: #27ae60;
+        background: #f0f9f0;
+    }
+    .info-label {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+    .info-value {
+        color: #666;
+        word-break: break-all;
+    }
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+    }
+    .status-banned {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .status-unverified {
+        background: #fff3cd;
+        color: #856404;
+    }
+    .action-section {
+        background: white;
+        border-radius: 10px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s;
+        display: inline-block;
+    }
+    .btn-danger {
+        background: #e74c3c;
+        color: white;
+    }
+    .btn-danger:hover {
+        background: #c0392b;
+        transform: translateY(-1px);
+    }
+    .btn-success {
+        background: #27ae60;
+        color: white;
+    }
+    .btn-success:hover {
+        background: #219a52;
+        transform: translateY(-1px);
+    }
+    .btn-secondary {
+        background: #95a5a6;
+        color: white;
+    }
+    .btn-secondary:hover {
+        background: #7f8c8d;
+    }
+    .config-section {
+        background: white;
+        border-radius: 10px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .config-tabs {
+        display: flex;
+        margin-bottom: 2rem;
+        border-bottom: 2px solid #eee;
+    }
+    .json-container {
+        background: #2d3748;
+        color: #e2e8f0;
+        padding: 1.5rem;
+        border-radius: 8px;
+        overflow-x: auto;
+        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    .json-key {
+        color: #68d391;
+    }
+    .json-string {
+        color: #f6e05e;
+    }
+    .json-number {
+        color: #63b3ed;
+    }
+    .json-boolean {
+        color: #fc8181;
+    }
+    .json-null {
+        color: #a0aec0;
+    }
+    .ban-form {
+        background: #fdf2f2;
+        border: 1px solid #fed7d7;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-top: 1rem;
+    }
+    .ban-form textarea {
+        width: 100%;
+        min-height: 80px;
+        padding: 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        resize: vertical;
+        font-family: inherit;
+    }
+    .ban-form .form-group {
+        margin-bottom: 1rem;
+    }
+    .ban-form label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: #333;
+    }
+    .logout-btn {
+        background: #e74c3c;
+        color: white;
+        padding: 0.5rem 1rem;
+        text-decoration: none;
+        border-radius: 5px;
+        transition: background 0.3s;
+    }
+    .logout-btn:hover {
+        background: #c0392b;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h1>👤 User Details - {{ user.email }}</h1>
+        <a href="{{ url_for('admin.logout') }}" class="logout-btn">Logout</a>
+    </div>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }}" style="margin-bottom: 1rem;">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <nav class="admin-nav">
+        <a href="{{ url_for('admin.dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('admin.users') }}">← Back to Users</a>
+        <a href="{{ url_for('index') }}">View Site</a>
+    </nav>
+    
+    <!-- User Overview -->
+    <div class="user-overview">
+        <h2>User Overview</h2>
+        <div class="user-info-grid">
+            <div class="info-item">
+                <div class="info-label">User ID</div>
+                <div class="info-value">{{ user.id }}</div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Email Address</div>
+                <div class="info-value">{{ user.email }}</div>
+            </div>
+            
+            <div class="info-item {% if user.is_banned %}banned{% elif user.email_verified and user.is_active %}active{% endif %}">
+                <div class="info-label">Account Status</div>
+                <div class="info-value">
+                    {% if user.is_banned %}
+                        <span class="status-badge status-banned">Banned</span>
+                    {% elif not user.email_verified %}
+                        <span class="status-badge status-unverified">Unverified</span>
+                    {% else %}
+                        <span class="status-badge status-active">Active</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Registration Date</div>
+                <div class="info-value">
+                    {{ user.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') if user.created_at else 'Unknown' }}
+                </div>
+            </div>
+            
+            <div class="info-item">
+                <div class="info-label">Last Login</div>
+                <div class="info-value">
+                    {% if user.last_login %}
+                        {{ user.last_login.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+                    {% else %}
+                        <em>Never logged in</em>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% if user.is_banned %}
+            <div class="info-item banned">
+                <div class="info-label">Banned Date</div>
+                <div class="info-value">
+                    {{ user.banned_at.strftime('%Y-%m-%d %H:%M:%S UTC') if user.banned_at else 'Unknown' }}
+                </div>
+            </div>
+            
+            {% if user.banned_reason %}
+            <div class="info-item banned">
+                <div class="info-label">Ban Reason</div>
+                <div class="info-value">{{ user.banned_reason }}</div>
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Admin Actions -->
+    <div class="action-section">
+        <h3>Administrative Actions</h3>
+        <div class="action-buttons">
+            {% if user.is_banned %}
+                <form method="POST" action="{{ url_for('admin.unban_user', user_id=user.id) }}" style="display: inline;">
+                    <button type="submit" class="btn btn-success" data-action="unban">
+                        ✅ Unban User
+                    </button>
+                </form>
+            {% else %}
+                <button type="button" class="btn btn-danger" data-action="toggle-ban-form">
+                    🚫 Ban User
+                </button>
+            {% endif %}
+        </div>
+        
+        {% if not user.is_banned %}
+        <div id="ban-form" class="ban-form" style="display: none;">
+            <form method="POST" action="{{ url_for('admin.ban_user', user_id=user.id) }}">
+                <div class="form-group">
+                    <label for="reason">Reason for Ban (optional)</label>
+                    <textarea name="reason" id="reason" placeholder="Enter reason for banning this user..."></textarea>
+                </div>
+                <div class="action-buttons">
+                    <button type="submit" class="btn btn-danger" data-action="ban">
+                        Confirm Ban
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-action="toggle-ban-form">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Configuration Display -->
+    <div class="config-section">
+        <h3>User Configuration</h3>
+        <div class="json-container">{{ user_data_json }}</div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='admin-user-detail.js') }}"></script>
+{% endblock %}

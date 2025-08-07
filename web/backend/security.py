@@ -21,11 +21,10 @@ blocked_ips = {}
 # Suspicious patterns that indicate scanning/probing
 SUSPICIOUS_PATHS = [
     '/dns-query',
-    '/query', 
+    '/query',
     '/resolve',
     '/.env',
     '/.well-known/',
-    '/admin',
     '/wp-admin',
     '/wp-login.php',
     '/phpmyadmin',
@@ -35,6 +34,22 @@ SUSPICIOUS_PATHS = [
     '/.git/',
     '/server-status',
     '/server-info',
+    # Block generic admin scanning attempts but allow our legitimate admin routes
+    '/administrator',
+    '/admin.php',
+    '/admin/',
+    '/admin/index.php',
+    '/admin/admin.php',
+]
+
+# Legitimate admin routes that should be allowed
+LEGITIMATE_ADMIN_PATHS = [
+    '/admin/login',
+    '/admin/logout',
+    '/admin/dashboard',
+    '/admin/users',
+    '/admin/user/',
+    '/admin/api/',
 ]
 
 # User agents that are commonly associated with scanning
@@ -92,7 +107,12 @@ def is_suspicious_request():
     # Allow health checks from localhost/internal monitoring
     if path == '/api/health':
         # Allow health checks from localhost and internal Docker networks
-        if client_ip in ['127.0.0.1', '::1'] or client_ip.startswith('172.') or client_ip.startswith('192.168.'):
+        if client_ip and (client_ip in ['127.0.0.1', '::1'] or client_ip.startswith('172.') or client_ip.startswith('192.168.')):
+            return False, None
+    
+    # Check if this is a legitimate admin route first
+    for legitimate_path in LEGITIMATE_ADMIN_PATHS:
+        if path.startswith(legitimate_path.lower()):
             return False, None
     
     # Check for suspicious paths
@@ -170,12 +190,15 @@ def rate_limit(max_requests=60, window_minutes=5, block_minutes=15):
 def get_client_ip():
     """Get the real client IP address, considering proxies"""
     # Check for forwarded headers (common with reverse proxies)
-    if request.headers.get('X-Forwarded-For'):
-        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
-    elif request.headers.get('X-Real-IP'):
-        return request.headers.get('X-Real-IP')
-    else:
-        return request.remote_addr
+    forwarded_for = request.headers.get('X-Forwarded-For')
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+    
+    real_ip = request.headers.get('X-Real-IP')
+    if real_ip:
+        return real_ip
+    
+    return request.remote_addr
 
 def block_suspicious_requests():
     """Middleware to block suspicious requests"""

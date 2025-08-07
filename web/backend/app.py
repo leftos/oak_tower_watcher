@@ -25,6 +25,7 @@ from shared.vatsim_core import VATSIMCore
 from shared.utils import load_artcc_roster, get_controller_name
 from .models import db, User
 from .auth import auth_bp
+from .admin import admin_bp
 from .email_service import init_mail
 from .api import api_bp
 from .security import init_security, rate_limit
@@ -76,6 +77,7 @@ def create_app():
     
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(api_bp, url_prefix='/api')
     
     # Configure environment-specific logging

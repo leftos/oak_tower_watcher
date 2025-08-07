@@ -31,7 +31,9 @@ class OAKTowerStatus {
         this.autoRefreshEnabled = true;
         this.refreshInterval = 10000; // 10 seconds - faster since we're just getting cached data
         this.refreshTimer = null;
-        this.lastUpdateTime = null;
+        this.lastServerUpdateTime = null;
+        this.dataFetchTime = null;
+        this.cacheAgeAtFetch = null;
         
         this.init();
     }
@@ -93,7 +95,32 @@ class OAKTowerStatus {
             }
             
             this.updateUI(status);
-            this.lastUpdateTime = new Date();
+            
+            // Use cache age in seconds to avoid clock sync issues
+            if (status.cacheAge !== undefined) {
+                // Store when we fetched this data and the cache age at that time
+                this.dataFetchTime = new Date();
+                this.cacheAgeAtFetch = status.cacheAge;
+                console.debug('Using cache age approach - Cache age at fetch:', status.cacheAge, 'seconds');
+            } else if (status.lastUpdated) {
+                // Fallback to timestamp parsing if cache age not available
+                try {
+                    this.lastServerUpdateTime = new Date(status.lastUpdated);
+                    const now = new Date();
+                    const timeDiff = now - this.lastServerUpdateTime;
+                    
+                    if (isNaN(this.lastServerUpdateTime.getTime()) || timeDiff < -300000) {
+                        console.warn('Server timestamp issue, falling back to current time');
+                        this.lastServerUpdateTime = new Date();
+                    }
+                } catch (error) {
+                    console.error('Error parsing server timestamp:', error);
+                    this.lastServerUpdateTime = new Date();
+                }
+            } else {
+                // Final fallback to current time
+                this.lastServerUpdateTime = new Date();
+            }
             
         } catch (error) {
             // Clear the loading timeout on error
@@ -136,7 +163,8 @@ class OAKTowerStatus {
                 cacheAge: data.cache_age_seconds || 0,
                 lastUpdated: data.last_updated,
                 monitoringService: data.monitoring_service || {},
-                userAuthenticated: data.user_authenticated || false
+                userAuthenticated: data.user_authenticated || false,
+                facility_names: data.facility_names || {}
             };
             
         } catch (error) {
@@ -160,9 +188,10 @@ class OAKTowerStatus {
         // Clear existing classes
         indicator.className = 'status-indicator-large';
 
-        // Get facility names for dynamic descriptions
-        const mainFacilityName = this.getFacilityName(status.mainControllers) || status.facilityName || 'Main facility';
-        const supportingFacilityName = this.getFacilityName(status.supportingAbove) || 'Supporting facility';
+        // Get facility names from backend configuration instead of deriving from controller lists
+        const facilityNames = status.facility_names || {};
+        const mainFacilityName = facilityNames.main_facility || this.getFacilityName(status.mainControllers) || 'Main facility';
+        const supportingFacilityName = facilityNames.supporting_above || this.getFacilityName(status.supportingAbove) || 'Supporting facility';
 
         switch (status.status) {
             case 'main_facility_and_supporting_above_online':
@@ -181,7 +210,7 @@ class OAKTowerStatus {
                 indicator.classList.add('status-partial');
                 indicator.textContent = '🟡';
                 title.textContent = `${supportingFacilityName} Online`;
-                description.textContent = `${mainFacilityName} offline, but ${supportingFacilityName.toLowerCase()} active`;
+                description.textContent = `${mainFacilityName} offline, but ${supportingFacilityName} active`;
                 break;
             case 'all_offline':
                 indicator.classList.add('status-offline');
@@ -202,8 +231,9 @@ class OAKTowerStatus {
     }
 
     updateControllers(status) {
-        // Get facility names for dynamic messages
-        const mainFacilityName = this.getFacilityName(status.mainControllers) || status.facilityName || 'main facility';
+        // Get facility names from backend configuration
+        const facilityNames = status.facility_names || {};
+        const mainFacilityName = facilityNames.main_facility || this.getFacilityName(status.mainControllers) || 'main facility';
         
         this.updateControllerSection('main-controllers', status.mainControllers, `No controllers online on ${mainFacilityName}`);
         this.updateControllerSection('supporting-above-controllers', status.supportingAbove, 'No supporting above controllers online');
@@ -237,15 +267,15 @@ class OAKTowerStatus {
         // Update monitoring status based on service state
         const monitoringStatusElement = document.getElementById('monitoring-status');
         if (status.monitoringService && status.monitoringService.running) {
-            monitoringStatusElement.textContent = 'Active (Cached Data)';
+            monitoringStatusElement.textContent = 'Active';
         } else {
             monitoringStatusElement.textContent = 'Initializing...';
         }
         
         if (status.config && status.config.check_interval) {
-            document.getElementById('check-interval').textContent = `${status.config.check_interval} seconds (Background Service)`;
+            document.getElementById('check-interval').textContent = `${status.config.check_interval} seconds`;
         } else {
-            document.getElementById('check-interval').textContent = '60 seconds (Background Service)';
+            document.getElementById('check-interval').textContent = '60 seconds';
         }
         
         // Update facility name
@@ -329,18 +359,49 @@ class OAKTowerStatus {
     }
 
     updateTimestamps() {
-        if (this.lastUpdateTime) {
-            const lastCheck = document.getElementById('last-check');
+        const lastCheck = document.getElementById('last-check');
+        
+        // Use cache age approach if available (avoids clock sync issues)
+        if (this.dataFetchTime && this.cacheAgeAtFetch !== null) {
             const now = new Date();
-            const diff = now - this.lastUpdateTime;
+            const timeSinceFetch = Math.floor((now - this.dataFetchTime) / 1000);
+            const totalAge = this.cacheAgeAtFetch + timeSinceFetch;
+            
+            console.debug('Cache age calculation - Age at fetch:', this.cacheAgeAtFetch, 'Time since fetch:', timeSinceFetch, 'Total age:', totalAge);
+            
+            this.formatTimeDisplay(lastCheck, totalAge);
+        } else if (this.lastServerUpdateTime) {
+            // Fallback to timestamp comparison
+            const now = new Date();
+            const diff = now - this.lastServerUpdateTime;
             const seconds = Math.floor(diff / 1000);
             
-            if (seconds < 60) {
-                lastCheck.textContent = `${seconds} seconds ago (cached data)`;
+            if (seconds < -30) { // Allow small negative differences (up to 30 seconds) for minor clock drift
+                lastCheck.textContent = 'Just updated';
+                console.debug('Minor negative time difference (clock drift), showing as just updated');
+            } else if (seconds < 0) {
+                lastCheck.textContent = 'Just updated';
             } else {
-                const minutes = Math.floor(seconds / 60);
-                lastCheck.textContent = `${minutes} minute${minutes > 1 ? 's' : ''} ago (cached data)`;
+                this.formatTimeDisplay(lastCheck, seconds);
             }
+        } else {
+            lastCheck.textContent = 'Never';
+        }
+    }
+
+    formatTimeDisplay(element, seconds) {
+        if (seconds < 60) {
+            element.textContent = `${seconds} seconds ago`;
+        } else if (seconds < 3600) { // Less than 1 hour
+            const minutes = Math.floor(seconds / 60);
+            element.textContent = `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+        } else if (seconds < 86400) { // Less than 1 day
+            const hours = Math.floor(seconds / 3600);
+            element.textContent = `${hours} hour${hours > 1 ? 's' : ''} ago`;
+        } else {
+            // More than a day - something is wrong
+            element.textContent = 'Unknown';
+            console.warn('Time difference too large, may indicate timestamp issue');
         }
     }
 
@@ -469,14 +530,18 @@ class OAKTowerStatus {
     }
 
     updateSectionHeaders(status) {
-        // Update section headers to use dynamic facility names where possible
-        const mainFacilityName = this.getFacilityName(status.mainControllers) || status.facilityName || 'Main Facilities';
+        // Update section headers to use configured facility names
+        const facilityNames = status.facility_names || {};
+        const mainFacilityName = facilityNames.main_facility || this.getFacilityName(status.mainControllers) || 'Main Facilities';
         
         // Find and update the main facility header by finding the element that contains the main controllers
         const controllerCards = document.querySelectorAll('.controller-card h3');
         controllerCards.forEach(header => {
             if (header.textContent.includes('Main Facilities')) {
-                if (status.mainControllers && status.mainControllers.length > 0) {
+                // Always use the configured facility name, regardless of online status
+                if (facilityNames.main_facility) {
+                    header.innerHTML = `🏗️ ${facilityNames.main_facility}`;
+                } else if (status.mainControllers && status.mainControllers.length > 0) {
                     const facilityName = this.getFacilityName(status.mainControllers);
                     if (facilityName) {
                         header.innerHTML = `🏗️ ${facilityName}`;

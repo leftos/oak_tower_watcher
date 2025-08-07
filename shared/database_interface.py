@@ -334,7 +334,8 @@ class DatabaseInterface:
     
     def get_all_user_facility_patterns(self, service_name: str = 'oak_tower_watcher') -> Dict[str, List[str]]:
         """
-        Get all unique facility patterns from all users to create comprehensive monitoring
+        Get all unique facility patterns from all users to create comprehensive monitoring.
+        If no user patterns exist, returns default patterns from config.
         
         Args:
             service_name: The service name to filter by
@@ -343,11 +344,14 @@ class DatabaseInterface:
             Dictionary with aggregated facility patterns by type
         """
         if not self.enabled or not self.session_factory:
-            return {
+            # Return default patterns when database is not available
+            from config.config import load_config
+            config = load_config()
+            return config.get("callsigns", {
                 'main_facility': [],
                 'supporting_above': [],
                 'supporting_below': []
-            }
+            })
         
         try:
             session = self.session_factory()
@@ -392,17 +396,31 @@ class DatabaseInterface:
             }
             
             total_patterns = sum(len(patterns) for patterns in result.values())
-            logging.info(f"Aggregated {total_patterns} unique facility patterns from {len(results)} users")
             
+            # If no user patterns found at all, return default patterns
+            if total_patterns == 0:
+                logging.info("No user facility patterns found - returning default patterns")
+                from config.config import load_config
+                config = load_config()
+                return config.get("callsigns", {
+                    'main_facility': [],
+                    'supporting_above': [],
+                    'supporting_below': []
+                })
+            
+            logging.info(f"Aggregated {total_patterns} unique facility patterns from {len(results)} users")
             return result
             
         except Exception as e:
             logging.error(f"Error getting aggregated facility patterns: {e}")
-            return {
+            # Return default patterns on error
+            from config.config import load_config
+            config = load_config()
+            return config.get("callsigns", {
                 'main_facility': [],
                 'supporting_above': [],
                 'supporting_below': []
-            }
+            })
     
     def cleanup_old_cache_entries(self, days_old: int = 30) -> int:
         """

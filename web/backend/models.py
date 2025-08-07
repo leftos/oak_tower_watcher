@@ -25,6 +25,9 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     is_active = db.Column(db.Boolean, default=True)
+    is_banned = db.Column(db.Boolean, default=False)  # For admin banning functionality
+    banned_at = db.Column(db.DateTime, nullable=True)  # When user was banned
+    banned_reason = db.Column(db.String(500), nullable=True)  # Reason for ban
     
     # Email verification fields
     email_verified = db.Column(db.Boolean, default=False, nullable=False)
@@ -153,8 +156,36 @@ class User(UserMixin, db.Model):
             return True
     
     def can_login(self):
-        """Check if user can log in (email must be verified)"""
-        return self.is_active and self.email_verified
+        """Check if user can log in (email must be verified and not banned)"""
+        return self.is_active and self.email_verified and not self.is_banned
+    
+    def ban_user(self, reason=None):
+        """Ban a user account"""
+        try:
+            logger.info(f"Banning user: {self.email}, reason: {reason}")
+            self.is_banned = True
+            self.banned_at = datetime.utcnow()
+            self.banned_reason = reason
+            db.session.commit()
+            logger.info(f"User banned successfully: {self.email}")
+        except Exception as e:
+            logger.error(f"Error banning user {self.email}: {str(e)}", exc_info=True)
+            db.session.rollback()
+            raise
+    
+    def unban_user(self):
+        """Unban a user account"""
+        try:
+            logger.info(f"Unbanning user: {self.email}")
+            self.is_banned = False
+            self.banned_at = None
+            self.banned_reason = None
+            db.session.commit()
+            logger.info(f"User unbanned successfully: {self.email}")
+        except Exception as e:
+            logger.error(f"Error unbanning user {self.email}: {str(e)}", exc_info=True)
+            db.session.rollback()
+            raise
     
     def generate_password_reset_token(self):
         """Generate a new password reset token"""

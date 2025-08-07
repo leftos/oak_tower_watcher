@@ -86,31 +86,100 @@ class WebMonitoringService:
             # Create config with aggregated patterns
             aggregated_config = self.config.copy()
             
-            # Merge default patterns with user patterns to ensure comprehensive monitoring
-            default_patterns = self.config.get("callsigns", {})
-            
-            for pattern_type in ['main_facility', 'supporting_above', 'supporting_below']:
-                # Start with default patterns
-                merged_patterns = list(default_patterns.get(pattern_type, []))
-                
-                # Add unique user patterns
-                user_patterns = aggregated_patterns.get(pattern_type, [])
-                for pattern in user_patterns:
-                    if pattern not in merged_patterns:
-                        merged_patterns.append(pattern)
-                
-                aggregated_patterns[pattern_type] = merged_patterns
-            
+            # Use aggregated user patterns directly - no merging with defaults
+            # Default patterns are already included by get_all_user_facility_patterns() if no user patterns exist
             aggregated_config['callsigns'] = aggregated_patterns
             
-            total_merged = sum(len(patterns) for patterns in aggregated_patterns.values())
-            logging.info(f"Created aggregated config with {total_merged} facility patterns")
+            total_patterns = sum(len(patterns) for patterns in aggregated_patterns.values())
+            logging.info(f"Using aggregated config with {total_patterns} facility patterns (user patterns only)")
             
             return aggregated_config
             
         except Exception as e:
             logging.error(f"Error creating aggregated config: {e}")
             return None
+    
+    def _get_facility_display_names(self) -> Dict[str, str]:
+        """
+        Extract representative facility names from configuration patterns
+        
+        Returns:
+            Dictionary with facility type as key and representative name as value
+        """
+        try:
+            # Get the effective config (aggregated if available, otherwise default)
+            config = self.get_aggregated_config() or self.config
+            callsigns = config.get('callsigns', {})
+            
+            facility_names = {}
+            
+            # Extract representative names from regex patterns
+            for facility_type in ['main_facility', 'supporting_above', 'supporting_below']:
+                patterns = callsigns.get(facility_type, [])
+                if patterns:
+                    # Try to extract a clean callsign from the first pattern
+                    pattern = patterns[0]
+                    
+                    # Extract facility name from regex pattern
+                    import re
+                    
+                    # Check if it's already a simple callsign (no regex special characters)
+                    # If it only contains letters, numbers, and underscores, treat it as an exact callsign
+                    if re.match(r'^[A-Z0-9_]+$', pattern) and not any(char in pattern for char in ['^', '$', '\\', '(', ')', '?', '+', '*', '[', ']', '{', '}']):
+                        # It's already a plain callsign like "SAN_TWR", "SCT_APP", "SAN_GND", "OAK_12_TWR", "OAK_N_TWR"
+                        facility_names[facility_type] = pattern
+                        logging.debug(f"Using exact callsign: {pattern}")
+                    else:
+                        # Remove regex anchors and escape characters, but preserve the core callsign
+                        clean_pattern = pattern.replace('^', '').replace('$', '')
+                        
+                        # Handle simple patterns first (like ^SAN_TWR$, ^SCT_APP$, ^SAN_GND$)
+                        simple_match = re.search(r'^([A-Z]{3,4}_[A-Z]{2,4})$', clean_pattern)
+                        if simple_match:
+                            facility_names[facility_type] = simple_match.group(1)
+                            logging.debug(f"Extracted simple facility name: {simple_match.group(1)} from pattern: {pattern}")
+                        else:
+                            # Handle more complex patterns
+                            clean_pattern = clean_pattern.replace('\\d+', '').replace('\\', '').replace('(?:', '').replace(')?', '').replace('_+', '_')
+                            
+                            # Look for common callsign patterns like XXX_TWR, XXX_APP, XXX_GND, etc.
+                            callsign_match = re.search(r'([A-Z]{3,4})_([A-Z]{2,4})', clean_pattern)
+                            if callsign_match:
+                                facility_names[facility_type] = f"{callsign_match.group(1)}_{callsign_match.group(2)}"
+                                logging.debug(f"Extracted complex facility name: {callsign_match.group(1)}_{callsign_match.group(2)} from pattern: {pattern}")
+                            else:
+                                # Try to find any combination of letters and underscores
+                                letters_match = re.search(r'([A-Z_]+)', clean_pattern)
+                                if letters_match:
+                                    # Clean up the matched pattern
+                                    name = letters_match.group(1).strip('_')
+                                    # If it doesn't have an underscore, it's probably incomplete
+                                    if '_' not in name:
+                                        # Try common facility type mappings based on context
+                                        if facility_type == 'main_facility':
+                                            name += '_TWR'
+                                        elif facility_type == 'supporting_above':
+                                            name += '_APP'
+                                        elif facility_type == 'supporting_below':
+                                            name += '_GND'
+                                    facility_names[facility_type] = name
+                                    logging.debug(f"Extracted fallback facility name: {name} from pattern: {pattern}")
+                                else:
+                                    facility_names[facility_type] = f"{facility_type.replace('_', ' ').title()}"
+                                    logging.debug(f"Using default facility name for {facility_type}")
+                else:
+                    facility_names[facility_type] = f"{facility_type.replace('_', ' ').title()}"
+                    
+            logging.debug(f"Extracted facility names: {facility_names}")
+            return facility_names
+            
+        except Exception as e:
+            logging.error(f"Error extracting facility names: {e}")
+            return {
+                'main_facility': 'Main Facility',
+                'supporting_above': 'Supporting Above',
+                'supporting_below': 'Supporting Below'
+            }
     
     def check_status_with_aggregated_config(self) -> Dict[str, Any]:
         """
@@ -213,6 +282,9 @@ class WebMonitoringService:
         """
         try:
             with self._cache_lock:
+                # Get configured facility names for display
+                facility_names = self._get_facility_display_names()
+                
                 self._cached_status = {
                     'status': status_result.get('status', 'error'),
                     'facility_name': 'Monitored Facilities',  # Generic name for aggregated monitoring
@@ -228,7 +300,8 @@ class WebMonitoringService:
                     'monitoring_service': {
                         'using_aggregated_config': self.get_aggregated_config() is not None,
                         'running': self.is_running()
-                    }
+                    },
+                    'facility_names': facility_names
                 }
                 self.last_cache_update = datetime.now()
                 

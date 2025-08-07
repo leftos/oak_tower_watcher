@@ -30,10 +30,13 @@ class RegistrationForm(FlaskForm):
     submit = SubmitField('Register')
     
     def validate_email(self, email):
-        """Check if email is already registered"""
+        """Check if email is already registered or banned"""
         user = User.query.filter_by(email=email.data).first()
         if user is not None:
-            raise ValidationError('Please use a different email address.')
+            if user.is_banned:
+                raise ValidationError('This email address is banned and cannot be used to register.')
+            else:
+                raise ValidationError('Please use a different email address.')
 
 class UserSettingsForm(FlaskForm):
     """User settings form for service configuration"""

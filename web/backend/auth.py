@@ -62,6 +62,15 @@ def login():
             flash('Account is disabled. Please contact support.')
             return redirect(url_for('auth.login'))
         
+        # Check if user is banned
+        if user.is_banned:
+            logger.warning(f"Login failed - User account banned: {email}")
+            if user.banned_reason:
+                flash(f'Account is banned: {user.banned_reason}')
+            else:
+                flash('Account is banned. Please contact support.')
+            return redirect(url_for('auth.login'))
+        
         # Check if email is verified
         if not user.email_verified:
             logger.warning(f"Login failed - Email not verified for user: {email}")
