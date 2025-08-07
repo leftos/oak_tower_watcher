@@ -356,16 +356,12 @@ class DatabaseInterface:
         try:
             session = self.session_factory()
             
-            # Query all active users with notifications enabled
+            # Query ALL active users with facility patterns (not just those with notifications enabled)
+            # The web monitoring service should monitor all facilities users care about
             results = session.query(MinimalUserSettings, MinimalUser).join(
                 MinimalUser, MinimalUserSettings.user_id == MinimalUser.id
             ).filter(
                 MinimalUserSettings.service_name == service_name,
-                MinimalUserSettings.notifications_enabled == True,
-                MinimalUserSettings.pushover_api_token.isnot(None),
-                MinimalUserSettings.pushover_user_key.isnot(None),
-                MinimalUserSettings.pushover_api_token != '',
-                MinimalUserSettings.pushover_user_key != '',
                 MinimalUser.is_active == True,
                 MinimalUser.email_verified == True
             ).all()
