@@ -423,24 +423,40 @@ class WebMonitoringService(BaseMonitoringService):
             # Get all active controllers from cache
             all_controllers = cached_data.get('all_controllers', [])
             
-            # If no user patterns provided, use default config patterns for facility name extraction
+            # If no user patterns provided, use default config patterns to filter the data
             if not user_facility_patterns or not any(user_facility_patterns.values()):
-                # Use default config patterns to generate proper facility names
+                # Use default config patterns instead of returning empty lists
                 default_config_patterns = self.config.get('callsigns', {})
                 default_facility_names = self._get_user_facility_display_names(default_config_patterns)
                 
-                # Create default response with empty controllers but use cleaned facility names from default config
+                logging.debug(f"No user patterns provided, using default config patterns: {default_config_patterns}")
+                
+                # Filter using default patterns
+                vatsim_core = VATSIMCore(self.config)
+                filtered_main, filtered_above, filtered_below = vatsim_core.filter_comprehensive_data(
+                    all_controllers, default_config_patterns
+                )
+                
+                # Determine status based on filtered results
+                default_status = self._determine_user_status(filtered_main, filtered_above, filtered_below)
+                
+                # Return filtered data using default config patterns
                 return {
-                    'status': 'all_offline',
+                    'status': default_status,
                     'facility_name': 'Monitored Facilities',
-                    'main_controllers': [],
-                    'supporting_above': [],
-                    'supporting_below': [],
+                    'main_controllers': filtered_main,
+                    'supporting_above': filtered_above,
+                    'supporting_below': filtered_below,
                     'using_user_config': False,
                     'facility_names': default_facility_names or {
                         'main_facility': 'Main Facility',
                         'supporting_above': 'Supporting Above',
                         'supporting_below': 'Supporting Below'
+                    },
+                    'filtered_counts': {
+                        'main': len(filtered_main),
+                        'supporting_above': len(filtered_above),
+                        'supporting_below': len(filtered_below)
                     },
                     'timestamp': cached_data.get('timestamp'),
                     'cache_age_seconds': cached_data.get('cache_age_seconds'),
