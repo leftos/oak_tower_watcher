@@ -72,6 +72,9 @@ class NotificationManager:
         controller_info,
         supporting_info,
         supporting_below_controllers,
+        previous_controller_info=None,
+        previous_supporting_info=None,
+        previous_supporting_below_controllers=None,
     ):
         """Generate appropriate notification message based on state transition"""
 
@@ -154,7 +157,7 @@ class NotificationManager:
 
         # Handle transitions to all offline
         else:  # all_offline
-            # Use generic names when offline since we can't determine specific facilities
+            # Use previous state information to get consistent facility names
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "All Facilities Now Offline"
                 message = (
@@ -162,17 +165,27 @@ class NotificationManager:
                     + f"{supporting_below_info}"
                 )
             elif previous_status == "main_facility_online":
-                # Get the facility name that was online
+                # Use previous controller info to get the facility name that was online
                 previous_facility_name = get_facility_display_name(
-                    "main_facility_online", controller_info, [], "Main Facility"
+                    "main_facility_online",
+                    previous_controller_info or [],
+                    [],
+                    "Main Facility"
                 )
                 title = f"{previous_facility_name} Now Offline"
                 message = (
                     f"{previous_facility_name} controller has gone offline{supporting_below_info}"
                 )
             elif previous_status == "supporting_above_online":
-                title = "Supporting Above Facility Now Offline"
-                message = f"Supporting above controller has gone offline{supporting_below_info}"
+                # Use previous supporting info to get the facility name that was online
+                previous_facility_name = get_facility_display_name(
+                    "supporting_above_online",
+                    [],
+                    previous_supporting_info or [],
+                    "Supporting Above Facility"
+                )
+                title = f"{previous_facility_name} Now Offline"
+                message = f"{previous_facility_name} controller has gone offline{supporting_below_info}"
             else:
                 title = "All Facilities Offline"
                 message = f"No main facility or supporting above controllers found{supporting_below_info}"

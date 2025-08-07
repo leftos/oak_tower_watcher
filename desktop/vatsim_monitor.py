@@ -333,6 +333,9 @@ class VATSIMMonitor(QApplication):
         controller_info,
         supporting_info,
         supporting_below_controllers,
+        previous_controller_info=None,
+        previous_supporting_info=None,
+        previous_supporting_below_controllers=None,
     ):
         """Generate appropriate notification message based on state transition"""
 
@@ -415,7 +418,7 @@ class VATSIMMonitor(QApplication):
 
         # Handle transitions to all offline
         else:  # all_offline
-            # Use generic names when offline since we can't determine specific facilities
+            # Use previous state information to get consistent facility names
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "All Facilities Now Offline"
                 message = (
@@ -423,17 +426,27 @@ class VATSIMMonitor(QApplication):
                     + f"{supporting_below_info}"
                 )
             elif previous_status == "main_facility_online":
-                # Get the facility name that was online
+                # Use previous controller info to get the facility name that was online
                 previous_facility_name = get_facility_display_name(
-                    "main_facility_online", controller_info, [], "Main Facility"
+                    "main_facility_online",
+                    previous_controller_info or [],
+                    [],
+                    "Main Facility"
                 )
                 title = f"{previous_facility_name} Now Offline"
                 message = (
                     f"{previous_facility_name} controller has gone offline{supporting_below_info}"
                 )
             elif previous_status == "supporting_above_online":
-                title = "Supporting Above Facility Now Offline"
-                message = f"Supporting above controller has gone offline{supporting_below_info}"
+                # Use previous supporting info to get the facility name that was online
+                previous_facility_name = get_facility_display_name(
+                    "supporting_above_online",
+                    [],
+                    previous_supporting_info or [],
+                    "Supporting Above Facility"
+                )
+                title = f"{previous_facility_name} Now Offline"
+                message = f"{previous_facility_name} controller has gone offline{supporting_below_info}"
             else:
                 title = "All Facilities Offline"
                 message = f"No main facility or supporting above controllers found{supporting_below_info}"
@@ -616,6 +629,11 @@ class VATSIMMonitor(QApplication):
         self.supporting_info = {}
         self.supporting_below_controllers = []
         self.current_status = "all_offline"
+        
+        # Store previous state information for consistent offline notifications
+        self.previous_controller_info = []
+        self.previous_supporting_info = []
+        self.previous_supporting_below_controllers = []
 
     def update_tray_tooltip(self):
         """Update the system tray icon tooltip with current status"""
@@ -707,6 +725,13 @@ class VATSIMMonitor(QApplication):
     ):
         """Handle status update from worker thread"""
         previous_status = self.current_status
+        
+        # Store previous state information before updating
+        self.previous_controller_info = self.controller_info if hasattr(self, 'controller_info') else []
+        self.previous_supporting_info = self.supporting_info if hasattr(self, 'supporting_info') else []
+        self.previous_supporting_below_controllers = self.supporting_below_controllers if hasattr(self, 'supporting_below_controllers') else []
+        
+        # Update current state
         self.current_status = status
         self.main_facility_online = status in [
             "main_facility_online",
@@ -740,6 +765,9 @@ class VATSIMMonitor(QApplication):
                 controller_info,
                 supporting_info,
                 supporting_below_controllers,
+                self.previous_controller_info,
+                self.previous_supporting_info,
+                self.previous_supporting_below_controllers,
             )
             self.show_toast_notification(title, message, toast_type, 3000, status)
             

@@ -91,6 +91,11 @@ class HeadlessVATSIMMonitor:
         self.last_check = None
         self.monitoring = False
         self._shutting_down = False
+        
+        # Store previous state information for consistent offline notifications
+        self.previous_controller_info = []
+        self.previous_supporting_info = []
+        self.previous_supporting_below_controllers = []
 
         # Load ARTCC roster at startup
         self.controller_names = self.load_roster()
@@ -119,6 +124,13 @@ class HeadlessVATSIMMonitor:
     ):
         """Handle status update from worker thread"""
         previous_status = self.current_status
+        
+        # Store previous state information before updating
+        self.previous_controller_info = self.controller_info if hasattr(self, 'controller_info') else []
+        self.previous_supporting_info = self.supporting_info if hasattr(self, 'supporting_info') else []
+        self.previous_supporting_below_controllers = self.supporting_below_controllers if hasattr(self, 'supporting_below_controllers') else []
+        
+        # Update current state
         self.current_status = status
         self.controller_info = controller_info
         self.supporting_info = supporting_info
@@ -136,6 +148,9 @@ class HeadlessVATSIMMonitor:
                 controller_info,
                 supporting_info,
                 supporting_below_controllers,
+                self.previous_controller_info,
+                self.previous_supporting_info,
+                self.previous_supporting_below_controllers,
             )
             
             # Send Pushover notification

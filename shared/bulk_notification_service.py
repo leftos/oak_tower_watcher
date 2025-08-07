@@ -226,6 +226,11 @@ class BulkNotificationService:
                 cached_status = self.db_interface.get_cached_status(user_settings_id)
                 previous_status = cached_status['status'] if cached_status else 'all_offline'
                 
+                # Extract previous controller information from cache if available
+                previous_main_controllers = cached_status.get('main_controllers', []) if cached_status else []
+                previous_supporting_above = cached_status.get('supporting_above', []) if cached_status else []
+                previous_supporting_below = cached_status.get('supporting_below', []) if cached_status else []
+                
                 # Check current status with user's configuration
                 status_result = vatsim_core.check_status()
                 
@@ -260,7 +265,10 @@ class BulkNotificationService:
                         current_status=current_status,
                         controller_info=main_controllers,
                         supporting_info=supporting_above,
-                        supporting_below_controllers=supporting_below
+                        supporting_below_controllers=supporting_below,
+                        previous_controller_info=previous_main_controllers,
+                        previous_supporting_info=previous_supporting_above,
+                        previous_supporting_below_controllers=previous_supporting_below
                     )
                     
                     if transition_result:
