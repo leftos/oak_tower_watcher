@@ -139,9 +139,9 @@ If users don't configure custom patterns, the system uses these Oakland Tower de
 
 ```json
 {
-  "main_facility": ["^OAK_(?:\\d+_)?TWR$"],
+  "main_facility": ["^OAK_(?:[A-Z\\d]+_)?TWR$"],
   "supporting_above": ["^NCT_APP$", "^OAK_\\d+_CTR$"],
-  "supporting_below": ["^OAK_(?:\\d+_)?GND$", "^OAK_(?:\\d+_)?DEL$"]
+  "supporting_below": ["^OAK_(?:[A-Z\\d]+_)?GND$", "^OAK_(?:[A-Z\\d]+_)?DEL$"]
 }
 ```
 

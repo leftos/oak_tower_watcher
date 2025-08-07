@@ -112,9 +112,9 @@ You can also mount a custom `config.json` file:
     "check_interval": 30
   },
   "callsigns": {
-    "main_facility": ["^OAK_(?:\\d+_)?TWR$"],
+    "main_facility": ["^OAK_(?:[A-Z\\d]+_)?TWR$"],
     "supporting_above": ["^NCT_APP$", "^OAK_\\d+_CTR$"],
-    "supporting_below": ["^OAK_(?:\\d+_)?GND$", "^OAK_(?:\\d+_)?DEL$"]
+    "supporting_below": ["^OAK_(?:[A-Z\\d]+_)?GND$", "^OAK_(?:[A-Z\\d]+_)?DEL$"]
   },
   "pushover": {
     "enabled": true,
@@ -246,9 +246,9 @@ Create a custom `config.json` with your airport's callsigns:
     "display_name": "San Francisco Tower"
   },
   "callsigns": {
-    "main_facility": ["^SFO_(?:\\d+_)?TWR$"],
+    "main_facility": ["^SFO_(?:[A-Z\\d]+_)?TWR$"],
     "supporting_above": ["^NCT_APP$", "^SFO_\\d+_CTR$"],
-    "supporting_below": ["^SFO_(?:\\d+_)?GND$", "^SFO_(?:\\d+_)?DEL$"]
+    "supporting_below": ["^SFO_(?:[A-Z\\d]+_)?GND$", "^SFO_(?:[A-Z\\d]+_)?DEL$"]
   }
 }
 ```

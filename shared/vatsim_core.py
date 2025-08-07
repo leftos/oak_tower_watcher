@@ -26,18 +26,18 @@ class VATSIMCore:
         # Load callsign regex patterns from config
         callsigns = config.get("callsigns", {})
         self.main_facility_patterns = callsigns.get(
-            "main_facility", [r"^OAK_(?:\d+_)?TWR$"]
+            "main_facility", [r"^OAK_(?:[A-Z\d]+_)?TWR$"]
         )
         self.supporting_above_patterns = callsigns.get(
             "supporting_above", [r"^NCT_APP$", r"^OAK_\d+_CTR$"]
         )
         self.supporting_below_patterns = callsigns.get(
-            "supporting_below", [r"^OAK_(?:\d+_)?GND$", r"^OAK_(?:\d+_)?DEL$"]
+            "supporting_below", [r"^OAK_(?:[A-Z\d]+_)?GND$", r"^OAK_(?:[A-Z\d]+_)?DEL$"]
         )
 
         # Compile regex patterns for better performance (case-insensitive matching)
         # This allows capturing multiple controllers matching the same pattern
-        # e.g., OAK_TWR, OAK_1_TWR, OAK_2_TWR all match ^OAK_(?:\d+_)?TWR$
+        # e.g., OAK_TWR, OAK_1_TWR, OAK_2_TWR all match ^OAK_(?:[A-Z\d]+_)?TWR$
         self.main_facility_regex = [
             re.compile(pattern, re.IGNORECASE)
             for pattern in self.main_facility_patterns

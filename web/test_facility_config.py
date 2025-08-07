@@ -109,9 +109,9 @@ def test_forms():
         
         # Test valid patterns
         form_data = {
-            'main_facility_patterns': r'^OAK_(?:\d+_)?TWR$',
+            'main_facility_patterns': r'^OAK_(?:[A-Z\d]+_)?TWR$',
             'supporting_above_patterns': r'^NCT_APP$' + '\n' + r'^OAK_\d+_CTR$',
-            'supporting_below_patterns': r'^OAK_(?:\d+_)?GND$' + '\n' + r'^OAK_(?:\d+_)?DEL$',
+            'supporting_below_patterns': r'^OAK_(?:[A-Z\d]+_)?GND$' + '\n' + r'^OAK_(?:[A-Z\d]+_)?DEL$',
             'notifications_enabled': True,
             'csrf_token': 'test'
         }
@@ -121,7 +121,7 @@ def test_forms():
         
         # Test pattern list conversion
         main_patterns = form.get_patterns_list('main_facility_patterns')
-        assert main_patterns == [r'^OAK_(?:\d+_)?TWR$'], f"Unexpected main patterns: {main_patterns}"
+        assert main_patterns == [r'^OAK_(?:[A-Z\d]+_)?TWR$'], f"Unexpected main patterns: {main_patterns}"
         
         supporting_above = form.get_patterns_list('supporting_above_patterns')
         expected_above = [r'^NCT_APP$', r'^OAK_\d+_CTR$']
