@@ -1,29 +1,69 @@
 User-agent: *
+
+# Block authentication and admin areas
 Disallow: /auth/
-Disallow: /api/
 Disallow: /admin/
-Disallow: /config/
-Disallow: /.env
+
+# Block API endpoints (except health check for monitoring)
+Disallow: /api/
+
+# Block sensitive files and directories
+Disallow: /.env*
 Disallow: /.git/
+Disallow: /config/
 Disallow: /backup/
 Disallow: /logs/
+
+# Block system directories
 Disallow: /tmp/
 Disallow: /var/
 Disallow: /etc/
 Disallow: /usr/
 Disallow: /proc/
+
+# Block DNS-over-HTTPS endpoints
 Disallow: /dns-query
 Disallow: /query
 Disallow: /resolve
 
+# Block common CMS and admin scanning paths
+Disallow: /wp-admin/
+Disallow: /wp-login.php
+Disallow: /xmlrpc.php
+Disallow: /phpmyadmin/
+Disallow: /administrator/
+Disallow: /server-status
+Disallow: /server-info
+
+# Block sensitive file patterns
+Disallow: /*.env*
+Disallow: /*.sql
+Disallow: /*.db
+Disallow: /*.sqlite
+Disallow: /*.log
+Disallow: /*.bak
+Disallow: /*.backup
+Disallow: /*.conf
+Disallow: /*.config
+
 # Allow access to public pages
 Allow: /
+Allow: /oak-tower-status
+
+# Allow static assets
 Allow: /*.css
 Allow: /*.js
 Allow: /*.png
 Allow: /*.jpg
+Allow: /*.jpeg
 Allow: /*.gif
 Allow: /*.ico
+Allow: /*.svg
+Allow: /*.webp
+Allow: /*.woff
+Allow: /*.woff2
+Allow: /*.ttf
+Allow: /*.eot
 
 # Crawl delay to reduce server load
 Crawl-delay: 10
