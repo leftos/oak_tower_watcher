@@ -39,16 +39,29 @@ def get_status():
 
 @api_bp.route('/cached-status')
 def get_cached_status():
-    """Get current cached VATSIM status from monitoring service (no fresh API calls)"""
+    """Get current cached VATSIM status from monitoring service (no fresh API calls), filtered by user config if authenticated"""
     try:
-        # Check if user is authenticated to provide user-specific configuration if needed
-        user_id = None
-        if current_user.is_authenticated:
-            user_id = current_user.id
-            logging.debug(f"Getting cached status for authenticated user: {current_user.email}")
+        user_authenticated = False
+        cached_data = None
         
-        # Get cached status from web monitoring service
-        cached_data = web_monitoring_service.get_cached_status()
+        # Check if user is authenticated and get their facility patterns
+        if current_user.is_authenticated:
+            user_authenticated = True
+            logging.debug(f"Getting cached status for authenticated user: {current_user.email}")
+            
+            # Get user's facility patterns
+            oak_settings = current_user.get_service_settings('oak_tower_watcher')
+            if oak_settings:
+                user_patterns = oak_settings.get_all_facility_patterns()
+                
+                # Get user-filtered status from monitoring service
+                cached_data = web_monitoring_service.get_user_filtered_status(user_patterns)
+            else:
+                # User has no settings, get unfiltered cached status
+                cached_data = web_monitoring_service.get_cached_status()
+        else:
+            # User not authenticated, get unfiltered cached status
+            cached_data = web_monitoring_service.get_cached_status()
         
         if cached_data is None:
             # No cached data available - service might be starting up
@@ -59,15 +72,8 @@ def get_cached_status():
                 "timestamp": datetime.now().isoformat()
             }), 503
         
-        # If user is authenticated, we could potentially customize the response
-        # but for now we'll show the aggregated monitoring data for all users
-        
-        # Add user-specific info if available
-        if user_id and current_user.is_authenticated:
-            # Could potentially show user's specific patterns here in the future
-            cached_data['user_authenticated'] = True
-        else:
-            cached_data['user_authenticated'] = False
+        # Add user authentication metadata
+        cached_data['user_authenticated'] = user_authenticated
         
         return jsonify(cached_data)
         

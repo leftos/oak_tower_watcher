@@ -337,6 +337,175 @@ class WebMonitoringService:
             logging.error(f"Error getting cached status: {e}")
             return None
     
+    def get_user_filtered_status(self, user_facility_patterns: Dict[str, List[str]]) -> Optional[Dict[str, Any]]:
+        """
+        Get cached status data filtered by user's facility patterns
+        
+        Args:
+            user_facility_patterns: Dictionary with keys 'main_facility', 'supporting_above', 'supporting_below'
+                                  and values as lists of regex patterns
+        
+        Returns:
+            Filtered status dictionary or None if no cached data available
+        """
+        try:
+            # Get the full cached status first
+            cached_data = self.get_cached_status()
+            if cached_data is None:
+                return None
+            
+            # If no user patterns provided, return unfiltered data
+            if not user_facility_patterns or not any(user_facility_patterns.values()):
+                cached_data['using_user_config'] = False
+                return cached_data
+            
+            logging.debug(f"Filtering cached data with user patterns: {user_facility_patterns}")
+            
+            # Get all controllers from cached data
+            all_controllers = (
+                cached_data.get('main_controllers', []) +
+                cached_data.get('supporting_above', []) +
+                cached_data.get('supporting_below', [])
+            )
+            
+            # Filter controllers by user's patterns
+            filtered_main = self._filter_controllers_by_patterns(
+                all_controllers, user_facility_patterns.get('main_facility', [])
+            )
+            filtered_above = self._filter_controllers_by_patterns(
+                all_controllers, user_facility_patterns.get('supporting_above', [])
+            )
+            filtered_below = self._filter_controllers_by_patterns(
+                all_controllers, user_facility_patterns.get('supporting_below', [])
+            )
+            
+            # Determine user-specific status
+            user_status = self._determine_user_status(filtered_main, filtered_above, filtered_below)
+            
+            # Create user-specific facility names for display
+            user_facility_names = self._get_user_facility_display_names(user_facility_patterns)
+            
+            # Create filtered response
+            filtered_data = cached_data.copy()
+            filtered_data.update({
+                'status': user_status,
+                'facility_name': 'Your Monitored Facilities',
+                'main_controllers': filtered_main,
+                'supporting_above': filtered_above,
+                'supporting_below': filtered_below,
+                'using_user_config': True,
+                'facility_names': user_facility_names
+            })
+            
+            return filtered_data
+            
+        except Exception as e:
+            logging.error(f"Error filtering cached status for user: {e}")
+            return None
+    
+    def _filter_controllers_by_patterns(self, controllers: List[Dict[str, Any]], patterns: List[str]) -> List[Dict[str, Any]]:
+        """
+        Filter controllers by regex patterns
+        
+        Args:
+            controllers: List of controller dictionaries
+            patterns: List of regex patterns to match against callsigns
+        
+        Returns:
+            List of controllers matching the patterns
+        """
+        if not patterns:
+            return []
+        
+        import re
+        filtered_controllers = []
+        
+        for controller in controllers:
+            callsign = controller.get('callsign', '')
+            for pattern in patterns:
+                try:
+                    if re.match(pattern, callsign):
+                        filtered_controllers.append(controller)
+                        break  # Don't add the same controller multiple times
+                except re.error:
+                    # If regex fails, try exact match
+                    if pattern == callsign:
+                        filtered_controllers.append(controller)
+                        break
+        
+        return filtered_controllers
+    
+    def _determine_user_status(self, main_controllers: List, supporting_above: List, supporting_below: List) -> str:
+        """
+        Determine status based on filtered controller lists
+        
+        Args:
+            main_controllers: List of main facility controllers
+            supporting_above: List of supporting above controllers
+            supporting_below: List of supporting below controllers
+        
+        Returns:
+            Status string
+        """
+        if main_controllers and supporting_above:
+            return 'main_facility_and_supporting_above_online'
+        elif main_controllers:
+            return 'main_facility_online'
+        elif supporting_above:
+            return 'supporting_above_online'
+        else:
+            return 'all_offline'
+    
+    def _get_user_facility_display_names(self, user_patterns: Dict[str, List[str]]) -> Dict[str, str]:
+        """
+        Generate display names from user facility patterns
+        
+        Args:
+            user_patterns: User's facility patterns dictionary
+        
+        Returns:
+            Dictionary with display names for each facility type
+        """
+        import re
+        facility_names = {}
+        
+        for facility_type, patterns in user_patterns.items():
+            if not patterns:
+                continue
+                
+            # Use the first pattern to derive a display name
+            pattern = patterns[0]
+            display_name = None
+            
+            # Try to extract a clean callsign from the regex pattern
+            if re.match(r'^[A-Z0-9_]+$', pattern) and not any(char in pattern for char in ['^', '$', '\\', '(', ')', '?', '+', '*', '[', ']', '{', '}']):
+                # It's already a plain callsign
+                display_name = pattern
+            else:
+                # Remove regex anchors and try to extract the core callsign
+                clean_pattern = pattern.replace('^', '').replace('$', '')
+                
+                # Look for common callsign patterns
+                simple_match = re.search(r'^([A-Z]{3,4}_[A-Z]{2,4})$', clean_pattern)
+                if simple_match:
+                    display_name = simple_match.group(1)
+                else:
+                    # Try more complex extraction
+                    callsign_match = re.search(r'([A-Z]{3,4})_([A-Z]{2,4})', clean_pattern)
+                    if callsign_match:
+                        display_name = f"{callsign_match.group(1)}_{callsign_match.group(2)}"
+            
+            # If we have multiple patterns, show count
+            if len(patterns) > 1:
+                if display_name:
+                    facility_names[facility_type] = f"{display_name} (+{len(patterns)-1} more)"
+                else:
+                    facility_names[facility_type] = f"{len(patterns)} facilities"
+            else:
+                facility_names[facility_type] = display_name or f"{facility_type.replace('_', ' ').title()}"
+        
+        return facility_names
+    
     def monitoring_loop(self):
         """
         Main monitoring loop that runs in background thread

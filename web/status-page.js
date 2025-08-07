@@ -164,7 +164,8 @@ class OAKTowerStatus {
                 lastUpdated: data.last_updated,
                 monitoringService: data.monitoring_service || {},
                 userAuthenticated: data.user_authenticated || false,
-                facility_names: data.facility_names || {}
+                facility_names: data.facility_names || {},
+                usingUserConfig: data.using_user_config || false
             };
             
         } catch (error) {
@@ -273,10 +274,15 @@ class OAKTowerStatus {
     updateServiceStats(status) {
         // Update monitoring status based on service state
         const monitoringStatusElement = document.getElementById('monitoring-status');
-        if (status.monitoringService && status.monitoringService.running) {
+        if (status.usingUserConfig) {
+            monitoringStatusElement.textContent = 'Active (Personal Config)';
+            monitoringStatusElement.style.color = '#28a745'; // Green to indicate personal config
+        } else if (status.monitoringService && status.monitoringService.running) {
             monitoringStatusElement.textContent = 'Active';
+            monitoringStatusElement.style.color = ''; // Reset color
         } else {
             monitoringStatusElement.textContent = 'Initializing...';
+            monitoringStatusElement.style.color = ''; // Reset color
         }
         
         if (status.config && status.config.check_interval) {

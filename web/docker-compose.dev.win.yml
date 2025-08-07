@@ -47,38 +47,39 @@ services:
     # Remove resource limits for development
     deploy: {}
 
-  # Override vatsim-monitor for development
-  vatsim-monitor:
-    environment:
-      - PYTHONUNBUFFERED=1
-      - TZ=UTC
-      - APP_ENV=development
-      - DATABASE_URL=sqlite:////app/web/per_env/dev/data/users.db
-    
-    volumes:
-      - ./per_env/dev/logs:/app/web/per_env/dev/logs
-      - ./per_env/dev/data:/app/web/per_env/dev/data
-      - .:/app/web
-      - ../shared:/app/shared:ro
-      - ../config:/app/config:ro
-      - ../headless:/app/headless:ro
-    
-    # Override entrypoint for development
-    entrypoint: []
-    user: root
-    command: >
-      bash -c "
-      pip install --no-cache-dir -r /app/headless/requirements.txt &&
-      export PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin &&
-      export PYTHONPATH=/app:/app/web &&
-      mkdir -p /app/web/per_env/dev/{data,logs} &&
-      rm -f /home/vatsim/.vatsim_monitor.lock /tmp/vatsim_monitor_headless.lock &&
-      cd /app/headless &&
-      python main.py
-      "
-    
-    # Remove resource limits for development
-    deploy: {}
+  # NOTE: Headless monitoring service DISABLED for multi-user web deployment
+  # The web monitoring service handles all VATSIM API calls with aggregated user patterns
+  # vatsim-monitor:
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #     - TZ=UTC
+  #     - APP_ENV=development
+  #     - DATABASE_URL=sqlite:////app/web/per_env/dev/data/users.db
+  #
+  #   volumes:
+  #     - ./per_env/dev/logs:/app/web/per_env/dev/logs
+  #     - ./per_env/dev/data:/app/web/per_env/dev/data
+  #     - .:/app/web
+  #     - ../shared:/app/shared:ro
+  #     - ../config:/app/config:ro
+  #     - ../headless:/app/headless:ro
+  #
+  #   # Override entrypoint for development
+  #   entrypoint: []
+  #   user: root
+  #   command: >
+  #     bash -c "
+  #     pip install --no-cache-dir -r /app/headless/requirements.txt &&
+  #     export PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin &&
+  #     export PYTHONPATH=/app:/app/web &&
+  #     mkdir -p /app/web/per_env/dev/{data,logs} &&
+  #     rm -f /home/vatsim/.vatsim_monitor.lock /tmp/vatsim_monitor_headless.lock &&
+  #     cd /app/headless &&
+  #     python main.py
+  #     "
+  #
+  #   # Remove resource limits for development
+  #   deploy: {}
 
   # Disable nginx for development since we're accessing the web-api directly
   nginx:
