@@ -7,7 +7,7 @@ Organize files in folders as much as possible.
 Avoid clutter in the root folder. 
 Put documentation under /docs/.
 
-Testing of the web app in development can happen through /web/start_dev.sh.
+Testing of the web app in development can happen through /web/start_dev.sh. The development server can be accessed through localhost:8080, not :5000.
 
 After changes to a docker image, 'docker compose restart' will NOT create a new container if the image changed. You need to use 'docker compose up' instead.
 

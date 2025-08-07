@@ -61,7 +61,7 @@ python test_facility_config.py
    - Save configuration
 
 3. **Verify Status Page**
-   - Visit `/oak-tower-status.html` while logged in
+   - Visit `/oak-tower-status` while logged in
    - Confirm "Personal Configuration Active" badge appears
    - Check pattern counts match your configuration
 

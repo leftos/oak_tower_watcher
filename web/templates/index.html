@@ -44,7 +44,7 @@
                         <span class="feature">Controller Info</span>
                     </div>
                     <div class="service-actions">
-                        <a href="{{ url_for('static', filename='oak-tower-status.html') }}" class="btn btn-primary">View Status</a>
+                        <a href="{{ url_for('oak_tower_status') }}" class="btn btn-primary">View Status</a>
                         {% if current_user.is_authenticated %}
                             <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Configure Notifications</a>
                         {% else %}

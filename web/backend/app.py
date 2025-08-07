@@ -128,6 +128,12 @@ def create_app():
         """Serve the homepage"""
         return render_template('index.html')
 
+    @app.route('/oak-tower-status')
+    @rate_limit(max_requests=20, window_minutes=5)
+    def oak_tower_status():
+        """Serve the oak tower status page"""
+        return render_template('oak-tower-status.html')
+
     @app.route('/robots.txt')
     def robots_txt():
         """Serve robots.txt to discourage bots"""
