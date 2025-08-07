@@ -141,6 +141,8 @@ class WebMonitoringService:
                         else:
                             # Handle more complex patterns
                             clean_pattern = clean_pattern.replace('\\d+', '').replace('\\', '').replace('(?:', '').replace(')?', '').replace('_+', '_')
+                            # Clean up consecutive underscores and trim
+                            clean_pattern = re.sub(r'_+', '_', clean_pattern).strip('_')
                             
                             # Look for common callsign patterns like XXX_TWR, XXX_APP, XXX_GND, etc.
                             callsign_match = re.search(r'([A-Z]{3,4})_([A-Z]{2,4})', clean_pattern)
