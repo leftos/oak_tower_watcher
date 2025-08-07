@@ -12,7 +12,7 @@ from shared.pushover_service import PushoverService
 from shared.bulk_notification_service import BulkNotificationService
 from shared.utils import format_push_notification
 from .status_service import status_api
-from .security import email_verification_required
+from .security import email_verification_required, require_admin_api
 from .web_monitoring_service import web_monitoring_service
 
 api_bp = Blueprint('api', __name__)
@@ -207,8 +207,7 @@ def test_pushover():
 
 
 @api_bp.route('/test-bulk-pushover', methods=['POST'])
-@login_required
-@email_verification_required
+@require_admin_api()
 def test_bulk_pushover():
     """Test bulk Pushover notifications to all users with valid credentials"""
     try:
@@ -274,8 +273,7 @@ def test_bulk_pushover():
 
 
 @api_bp.route('/bulk-notification-stats', methods=['GET'])
-@login_required
-@email_verification_required
+@require_admin_api()
 def bulk_notification_stats():
     """Get statistics about users with valid Pushover settings"""
     try:
@@ -324,8 +322,7 @@ def bulk_notification_stats():
 
 
 @api_bp.route('/test-personalized-bulk-notification', methods=['POST'])
-@login_required
-@email_verification_required
+@require_admin_api()
 def test_personalized_bulk_notification():
     """Test personalized bulk notifications based on user configurations"""
     try:
@@ -522,8 +519,7 @@ def test_status_notification():
 
 
 @api_bp.route('/web-monitor/status', methods=['GET'])
-@login_required
-@email_verification_required
+@require_admin_api()
 def web_monitor_status():
     """Get web monitoring service status"""
     try:
@@ -589,8 +585,7 @@ def web_monitor_status():
 
 
 @api_bp.route('/web-monitor/force-check', methods=['POST'])
-@login_required
-@email_verification_required
+@require_admin_api()
 def web_monitor_force_check():
     """Force immediate comprehensive status check with web monitoring service"""
     try:
@@ -629,8 +624,7 @@ def web_monitor_force_check():
 
 
 @api_bp.route('/web-monitor/restart', methods=['POST'])
-@login_required
-@email_verification_required
+@require_admin_api()
 def web_monitor_restart():
     """Restart the web monitoring service"""
     try:

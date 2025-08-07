@@ -143,10 +143,14 @@ def create_app():
     @rate_limit(max_requests=20, window_minutes=5)  # Rate limit static files
     def serve_static(filename):
         """Serve static files from web directory - with security restrictions"""
+        # Skip static file handling for API routes - let blueprints handle them
+        if filename.startswith('api/'):
+            abort(404)
+        
         # Security: Block common attack paths
         forbidden_patterns = [
             '.env', 'config', 'backup', '.git', '.htaccess', '.htpasswd',
-            'wp-admin', 'wp-login', 'phpmyadmin', 'admin', 'server-status',
+            'wp-admin', 'wp-login', 'phpmyadmin', 'server-status',
             'xmlrpc', '.well-known'
         ]
         

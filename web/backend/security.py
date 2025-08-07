@@ -8,7 +8,7 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import request, jsonify, abort, current_app, redirect, url_for, render_template
+from flask import request, jsonify, abort, current_app, redirect, url_for, render_template, session
 from flask_login import current_user
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,28 @@ def email_verification_required(f):
         
         return f(*args, **kwargs)
     return decorated_function
+
+def require_admin_api():
+    """
+    Decorator to require admin authentication for API endpoints.
+    Returns JSON error instead of redirecting to login page.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # Check if current session is authenticated as admin
+            if not session.get('admin_authenticated', False):
+                logger.warning(f"Non-admin user attempted to access admin API endpoint: {request.endpoint} from IP: {get_client_ip()}")
+                return jsonify({
+                    "error": "Admin authentication required",
+                    "message": "This endpoint requires administrator privileges",
+                    "timestamp": datetime.now().isoformat()
+                }), 403
+            
+            return f(*args, **kwargs)
+        decorated_function.__name__ = f.__name__
+        return decorated_function
+    return decorator
 
 def is_suspicious_request():
     """Check if the current request looks suspicious"""
