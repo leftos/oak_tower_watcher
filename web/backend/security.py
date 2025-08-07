@@ -154,6 +154,11 @@ def rate_limit(max_requests=60, window_minutes=5, block_minutes=15):
             client_ip = get_client_ip()
             current_time = datetime.now()
             
+            # Skip rate limiting for localhost and internal Docker networks
+            if client_ip and (client_ip in ['127.0.0.1', '::1'] or client_ip.startswith('172.') or client_ip.startswith('192.168.') or client_ip.startswith('10.')):
+                logger.debug(f"Skipping rate limit for internal IP: {client_ip}")
+                return f(*args, **kwargs)
+            
             # Check if IP is currently blocked
             if client_ip in blocked_ips:
                 block_until = blocked_ips[client_ip]
