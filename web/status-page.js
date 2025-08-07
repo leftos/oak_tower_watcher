@@ -29,7 +29,7 @@ function translateControllerRating(ratingId) {
 class OAKTowerStatus {
     constructor() {
         this.autoRefreshEnabled = true;
-        this.refreshInterval = 30000; // 30 seconds
+        this.refreshInterval = 10000; // 10 seconds - faster since we're just getting cached data
         this.refreshTimer = null;
         this.lastUpdateTime = null;
         
@@ -57,11 +57,7 @@ class OAKTowerStatus {
             forceRefreshBtn.addEventListener('click', () => this.forceRefresh());
         }
 
-        // Toggle auto-refresh button
-        const toggleAutoRefreshBtn = document.getElementById('toggle-auto-refresh-btn');
-        if (toggleAutoRefreshBtn) {
-            toggleAutoRefreshBtn.addEventListener('click', () => this.toggleAutoRefresh());
-        }
+        // Toggle auto-refresh button no longer exists - users can't control monitoring frequency
 
         // Test notification button
         const testNotificationBtn = document.getElementById('test-notification-btn');
@@ -117,7 +113,8 @@ class OAKTowerStatus {
 
     async fetchStatus() {
         try {
-            const response = await fetch('/api/status');
+            // Use cached status from monitoring service to prevent VATSIM API spam
+            const response = await fetch('/api/cached-status');
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -128,20 +125,22 @@ class OAKTowerStatus {
                 throw new Error(data.error);
             }
             
-            // Transform API response to match our UI expectations
+            // Transform cached API response to match our UI expectations
             return {
                 status: data.status,
-                facilityName: data.facility_name || 'Main Facility',
+                facilityName: data.facility_name || 'Monitored Facilities',
                 mainControllers: data.main_controllers || [],
                 supportingAbove: data.supporting_above || [],
                 supportingBelow: data.supporting_below || [],
                 config: data.config || {},
-                usingUserConfig: data.using_user_config || false,
-                facilityPatterns: data.facility_patterns || {}
+                cacheAge: data.cache_age_seconds || 0,
+                lastUpdated: data.last_updated,
+                monitoringService: data.monitoring_service || {},
+                userAuthenticated: data.user_authenticated || false
             };
             
         } catch (error) {
-            console.error('API fetch error:', error);
+            console.error('Cached status fetch error:', error);
             throw error;
         }
     }
@@ -235,12 +234,18 @@ class OAKTowerStatus {
     }
 
     updateServiceStats(status) {
-        document.getElementById('monitoring-status').textContent = 'Active';
+        // Update monitoring status based on service state
+        const monitoringStatusElement = document.getElementById('monitoring-status');
+        if (status.monitoringService && status.monitoringService.running) {
+            monitoringStatusElement.textContent = 'Active (Cached Data)';
+        } else {
+            monitoringStatusElement.textContent = 'Initializing...';
+        }
         
         if (status.config && status.config.check_interval) {
-            document.getElementById('check-interval').textContent = `${status.config.check_interval} seconds`;
+            document.getElementById('check-interval').textContent = `${status.config.check_interval} seconds (Background Service)`;
         } else {
-            document.getElementById('check-interval').textContent = '30 seconds';
+            document.getElementById('check-interval').textContent = '60 seconds (Background Service)';
         }
         
         // Update facility name
@@ -331,10 +336,10 @@ class OAKTowerStatus {
             const seconds = Math.floor(diff / 1000);
             
             if (seconds < 60) {
-                lastCheck.textContent = `${seconds} seconds ago`;
+                lastCheck.textContent = `${seconds} seconds ago (cached data)`;
             } else {
                 const minutes = Math.floor(seconds / 60);
-                lastCheck.textContent = `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+                lastCheck.textContent = `${minutes} minute${minutes > 1 ? 's' : ''} ago (cached data)`;
             }
         }
     }
@@ -362,8 +367,9 @@ class OAKTowerStatus {
         const refreshBtn = document.getElementById('refresh-text');
         const originalText = refreshBtn.textContent;
         
-        refreshBtn.textContent = '🔄 Refreshing...';
+        refreshBtn.textContent = '🔄 Refreshing Cache...';
         
+        // Just refresh the cached data, don't trigger new VATSIM API calls
         this.loadStatus().then(() => {
             refreshBtn.textContent = originalText;
             
@@ -371,26 +377,15 @@ class OAKTowerStatus {
             const container = document.querySelector('.status-section');
             const successDiv = document.createElement('div');
             successDiv.className = 'success-message';
-            successDiv.textContent = 'Status refreshed successfully';
+            successDiv.textContent = 'Cached data refreshed successfully';
             container.appendChild(successDiv);
             
             setTimeout(() => successDiv.remove(), 3000);
         });
     }
 
-    toggleAutoRefresh() {
-        const btn = document.getElementById('auto-refresh-text');
-        
-        if (this.autoRefreshEnabled) {
-            this.autoRefreshEnabled = false;
-            this.stopAutoRefresh();
-            btn.textContent = '▶️ Resume Auto-refresh';
-        } else {
-            this.autoRefreshEnabled = true;
-            this.startAutoRefresh();
-            btn.textContent = '⏸️ Pause Auto-refresh';
-        }
-    }
+    // Removed toggleAutoRefresh() - users no longer control monitoring frequency
+    // The background monitoring service handles all VATSIM API calls
 
     async testStatusNotification() {
         const testBtn = document.getElementById('test-notification-text');

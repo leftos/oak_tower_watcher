@@ -28,6 +28,7 @@ from .auth import auth_bp
 from .email_service import init_mail
 from .api import api_bp
 from .security import init_security, rate_limit
+from .web_monitoring_service import web_monitoring_service
  
 def create_app():
     """Application factory with environment-specific configuration"""
@@ -102,6 +103,22 @@ def create_app():
             else:
                 app.logger.error(f"Error creating database tables: {e}")
                 raise
+    
+    # Start web monitoring service if database is available
+    def start_web_monitoring():
+        """Start web monitoring service in background"""
+        try:
+            web_monitoring_service.start()
+            app.logger.info("Web monitoring service started successfully")
+        except Exception as e:
+            app.logger.error(f"Failed to start web monitoring service: {e}")
+    
+    # Start monitoring service after a short delay to ensure app is fully initialized
+    if web_monitoring_service.db_interface.enabled:
+        import threading
+        threading.Timer(2.0, start_web_monitoring).start()
+    else:
+        app.logger.warning("Web monitoring service disabled - database interface not available")
     
     @app.route('/')
     @rate_limit(max_requests=30, window_minutes=5)  # More lenient for homepage
@@ -252,7 +269,23 @@ def handle_exception(error):
         "timestamp": datetime.now().isoformat()
     }), 500
 
-# Database initialization is handled in main() function
+@app.teardown_appcontext
+def cleanup_web_monitoring(error):
+    """Cleanup function called when app context tears down"""
+    # This is called for each request, so we don't want to stop the service here
+    pass
+
+def cleanup_on_exit():
+    """Cleanup function for application shutdown"""
+    try:
+        web_monitoring_service.stop()
+        app.logger.info("Web monitoring service stopped during shutdown")
+    except Exception as e:
+        app.logger.error(f"Error stopping web monitoring service: {e}")
+
+# Register cleanup function for graceful shutdown
+import atexit
+atexit.register(cleanup_on_exit)
 
 def main():
     """Main entry point"""

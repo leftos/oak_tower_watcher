@@ -332,6 +332,78 @@ class DatabaseInterface:
             logging.error(f"Error clearing cached status for user_settings_id {user_settings_id}: {e}")
             return False
     
+    def get_all_user_facility_patterns(self, service_name: str = 'oak_tower_watcher') -> Dict[str, List[str]]:
+        """
+        Get all unique facility patterns from all users to create comprehensive monitoring
+        
+        Args:
+            service_name: The service name to filter by
+            
+        Returns:
+            Dictionary with aggregated facility patterns by type
+        """
+        if not self.enabled or not self.session_factory:
+            return {
+                'main_facility': [],
+                'supporting_above': [],
+                'supporting_below': []
+            }
+        
+        try:
+            session = self.session_factory()
+            
+            # Query all active users with notifications enabled
+            results = session.query(MinimalUserSettings, MinimalUser).join(
+                MinimalUser, MinimalUserSettings.user_id == MinimalUser.id
+            ).filter(
+                MinimalUserSettings.service_name == service_name,
+                MinimalUserSettings.notifications_enabled == True,
+                MinimalUserSettings.pushover_api_token.isnot(None),
+                MinimalUserSettings.pushover_user_key.isnot(None),
+                MinimalUserSettings.pushover_api_token != '',
+                MinimalUserSettings.pushover_user_key != '',
+                MinimalUser.is_active == True,
+                MinimalUser.email_verified == True
+            ).all()
+            
+            # Aggregate all unique patterns
+            aggregated_patterns = {
+                'main_facility': set(),
+                'supporting_above': set(),
+                'supporting_below': set()
+            }
+            
+            for settings, user in results:
+                facility_patterns = settings.get_all_facility_patterns()
+                
+                # Add patterns to respective sets (using sets to avoid duplicates)
+                for pattern_type, patterns in facility_patterns.items():
+                    if pattern_type in aggregated_patterns:
+                        for pattern in patterns:
+                            if pattern.strip():  # Only add non-empty patterns
+                                aggregated_patterns[pattern_type].add(pattern.strip())
+            
+            session.close()
+            
+            # Convert sets to lists
+            result = {
+                pattern_type: list(pattern_set)
+                for pattern_type, pattern_set in aggregated_patterns.items()
+            }
+            
+            total_patterns = sum(len(patterns) for patterns in result.values())
+            logging.info(f"Aggregated {total_patterns} unique facility patterns from {len(results)} users")
+            
+            return result
+            
+        except Exception as e:
+            logging.error(f"Error getting aggregated facility patterns: {e}")
+            return {
+                'main_facility': [],
+                'supporting_above': [],
+                'supporting_below': []
+            }
+    
     def cleanup_old_cache_entries(self, days_old: int = 30) -> int:
         """
         Clean up old cache entries

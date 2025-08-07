@@ -13,6 +13,7 @@ from shared.bulk_notification_service import BulkNotificationService
 from shared.utils import format_push_notification
 from .status_service import status_api
 from .security import email_verification_required
+from .web_monitoring_service import web_monitoring_service
 
 api_bp = Blueprint('api', __name__)
 
@@ -36,6 +37,48 @@ def get_status():
             "timestamp": datetime.now().isoformat()
         }), 500
 
+@api_bp.route('/cached-status')
+def get_cached_status():
+    """Get current cached VATSIM status from monitoring service (no fresh API calls)"""
+    try:
+        # Check if user is authenticated to provide user-specific configuration if needed
+        user_id = None
+        if current_user.is_authenticated:
+            user_id = current_user.id
+            logging.debug(f"Getting cached status for authenticated user: {current_user.email}")
+        
+        # Get cached status from web monitoring service
+        cached_data = web_monitoring_service.get_cached_status()
+        
+        if cached_data is None:
+            # No cached data available - service might be starting up
+            return jsonify({
+                "error": "No status data available",
+                "status": "initializing",
+                "message": "Monitoring service is initializing, please try again in a moment",
+                "timestamp": datetime.now().isoformat()
+            }), 503
+        
+        # If user is authenticated, we could potentially customize the response
+        # but for now we'll show the aggregated monitoring data for all users
+        
+        # Add user-specific info if available
+        if user_id and current_user.is_authenticated:
+            # Could potentially show user's specific patterns here in the future
+            cached_data['user_authenticated'] = True
+        else:
+            cached_data['user_authenticated'] = False
+        
+        return jsonify(cached_data)
+        
+    except Exception as e:
+        logging.error(f"API error in cached status: {e}")
+        return jsonify({
+            "error": "Internal server error",
+            "status": "error",
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
 @api_bp.route('/health')
 def health_check():
     """Health check endpoint"""
@@ -51,9 +94,7 @@ def get_config():
     """Get basic configuration information"""
     try:
         return jsonify({
-            "airport_code": status_api.airport_code,
-            "display_name": status_api.display_name,
-            "airport_name": status_api.airport_config.get("name", "Oakland International Airport"),
+            "service_name": "OAK Tower Watcher",
             "check_interval": status_api.config.get("monitoring", {}).get("check_interval", 30),
             "timestamp": datetime.now().isoformat()
         })
@@ -444,5 +485,125 @@ def test_status_notification():
             "success": False,
             "error": "Internal server error",
             "message": "An unexpected error occurred while sending the test status notification",
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+
+@api_bp.route('/web-monitor/status', methods=['GET'])
+@login_required
+@email_verification_required
+def web_monitor_status():
+    """Get web monitoring service status"""
+    try:
+        logging.info(f"Web monitor status requested by user: {current_user.email}")
+        
+        # Get monitoring service status
+        is_running = web_monitoring_service.is_running()
+        db_enabled = web_monitoring_service.db_interface.enabled
+        
+        # Get aggregated patterns info
+        aggregated_config = web_monitoring_service.get_aggregated_config()
+        pattern_counts = {}
+        total_patterns = 0
+        
+        if aggregated_config:
+            callsigns = aggregated_config.get('callsigns', {})
+            for pattern_type in ['main_facility', 'supporting_above', 'supporting_below']:
+                count = len(callsigns.get(pattern_type, []))
+                pattern_counts[pattern_type] = count
+                total_patterns += count
+        
+        return jsonify({
+            "success": True,
+            "monitoring_service": {
+                "running": is_running,
+                "database_enabled": db_enabled,
+                "check_interval": web_monitoring_service.check_interval,
+                "previous_status": web_monitoring_service.previous_status
+            },
+            "facility_monitoring": {
+                "total_patterns": total_patterns,
+                "pattern_counts": pattern_counts,
+                "using_aggregated_config": aggregated_config is not None
+            },
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting web monitor status: {str(e)}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": "Internal server error",
+            "message": "An unexpected error occurred while getting monitor status",
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+
+@api_bp.route('/web-monitor/force-check', methods=['POST'])
+@login_required
+@email_verification_required
+def web_monitor_force_check():
+    """Force immediate status check with web monitoring service"""
+    try:
+        logging.info(f"Web monitor force check requested by user: {current_user.email}")
+        
+        if not web_monitoring_service.is_running():
+            return jsonify({
+                "success": False,
+                "error": "Monitoring service not running",
+                "message": "Web monitoring service is not currently running",
+                "timestamp": datetime.now().isoformat()
+            }), 400
+        
+        # Force immediate check
+        web_monitoring_service.force_check()
+        
+        return jsonify({
+            "success": True,
+            "message": "Force check completed - notifications sent to users with facility changes",
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error during web monitor force check: {str(e)}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": "Internal server error",
+            "message": "An unexpected error occurred during force check",
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+
+@api_bp.route('/web-monitor/restart', methods=['POST'])
+@login_required
+@email_verification_required
+def web_monitor_restart():
+    """Restart the web monitoring service"""
+    try:
+        logging.info(f"Web monitor restart requested by user: {current_user.email}")
+        
+        # Stop if running
+        if web_monitoring_service.is_running():
+            web_monitoring_service.stop()
+            # Give it a moment to stop
+            import time
+            time.sleep(1)
+        
+        # Start the service
+        web_monitoring_service.start()
+        
+        return jsonify({
+            "success": True,
+            "message": "Web monitoring service restarted successfully",
+            "running": web_monitoring_service.is_running(),
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error restarting web monitor: {str(e)}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": "Internal server error",
+            "message": "An unexpected error occurred during restart",
             "timestamp": datetime.now().isoformat()
         }), 500

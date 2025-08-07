@@ -98,20 +98,20 @@
                         <h3>🔧 Actions</h3>
                         <div class="actions-list">
                             <button id="force-refresh-btn" class="btn btn-primary">
-                                <span id="refresh-text">🔄 Refresh Now</span>
-                            </button>
-                            <button id="toggle-auto-refresh-btn" class="btn btn-secondary">
-                                <span id="auto-refresh-text">⏸️ Pause Auto-refresh</span>
+                                <span id="refresh-text">🔄 Refresh Display</span>
                             </button>
                             <button id="test-notification-btn" class="btn btn-success">
                                 <span id="test-notification-text">🔔 Test Status Notification</span>
                             </button>
                         </div>
+                        <div class="cache-info">
+                            <small>📋 Data is updated automatically by background monitoring service</small>
+                        </div>
                     </div>
 
                     <div class="info-card">
                         <h3>ℹ️ About</h3>
-                        <p>This service monitors VATSIM network facilities and controllers, providing real-time status updates. The system checks for active controllers every 30 seconds and can send notifications when status changes occur.</p>
+                        <p>This service monitors VATSIM network facilities and controllers using a background monitoring service. The system automatically checks for active controllers at regular intervals and provides cached data to prevent API overload. Notifications are sent when status changes occur.</p>
                     </div>
                 </div>
             </section>
