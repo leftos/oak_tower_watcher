@@ -1,0 +1,91 @@
+# Development overrides for Docker Compose
+# This file extends docker-compose.yml with development-specific configurations
+
+services:
+  # Override web-api service for development
+  web-api:
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=UTC
+      - APP_ENV=development
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - GUNICORN_BIND=0.0.0.0:8080
+      - DATABASE_URL=sqlite:////app/web/per_env/dev/data/users.db
+    
+    # Mount source code for live reloading
+    volumes:
+      - ./per_env/dev/logs:/app/web/per_env/dev/logs
+      - ./per_env/dev/data:/app/web/per_env/dev/data
+      - ./backend:/app/backend:ro
+      - ./templates:/app/templates:ro
+      - .:/app/web:ro
+      - ../shared:/app/shared:ro
+      - ../config:/app/config:ro
+    
+    # Override entrypoint to avoid missing script issues in development
+    entrypoint: []
+    user: root
+    command: >
+      bash -c "
+      pip install --no-cache-dir -r /app/web/requirements.txt &&
+      export PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin &&
+      export PYTHONPATH=/app:/app/web &&
+      mkdir -p /app/web/per_env/dev/{data,logs} &&
+      cd /app/web &&
+      python run_app.py
+      "
+    
+    # Expose port directly for development (no nginx proxy needed)
+    ports:
+      - "8080:8080"
+    
+    # Disable healthcheck for development to avoid noise
+    healthcheck:
+      disable: true
+    
+    # Remove resource limits for development
+    deploy: {}
+
+  # Override vatsim-monitor for development
+  vatsim-monitor:
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=UTC
+      - APP_ENV=development
+      - DATABASE_URL=sqlite:////app/web/per_env/dev/data/users.db
+    
+    volumes:
+      - ./per_env/dev/logs:/app/web/per_env/dev/logs
+      - ./per_env/dev/data:/app/web/per_env/dev/data
+      - .:/app/web
+      - ../shared:/app/shared:ro
+      - ../config:/app/config:ro
+      - ../headless:/app/headless:ro
+    
+    # Override entrypoint for development
+    entrypoint: []
+    user: root
+    command: >
+      bash -c "
+      pip install --no-cache-dir -r /app/headless/requirements.txt &&
+      export PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin &&
+      export PYTHONPATH=/app:/app/web &&
+      mkdir -p /app/web/per_env/dev/{data,logs} &&
+      rm -f /home/vatsim/.vatsim_monitor.lock /tmp/vatsim_monitor_headless.lock &&
+      cd /app/headless &&
+      python main.py
+      "
+    
+    # Remove resource limits for development
+    deploy: {}
+
+  # Disable nginx for development since we're accessing the web-api directly
+  nginx:
+    profiles:
+      - production
+
+  # Disable certbot for development
+  certbot:
+    profiles:
+      - production
