@@ -1,2 +1,0 @@
-- Admin panel
-- Down for maintenance
