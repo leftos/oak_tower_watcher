@@ -497,3 +497,96 @@ def format_push_notification(
             result['sound'] = "none"
     
     return result
+
+
+def get_facility_display_name(
+    current_status: str,
+    main_controllers: Optional[List[Dict[str, Any]]] = None,
+    supporting_above: Optional[List[Dict[str, Any]]] = None,
+    fallback_name: str = "Main Facility"
+) -> str:
+    """
+    Get dynamic facility display name based on current status and active controllers.
+    
+    Args:
+        current_status: The current facility status
+        main_controllers: List of main facility controllers
+        supporting_above: List of supporting above controllers
+        fallback_name: Fallback name when no specific facility can be determined
+    
+    Returns:
+        String: Appropriate facility display name
+    """
+    main_controllers = main_controllers or []
+    supporting_above = supporting_above or []
+    
+    # If exactly one main facility is online, use its callsign
+    if len(main_controllers) == 1 and current_status in ["main_facility_online", "main_facility_and_supporting_above_online"]:
+        callsign = main_controllers[0].get('callsign', '')
+        if callsign:
+            # Extract base callsign (remove _1, _2, etc. suffixes for display)
+            base_callsign = re.sub(r'_\d+_', '_', callsign)  # OAK_1_TWR -> OAK_TWR
+            return base_callsign
+    
+    # If main facility is offline but exactly one supporting facility is online
+    if len(supporting_above) == 1 and current_status == "supporting_above_online" and not main_controllers:
+        callsign = supporting_above[0].get('callsign', '')
+        if callsign:
+            base_callsign = re.sub(r'_\d+_', '_', callsign)
+            return base_callsign
+    
+    # For all other cases (multiple facilities, all offline, or mixed), use generic term
+    return fallback_name
+
+
+def extract_facility_name_from_callsign(callsign: str) -> str:
+    """
+    Extract a readable facility name from a callsign.
+    
+    Args:
+        callsign: Controller callsign (e.g., "OAK_TWR", "NCT_APP")
+    
+    Returns:
+        String: Readable facility name (e.g., "Oakland Tower", "NorCal Approach")
+    """
+    if not callsign:
+        return "Unknown Facility"
+    
+    # Remove numeric suffixes for cleaner display
+    clean_callsign = re.sub(r'_\d+(?=_|$)', '', callsign)
+    
+    # Common facility type mappings
+    facility_types = {
+        'TWR': 'Tower',
+        'APP': 'Approach',
+        'DEP': 'Departure',
+        'CTR': 'Center',
+        'GND': 'Ground',
+        'DEL': 'Delivery',
+        'FSS': 'Flight Service'
+    }
+    
+    # Extract airport/facility code and type
+    parts = clean_callsign.split('_')
+    if len(parts) >= 2:
+        facility_code = parts[0]
+        facility_type = parts[-1]
+        
+        # Map facility type to readable name
+        type_name = facility_types.get(facility_type, facility_type.title())
+        
+        # Special handling for some well-known facility codes
+        facility_names = {
+            'NCT': 'NorCal',
+            'SCT': 'SoCal',
+            'OAK': 'Oakland',
+            'SFO': 'San Francisco',
+            'LAX': 'Los Angeles',
+            'ZOA': 'Oakland Center',
+            'ZLA': 'Los Angeles Center'
+        }
+        
+        facility_name = facility_names.get(facility_code, facility_code)
+        return f"{facility_name} {type_name}"
+    
+    return callsign

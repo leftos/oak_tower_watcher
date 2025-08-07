@@ -131,10 +131,13 @@ class OAKTowerStatus {
             // Transform API response to match our UI expectations
             return {
                 status: data.status,
+                facilityName: data.facility_name || 'Main Facility',
                 mainControllers: data.main_controllers || [],
                 supportingAbove: data.supporting_above || [],
                 supportingBelow: data.supporting_below || [],
-                config: data.config || {}
+                config: data.config || {},
+                usingUserConfig: data.using_user_config || false,
+                facilityPatterns: data.facility_patterns || {}
             };
             
         } catch (error) {
@@ -147,7 +150,7 @@ class OAKTowerStatus {
         this.updateMainStatus(status);
         this.updateControllers(status);
         this.updateServiceStats(status);
-        this.updateUserConfigStatus(status);
+        this.updateSectionHeaders(status);
     }
 
     updateMainStatus(status) {
@@ -158,24 +161,28 @@ class OAKTowerStatus {
         // Clear existing classes
         indicator.className = 'status-indicator-large';
 
+        // Get facility names for dynamic descriptions
+        const mainFacilityName = this.getFacilityName(status.mainControllers) || status.facilityName || 'Main facility';
+        const supportingFacilityName = this.getFacilityName(status.supportingAbove) || 'Supporting facility';
+
         switch (status.status) {
             case 'main_facility_and_supporting_above_online':
                 indicator.classList.add('status-online');
                 indicator.textContent = '🟣';
                 title.textContent = 'Full Coverage Online';
-                description.textContent = 'Main facility and supporting facilities are active';
+                description.textContent = `${mainFacilityName} and supporting facilities are active`;
                 break;
             case 'main_facility_online':
                 indicator.classList.add('status-online');
                 indicator.textContent = '🟢';
-                title.textContent = 'Main Facility Online';
-                description.textContent = 'Main facility controller is active';
+                title.textContent = `${mainFacilityName} Online`;
+                description.textContent = `${mainFacilityName} controller is active`;
                 break;
             case 'supporting_above_online':
                 indicator.classList.add('status-partial');
                 indicator.textContent = '🟡';
-                title.textContent = 'Supporting Facility Online';
-                description.textContent = 'Main facility offline, but supporting facility active';
+                title.textContent = `${supportingFacilityName} Online`;
+                description.textContent = `${mainFacilityName} offline, but ${supportingFacilityName.toLowerCase()} active`;
                 break;
             case 'all_offline':
                 indicator.classList.add('status-offline');
@@ -196,7 +203,10 @@ class OAKTowerStatus {
     }
 
     updateControllers(status) {
-        this.updateControllerSection('main-controllers', status.mainControllers, 'No main facility controllers online');
+        // Get facility names for dynamic messages
+        const mainFacilityName = this.getFacilityName(status.mainControllers) || status.facilityName || 'main facility';
+        
+        this.updateControllerSection('main-controllers', status.mainControllers, `No controllers online on ${mainFacilityName}`);
         this.updateControllerSection('supporting-above-controllers', status.supportingAbove, 'No supporting above controllers online');
         this.updateControllerSection('supporting-below-controllers', status.supportingBelow, 'No supporting below controllers online');
     }
@@ -232,62 +242,15 @@ class OAKTowerStatus {
         } else {
             document.getElementById('check-interval').textContent = '30 seconds';
         }
-    }
-
-    updateUserConfigStatus(status) {
-        // Check if there's an existing user config indicator
-        let configIndicator = document.getElementById('user-config-indicator');
         
-        if (status.using_user_config) {
-            // Create or update the indicator if user config is being used
-            if (!configIndicator) {
-                configIndicator = document.createElement('div');
-                configIndicator.id = 'user-config-indicator';
-                configIndicator.className = 'user-config-badge';
-                
-                // Insert after the service stats
-                const serviceStatsCard = document.querySelector('.info-card');
-                if (serviceStatsCard && serviceStatsCard.parentNode) {
-                    const newCard = document.createElement('div');
-                    newCard.className = 'info-card user-config-card';
-                    newCard.appendChild(configIndicator);
-                    serviceStatsCard.parentNode.insertBefore(newCard, serviceStatsCard.nextSibling);
-                }
-            }
-            
-            configIndicator.innerHTML = `
-                <h3>🎯 Personal Configuration Active</h3>
-                <div class="user-config-info">
-                    <p><strong>You're using your custom facility patterns!</strong></p>
-                    <div class="pattern-summary">
-                        <div class="pattern-group">
-                            <strong>Main Facility:</strong>
-                            <span class="pattern-count">${status.facility_patterns?.main_facility?.length || 0} patterns</span>
-                        </div>
-                        <div class="pattern-group">
-                            <strong>Supporting Above:</strong>
-                            <span class="pattern-count">${status.facility_patterns?.supporting_above?.length || 0} patterns</span>
-                        </div>
-                        <div class="pattern-group">
-                            <strong>Supporting Below:</strong>
-                            <span class="pattern-count">${status.facility_patterns?.supporting_below?.length || 0} patterns</span>
-                        </div>
-                    </div>
-                    <div class="config-actions">
-                        <a href="/auth/settings/oak_tower_watcher" class="btn btn-secondary">⚙️ Edit Configuration</a>
-                    </div>
-                </div>
-            `;
-        } else {
-            // Remove the indicator if using default config
-            if (configIndicator) {
-                const parentCard = configIndicator.closest('.user-config-card');
-                if (parentCard) {
-                    parentCard.remove();
-                }
-            }
+        // Update facility name
+        const facilityNameElement = document.getElementById('facility-name');
+        if (facilityNameElement && status.facilityName) {
+            facilityNameElement.textContent = status.facilityName;
         }
     }
+
+    // Removed updateUserConfigStatus - personal configuration card no longer shown
 
     formatDuration(logonTime) {
         if (!logonTime) return 'Unknown';
@@ -500,6 +463,34 @@ class OAKTowerStatus {
         
         // Add fade-in animation
         setTimeout(() => messageDiv.classList.add('message-fade-in'), 100);
+    }
+
+    getFacilityName(controllers) {
+        // Extract facility name from first controller's callsign
+        if (controllers && controllers.length > 0) {
+            return controllers[0].callsign;
+        }
+        return null;
+    }
+
+    updateSectionHeaders(status) {
+        // Update section headers to use dynamic facility names where possible
+        const mainFacilityName = this.getFacilityName(status.mainControllers) || status.facilityName || 'Main Facilities';
+        
+        // Find and update the main facility header by finding the element that contains the main controllers
+        const controllerCards = document.querySelectorAll('.controller-card h3');
+        controllerCards.forEach(header => {
+            if (header.textContent.includes('Main Facilities')) {
+                if (status.mainControllers && status.mainControllers.length > 0) {
+                    const facilityName = this.getFacilityName(status.mainControllers);
+                    if (facilityName) {
+                        header.innerHTML = `🏗️ ${facilityName}`;
+                    }
+                } else {
+                    header.innerHTML = `🏗️ Main Facilities`;
+                }
+            }
+        });
     }
 }
 

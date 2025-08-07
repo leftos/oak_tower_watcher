@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from config.config import load_config
 from shared.vatsim_core import VATSIMCore
-from shared.utils import load_artcc_roster, get_controller_name
+from shared.utils import load_artcc_roster, get_controller_name, get_facility_display_name, extract_facility_name_from_callsign
 
 # Import web models for user configuration support
 try:
@@ -29,9 +29,6 @@ except ImportError:
 class StatusAPI:
     def __init__(self):
         self.config = load_config()
-        self.airport_config = self.config.get("airport", {})
-        self.airport_code = self.airport_config.get("code", "KOAK")
-        self.display_name = self.airport_config.get("display_name", "Oakland Tower")
         
         # Load ARTCC roster for controller names
         roster_url = self.config.get("api", {}).get(
@@ -42,7 +39,7 @@ class StatusAPI:
         # Create a core VATSIM client instance with default config
         self.vatsim_core = VATSIMCore(self.config)
         
-        logging.info(f"Status API initialized for {self.display_name}")
+        logging.info("Status API initialized")
     
     def _get_user_facility_patterns(self, user_id):
         """Get user-specific facility patterns if available"""
@@ -129,17 +126,23 @@ class StatusAPI:
                     })
                 return formatted
             
+            # Get dynamic facility name based on current status and controllers
+            facility_name = get_facility_display_name(
+                result["status"],
+                result["main_controllers"],
+                result["supporting_above"],
+                "Main Facility"
+            )
+            
             response = {
                 "status": result["status"],
-                "airport_code": self.airport_code,
-                "display_name": self.display_name,
+                "facility_name": facility_name,
                 "timestamp": result["timestamp"],
                 "main_controllers": format_controllers(result["main_controllers"]),
                 "supporting_above": format_controllers(result["supporting_above"]),
                 "supporting_below": format_controllers(result["supporting_below"]),
                 "config": {
-                    "check_interval": self.config.get("monitoring", {}).get("check_interval", 30),
-                    "airport_name": self.airport_config.get("name", "Oakland International Airport")
+                    "check_interval": self.config.get("monitoring", {}).get("check_interval", 30)
                 }
             }
             

@@ -21,11 +21,6 @@ def load_config():
     """Load configuration from config.json file"""
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.json")
     default_config = {
-        "airport": {
-            "code": "KOAK",
-            "name": "Oakland International Airport",
-            "display_name": "Oakland Tower",
-        },
         "monitoring": {"check_interval": 30},
         "auto_update": {
             "enabled": True,

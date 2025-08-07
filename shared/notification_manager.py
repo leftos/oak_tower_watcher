@@ -6,7 +6,7 @@ Handles notification logic and formatting that can be shared between GUI and hea
 
 import logging
 from datetime import datetime
-from .utils import get_controller_name, get_controller_initials
+from .utils import get_controller_name, get_controller_initials, get_facility_display_name
 from .pushover_service import create_pushover_service, get_priority_for_status, get_sound_for_status
 from .bulk_notification_service import BulkNotificationService
 
@@ -17,13 +17,6 @@ class NotificationManager:
     def __init__(self, config, controller_names=None):
         self.config = config
         self.controller_names = controller_names or {}
-        
-        # Get airport configuration
-        self.airport_config = config.get("airport", {})
-        self.airport_code = self.airport_config.get("code", "KOAK")
-        self.display_name = self.airport_config.get(
-            "display_name", f"{self.airport_code} Main Facility"
-        )
         
         # Setup Pushover service for single-user notifications (legacy)
         self.pushover_service = create_pushover_service(config)
@@ -82,6 +75,11 @@ class NotificationManager:
     ):
         """Generate appropriate notification message based on state transition"""
 
+        # Get dynamic facility names based on current status
+        facility_name = get_facility_display_name(
+            current_status, controller_info, supporting_info, "Main Facility"
+        )
+        
         # Get supporting below controller info for all messages
         supporting_below_info = self.format_supporting_below_controllers_info(
             supporting_below_controllers
@@ -90,7 +88,7 @@ class NotificationManager:
         # Handle transitions to full coverage
         if current_status == "main_facility_and_supporting_above_online":
             main_facility_info = self.format_multiple_controllers_info(
-                controller_info, f"{self.display_name}: "
+                controller_info, f"{facility_name}: "
             )
             support_info = self.format_multiple_controllers_info(
                 supporting_info, "Supporting Above: "
@@ -101,7 +99,7 @@ class NotificationManager:
                 title = "Supporting Above Facilities Now Online!"
                 return title, message, "success"
             elif previous_status == "supporting_above_online":
-                title = f"{self.display_name} Now Online!"
+                title = f"{facility_name} Now Online!"
                 return title, message, "success"
             else:  # from all_offline
                 title = "Full Coverage Online!"
@@ -113,56 +111,71 @@ class NotificationManager:
 
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "Supporting Above Facilities Now Offline"
-                message = f"Only {self.display_name} remains online\n{main_facility_info}{supporting_below_info}"
+                message = f"Only {facility_name} remains online\n{main_facility_info}{supporting_below_info}"
                 return title, message, "warning"
             elif previous_status == "supporting_above_online":
-                title = f"{self.display_name} Now Online!"
-                message = f"{self.display_name} controller is now online\n{main_facility_info}{supporting_below_info}"
+                title = f"{facility_name} Now Online!"
+                message = f"{facility_name} controller is now online\n{main_facility_info}{supporting_below_info}"
                 return title, message, "success"
             else:  # from all_offline
-                title = f"{self.display_name} Online!"
+                title = f"{facility_name} Online!"
                 message = f"{main_facility_info} is now online!{supporting_below_info}"
                 return title, message, "success"
 
         # Handle transitions to supporting above only
         elif current_status == "supporting_above_online":
             support_info = self.format_multiple_controllers_info(supporting_info)
+            # For supporting above only, get the facility name from the supporting controllers
+            supporting_facility_name = get_facility_display_name(
+                "supporting_above_online", [], supporting_info, "Supporting Facility"
+            )
 
             if previous_status == "main_facility_and_supporting_above_online":
-                title = f"{self.display_name} Now Offline"
+                main_facility_name = get_facility_display_name(
+                    "main_facility_online", controller_info, [], "Main Facility"
+                )
+                title = f"{main_facility_name} Now Offline"
                 message = (
                     f"Only supporting above facility remains online\n"
                     f"{support_info}{supporting_below_info}"
                 )
                 return title, message, "warning"
             elif previous_status == "main_facility_online":
-                title = f"{self.display_name} Now Offline"
-                message = f"{self.display_name} went offline, but {support_info} is online{supporting_below_info}"
+                main_facility_name = get_facility_display_name(
+                    "main_facility_online", controller_info, [], "Main Facility"
+                )
+                title = f"{main_facility_name} Now Offline"
+                message = f"{main_facility_name} went offline, but {support_info} is online{supporting_below_info}"
                 return title, message, "warning"
             else:  # from all_offline
                 title = "Supporting Above Facility Online"
-                message = f"{self.display_name} is offline, but {support_info} is online{supporting_below_info}"
+                message = f"Main facility is offline, but {support_info} is online{supporting_below_info}"
                 return title, message, "warning"
 
         # Handle transitions to all offline
         else:  # all_offline
+            # Use generic names when offline since we can't determine specific facilities
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "All Facilities Now Offline"
                 message = (
-                    f"Both {self.display_name} and supporting above controllers have gone offline"
+                    f"Both main facility and supporting above controllers have gone offline"
                     + f"{supporting_below_info}"
                 )
             elif previous_status == "main_facility_online":
-                title = f"{self.display_name} Now Offline"
+                # Get the facility name that was online
+                previous_facility_name = get_facility_display_name(
+                    "main_facility_online", controller_info, [], "Main Facility"
+                )
+                title = f"{previous_facility_name} Now Offline"
                 message = (
-                    f"{self.display_name} controller has gone offline{supporting_below_info}"
+                    f"{previous_facility_name} controller has gone offline{supporting_below_info}"
                 )
             elif previous_status == "supporting_above_online":
                 title = "Supporting Above Facility Now Offline"
                 message = f"Supporting above controller has gone offline{supporting_below_info}"
             else:
                 title = "All Facilities Offline"
-                message = f"No {self.display_name} or supporting above controllers found{supporting_below_info}"
+                message = f"No main facility or supporting above controllers found{supporting_below_info}"
 
             return title, message, "error"
 

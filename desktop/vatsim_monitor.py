@@ -27,6 +27,8 @@ from shared.utils import (
     load_artcc_roster,
     get_controller_name,
     get_controller_initials,
+    get_facility_display_name,
+    extract_facility_name_from_callsign,
 )
 from desktop.worker import VATSIMWorker
 from desktop.gui.components import CustomToast, StatusDialog, SettingsDialog
@@ -48,16 +50,6 @@ class VATSIMMonitor(QApplication):
 
         # Load configuration
         self.config = load_config()
-
-        # Get airport configuration
-        self.airport_config = self.config.get("airport", {})
-        self.airport_code = self.airport_config.get("code", "KOAK")
-        self.airport_name = self.airport_config.get(
-            "name", "Oakland International Airport"
-        )
-        self.display_name = self.airport_config.get(
-            "display_name", f"{self.airport_code} Main Facility"
-        )
 
         # Application state
         self.main_facility_online = False
@@ -344,6 +336,11 @@ class VATSIMMonitor(QApplication):
     ):
         """Generate appropriate notification message based on state transition"""
 
+        # Get dynamic facility name based on current status
+        facility_name = get_facility_display_name(
+            current_status, controller_info, supporting_info, "Main Facility"
+        )
+        
         # Get supporting below controller info for all messages
         supporting_below_info = self.format_supporting_below_controllers_info(
             supporting_below_controllers
@@ -352,7 +349,7 @@ class VATSIMMonitor(QApplication):
         # Handle transitions to full coverage
         if current_status == "main_facility_and_supporting_above_online":
             main_facility_info = self.format_multiple_controllers_info(
-                controller_info, f"{self.display_name}: "
+                controller_info, f"{facility_name}: "
             )
             support_info = self.format_multiple_controllers_info(
                 supporting_info, "Supporting Above: "
@@ -363,7 +360,7 @@ class VATSIMMonitor(QApplication):
                 title = "Supporting Above Facilities Now Online!"
                 return title, message, "success"
             elif previous_status == "supporting_above_online":
-                title = f"{self.display_name} Now Online!"
+                title = f"{facility_name} Now Online!"
                 return title, message, "success"
             else:  # from all_offline
                 title = "Full Coverage Online!"
@@ -375,56 +372,71 @@ class VATSIMMonitor(QApplication):
 
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "Supporting Above Facilities Now Offline"
-                message = f"Only {self.display_name} remains online\n{main_facility_info}{supporting_below_info}"
+                message = f"Only {facility_name} remains online\n{main_facility_info}{supporting_below_info}"
                 return title, message, "warning"
             elif previous_status == "supporting_above_online":
-                title = f"{self.display_name} Now Online!"
-                message = f"{self.display_name} controller is now online\n{main_facility_info}{supporting_below_info}"
+                title = f"{facility_name} Now Online!"
+                message = f"{facility_name} controller is now online\n{main_facility_info}{supporting_below_info}"
                 return title, message, "success"
             else:  # from all_offline
-                title = f"{self.display_name} Online!"
+                title = f"{facility_name} Online!"
                 message = f"{main_facility_info} is now online!{supporting_below_info}"
                 return title, message, "success"
 
         # Handle transitions to supporting above only
         elif current_status == "supporting_above_online":
             support_info = self.format_multiple_controllers_info(supporting_info)
+            # For supporting above only, get the facility name from the supporting controllers
+            supporting_facility_name = get_facility_display_name(
+                "supporting_above_online", [], supporting_info, "Supporting Facility"
+            )
 
             if previous_status == "main_facility_and_supporting_above_online":
-                title = f"{self.display_name} Now Offline"
+                main_facility_name = get_facility_display_name(
+                    "main_facility_online", controller_info, [], "Main Facility"
+                )
+                title = f"{main_facility_name} Now Offline"
                 message = (
                     f"Only supporting above facility remains online\n"
                     f"{support_info}{supporting_below_info}"
                 )
                 return title, message, "warning"
             elif previous_status == "main_facility_online":
-                title = f"{self.display_name} Now Offline"
-                message = f"{self.display_name} went offline, but {support_info} is online{supporting_below_info}"
+                main_facility_name = get_facility_display_name(
+                    "main_facility_online", controller_info, [], "Main Facility"
+                )
+                title = f"{main_facility_name} Now Offline"
+                message = f"{main_facility_name} went offline, but {support_info} is online{supporting_below_info}"
                 return title, message, "warning"
             else:  # from all_offline
                 title = "Supporting Above Facility Online"
-                message = f"{self.display_name} is offline, but {support_info} is online{supporting_below_info}"
+                message = f"Main facility is offline, but {support_info} is online{supporting_below_info}"
                 return title, message, "warning"
 
         # Handle transitions to all offline
         else:  # all_offline
+            # Use generic names when offline since we can't determine specific facilities
             if previous_status == "main_facility_and_supporting_above_online":
                 title = "All Facilities Now Offline"
                 message = (
-                    f"Both {self.display_name} and supporting above controllers have gone offline"
+                    f"Both main facility and supporting above controllers have gone offline"
                     + f"{supporting_below_info}"
                 )
             elif previous_status == "main_facility_online":
-                title = f"{self.display_name} Now Offline"
+                # Get the facility name that was online
+                previous_facility_name = get_facility_display_name(
+                    "main_facility_online", controller_info, [], "Main Facility"
+                )
+                title = f"{previous_facility_name} Now Offline"
                 message = (
-                    f"{self.display_name} controller has gone offline{supporting_below_info}"
+                    f"{previous_facility_name} controller has gone offline{supporting_below_info}"
                 )
             elif previous_status == "supporting_above_online":
                 title = "Supporting Above Facility Now Offline"
                 message = f"Supporting above controller has gone offline{supporting_below_info}"
             else:
                 title = "All Facilities Offline"
-                message = f"No {self.display_name} or supporting above controllers found{supporting_below_info}"
+                message = f"No main facility or supporting above controllers found{supporting_below_info}"
 
             return title, message, "error"
 
@@ -543,7 +555,7 @@ class VATSIMMonitor(QApplication):
         tray_menu = QMenu()
 
         # Status action
-        status_action = QAction(f"{self.display_name} Status", self)
+        status_action = QAction("Facility Status", self)
         status_action.triggered.connect(self.show_status)
         tray_menu.addAction(status_action)
 
@@ -608,30 +620,44 @@ class VATSIMMonitor(QApplication):
     def update_tray_tooltip(self):
         """Update the system tray icon tooltip with current status"""
         if not hasattr(self, "current_status"):
-            self.tray_icon.setToolTip(f"VATSIM {self.airport_code} - Starting...")
+            self.tray_icon.setToolTip("VATSIM Facility Watcher - Starting...")
             return
 
-        # Use airport code instead of full display name for brevity
-        airport = self.airport_code
+        # Ensure controller_info and supporting_info are lists for the function
+        main_controllers = getattr(self, 'controller_info', [])
+        if isinstance(main_controllers, dict):
+            main_controllers = [main_controllers]
+        
+        supporting_controllers = getattr(self, 'supporting_info', [])
+        if isinstance(supporting_controllers, dict):
+            supporting_controllers = [supporting_controllers]
+
+        # Get dynamic facility name for tooltip
+        facility_name = get_facility_display_name(
+            self.current_status,
+            main_controllers,
+            supporting_controllers,
+            "Main Facility"
+        )
 
         if self.current_status == "main_facility_and_supporting_above_online":
             # Show first controller from each with initials
             main_text = self._format_controller_for_tooltip(self.controller_info, "Main")
             support_text = self._format_controller_for_tooltip(self.supporting_info, "Above")
-            tooltip = f"{airport}: ONLINE (Full)\n{support_text}\n{main_text}"
+            tooltip = f"{facility_name}: ONLINE (Full)\n{support_text}\n{main_text}"
         elif self.current_status == "main_facility_online":
             # Show main facility controller with initials
             controller_text = self._format_controller_for_tooltip(self.controller_info)
-            tooltip = f"{airport}: ONLINE\n{controller_text}"
+            tooltip = f"{facility_name}: ONLINE\n{controller_text}"
         elif self.current_status == "supporting_above_online":
             # Show supporting facility with initials
             support_text = self._format_controller_for_tooltip(self.supporting_info, "Above")
-            tooltip = f"{airport}: OFFLINE\n{support_text}"
+            tooltip = f"Main Facility: OFFLINE\n{support_text}"
         else:  # all_offline
-            tooltip = f"{airport}: OFFLINE"
+            tooltip = "All Facilities: OFFLINE"
 
         # Add supporting below controller info if available
-        if self.supporting_below_controllers:
+        if hasattr(self, 'supporting_below_controllers') and self.supporting_below_controllers:
             below_text = self._format_controller_for_tooltip(self.supporting_below_controllers, "Below")
             tooltip += f"\n{below_text}"
 
@@ -788,7 +814,7 @@ class VATSIMMonitor(QApplication):
         """Handle error from worker thread"""
         logging.error(error_message)
         self.tray_icon.setIcon(self.create_icon("gray"))
-        self.tray_icon.setToolTip(f"VATSIM {self.display_name} Monitor - Error")
+        self.tray_icon.setToolTip("VATSIM Facility Monitor - Error")
 
     def start_monitoring(self):
         """Start monitoring VATSIM"""
@@ -811,7 +837,7 @@ class VATSIMMonitor(QApplication):
             self.stop_action.setEnabled(False)
 
             self.tray_icon.setIcon(self.create_icon("gray"))
-            self.tray_icon.setToolTip(f"VATSIM {self.display_name} Monitor - Stopped")
+            self.tray_icon.setToolTip("VATSIM Facility Monitor - Stopped")
             logging.info("Stopped VATSIM monitoring")
 
     def force_check(self):
