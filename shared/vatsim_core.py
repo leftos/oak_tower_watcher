@@ -57,8 +57,41 @@ class VATSIMCore:
         # Convert frequency to string for comparison to handle both string and numeric types
         return str(frequency) != "199.998"
 
+    def query_vatsim_api_comprehensive(self):
+        """Query VATSIM API for ALL controller data (comprehensive collection)"""
+        try:
+            logging.info("Querying VATSIM API for comprehensive controller data...")
+            response = requests.get(self.vatsim_api_url, timeout=10)
+            response.raise_for_status()
+
+            data = response.json()
+            controllers = data.get("controllers", [])
+
+            # Filter out inactive controllers but keep ALL active ones
+            active_controllers = []
+            for controller in controllers:
+                callsign = controller.get("callsign", "")
+                
+                # Skip inactive controllers (frequency 199.998)
+                if not self.is_controller_active(controller):
+                    freq = controller.get('frequency', 'Unknown')
+                    logging.debug(f"Skipping inactive controller {callsign} (freq: {freq})")
+                    continue
+                
+                active_controllers.append(controller)
+
+            logging.info(f"Collected {len(active_controllers)} active controllers from VATSIM")
+            return active_controllers
+
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error querying VATSIM API: {e}")
+            raise e
+        except json.JSONDecodeError as e:
+            logging.error(f"Error parsing VATSIM API response: {e}")
+            raise e
+
     def query_vatsim_api(self):
-        """Query VATSIM API for controller data"""
+        """Query VATSIM API for controller data (filtered by configured patterns)"""
         try:
             logging.info("Querying VATSIM API...")
             response = requests.get(self.vatsim_api_url, timeout=10)
@@ -155,8 +188,77 @@ class VATSIMCore:
 
         return status
 
+    def filter_controllers_by_patterns(self, controllers, patterns):
+        """Filter controllers by a list of regex patterns"""
+        if not patterns:
+            return []
+        
+        filtered_controllers = []
+        compiled_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in patterns]
+        
+        for controller in controllers:
+            callsign = controller.get("callsign", "")
+            for pattern in compiled_patterns:
+                try:
+                    if pattern.match(callsign):
+                        filtered_controllers.append(controller)
+                        break  # Don't add the same controller multiple times
+                except re.error:
+                    # If regex fails, try exact match
+                    if pattern.pattern == callsign:
+                        filtered_controllers.append(controller)
+                        break
+        
+        return filtered_controllers
+
+    def filter_comprehensive_data(self, all_controllers, facility_patterns):
+        """Filter comprehensive controller data by facility patterns
+        
+        Args:
+            all_controllers: List of all active controllers
+            facility_patterns: Dict with keys 'main_facility', 'supporting_above', 'supporting_below'
+                             and values as lists of regex patterns
+        
+        Returns:
+            Tuple of (main_controllers, supporting_above, supporting_below)
+        """
+        main_controllers = self.filter_controllers_by_patterns(
+            all_controllers, facility_patterns.get('main_facility', [])
+        )
+        supporting_above = self.filter_controllers_by_patterns(
+            all_controllers, facility_patterns.get('supporting_above', [])
+        )
+        supporting_below = self.filter_controllers_by_patterns(
+            all_controllers, facility_patterns.get('supporting_below', [])
+        )
+        
+        return main_controllers, supporting_above, supporting_below
+
+    def check_status_comprehensive(self):
+        """Check current status and return comprehensive controller data"""
+        try:
+            # Query the API for ALL active controllers
+            all_controllers = self.query_vatsim_api_comprehensive()
+            
+            return {
+                "all_controllers": all_controllers,
+                "timestamp": datetime.now().isoformat(),
+                "success": True,
+                "total_controllers": len(all_controllers)
+            }
+            
+        except Exception as e:
+            logging.error(f"Error checking comprehensive status: {e}")
+            return {
+                "all_controllers": [],
+                "timestamp": datetime.now().isoformat(),
+                "success": False,
+                "error": str(e),
+                "total_controllers": 0
+            }
+
     def check_status(self):
-        """Check current status and return structured data"""
+        """Check current status and return structured data (filtered by configured patterns)"""
         try:
             # Query the API
             main_controllers, supporting_above, supporting_below = self.query_vatsim_api()

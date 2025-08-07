@@ -13,7 +13,12 @@ After changes to a docker image, 'docker compose restart' will NOT create a new 
 
 If you can't find a file or folder, say an ls or cd command fails, use pwd to check which folder you're in right now, instead of assuming.
 Try to keep track of which folder you're in so you don't keep adding a cd to a subfolder at the start of every subsequent command, only to have it fail.
+Prefer using directory change stacks (such as pushd and popd) to make sure that if a command chain fails we return to the working directory we were in before.
 
 Don't use inline scripts. The final document should not have inline `<script>` tags. Keep in mind: 'Refused to execute inline event handler because it violates the following Content Security Policy directive: "script-src 'self'". Either the 'unsafe-inline' keyword, a hash ('sha256-...'), or a nonce ('nonce-...') is required to enable inline execution. Note that hashes do not apply to event handlers, style attributes and javascript: navigations unless the 'unsafe-hashes' keyword is present.'
 
 Changes to the database schema should be done through bash scripts through sudo, so that databases owned by limited user accounts can be force-updated.
+
+Check whether you're in Windows and running in a Powershell/cmd terminal, or whether you're in Linux in a Bash/zsh terminal. Adjust your terminal commands accordingly.
+
+Don't create new documentation files as a result of code / architecture changes without asking. Feel free to update existing documentation without asking.

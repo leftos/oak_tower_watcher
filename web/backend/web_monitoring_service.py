@@ -41,25 +41,84 @@ class WebMonitoringService(BaseMonitoringService):
         logging.info("Web monitoring service initialized")
     
     def check_status(self) -> Dict[str, Any]:
-        """Check status using aggregated config (implements abstract method)"""
-        return self.check_status_with_aggregated_config()
+        """Check status using comprehensive data collection (implements abstract method)"""
+        return self.check_status_comprehensive()
 
     def on_status_changed(self, current_result: Dict[str, Any]):
         """Handle status changes with bulk notifications (implements abstract method)"""
         if current_result.get('success') and self.notification_manager:
             try:
+                # For comprehensive monitoring, send notifications based on significant network changes
+                total_controllers = current_result.get('total_controllers', 0)
+                
                 # Send bulk notifications to all users based on their individual configurations
+                # The notification manager will handle filtering for each user's specific patterns
                 self.notification_manager.send_bulk_pushover_notification(
-                    title="Facility Status Update",
-                    message="VATSIM facility status has changed",
-                    status=current_result['status']
+                    title="VATSIM Network Update",
+                    message=f"VATSIM network status update - {total_controllers} controllers online",
+                    status="network_update"
                 )
+                logging.info(f"Sent bulk notifications for network change - {total_controllers} controllers")
             except Exception as e:
                 logging.error(f"Error sending bulk notifications: {e}")
 
     def on_status_updated(self, current_result: Dict[str, Any]):
         """Update cache on every status check (overrides base method)"""
         self.update_cached_status(current_result)
+
+    def has_status_changed(self, current_result: Dict[str, Any]) -> bool:
+        """
+        Check if comprehensive status has changed
+        Override base method since comprehensive data has different structure
+        
+        Args:
+            current_result: Current comprehensive status check result
+            
+        Returns:
+            True if status has changed, False otherwise
+        """
+        if not current_result.get('success'):
+            return False
+        
+        # For comprehensive monitoring, we consider status changed if:
+        # 1. The total number of controllers changed significantly (±5)
+        # 2. It's been more than 5 minutes since last change notification
+        
+        current_total = current_result.get('total_controllers', 0)
+        
+        # Get previous total from our tracking
+        previous_total = getattr(self, '_previous_total_controllers', 0)
+        
+        # Check for significant change in controller count
+        if abs(current_total - previous_total) >= 5:
+            logging.info(f"Controller count changed from {previous_total} to {current_total}")
+            self._previous_total_controllers = current_total
+            return True
+        
+        # For comprehensive monitoring, we don't track individual facility status changes
+        # since those are handled by real-time filtering. We only notify on significant
+        # network-wide changes or periodically.
+        return False
+
+    def update_previous_status(self, current_result: Dict[str, Any]):
+        """
+        Update stored previous status for comprehensive data
+        Override base method since comprehensive data has different structure
+        
+        Args:
+            current_result: Current comprehensive status check result
+        """
+        if current_result.get('success'):
+            # For comprehensive monitoring, we only track total controller count
+            self._previous_total_controllers = current_result.get('total_controllers', 0)
+            # Set a generic status for base class compatibility
+            self.previous_status = f"comprehensive_monitoring_{self._previous_total_controllers}_controllers"
+            # Clear controller lists since we don't use them in comprehensive mode
+            self.previous_controllers = {
+                'main': [],
+                'supporting_above': [],
+                'supporting_below': []
+            }
 
     def get_aggregated_config(self) -> Optional[Dict[str, Any]]:
         """
@@ -182,9 +241,42 @@ class WebMonitoringService(BaseMonitoringService):
                 'supporting_below': 'Supporting Below'
             }
     
+    def check_status_comprehensive(self) -> Dict[str, Any]:
+        """
+        Check VATSIM status using comprehensive data collection
+        Collects ALL active controllers, not just user-configured patterns
+        
+        Returns:
+            Comprehensive status result dictionary with all controllers
+        """
+        try:
+            # Create VATSIMCore with default config (patterns don't matter for comprehensive collection)
+            vatsim_core = VATSIMCore(self.config)
+            
+            # Get comprehensive controller data
+            result = vatsim_core.check_status_comprehensive()
+            
+            if result['success']:
+                logging.debug(f"Comprehensive status check successful: {result['total_controllers']} controllers collected")
+            else:
+                logging.warning(f"Comprehensive status check failed: {result.get('error', 'Unknown error')}")
+            
+            return result
+            
+        except Exception as e:
+            logging.error(f"Error checking comprehensive status: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'all_controllers': [],
+                'timestamp': datetime.now().isoformat(),
+                'total_controllers': 0
+            }
+
     def check_status_with_aggregated_config(self) -> Dict[str, Any]:
         """
         Check VATSIM status using aggregated facility patterns from all users
+        DEPRECATED: Use check_status_comprehensive() for new architecture
         
         Returns:
             Status result dictionary
@@ -228,46 +320,42 @@ class WebMonitoringService(BaseMonitoringService):
     def update_cached_status(self, status_result: Dict[str, Any]):
         """
         Update cached status data for UI consumption
+        Now stores comprehensive controller data instead of filtered data
         
         Args:
-            status_result: Latest status check result
+            status_result: Latest comprehensive status check result
         """
         try:
             with self._cache_lock:
-                # Get configured facility names for display
-                facility_names = self._get_facility_display_names()
-                
                 self._cached_status = {
-                    'status': status_result.get('status', 'error'),
-                    'facility_name': 'Monitored Facilities',  # Generic name for aggregated monitoring
-                    'main_controllers': status_result.get('main_controllers', []),
-                    'supporting_above': status_result.get('supporting_above', []),
-                    'supporting_below': status_result.get('supporting_below', []),
+                    # Store comprehensive controller data
+                    'all_controllers': status_result.get('all_controllers', []),
                     'timestamp': status_result.get('timestamp', datetime.now().isoformat()),
                     'success': status_result.get('success', False),
                     'error': status_result.get('error'),
+                    'total_controllers': status_result.get('total_controllers', 0),
                     'config': {
                         'check_interval': self.check_interval
                     },
                     'monitoring_service': {
-                        'using_aggregated_config': self.get_aggregated_config() is not None,
+                        'using_comprehensive_cache': True,
                         'running': self.is_running()
-                    },
-                    'facility_names': facility_names
+                    }
                 }
                 self.last_cache_update = datetime.now()
                 
-                logging.debug(f"Updated cached status: {status_result.get('status', 'unknown')}")
+                total_controllers = status_result.get('total_controllers', 0)
+                logging.debug(f"Updated comprehensive cached status: {total_controllers} controllers")
                 
         except Exception as e:
             logging.error(f"Error updating cached status: {e}")
     
     def get_cached_status(self) -> Optional[Dict[str, Any]]:
         """
-        Get cached status data for UI consumption
+        Get comprehensive cached controller data
         
         Returns:
-            Cached status dictionary or None if no data available
+            Cached comprehensive controller data or None if no data available
         """
         try:
             with self._cache_lock:
@@ -289,7 +377,7 @@ class WebMonitoringService(BaseMonitoringService):
     
     def get_user_filtered_status(self, user_facility_patterns: Dict[str, List[str]]) -> Optional[Dict[str, Any]]:
         """
-        Get cached status data filtered by user's facility patterns
+        Get user-specific status by filtering comprehensive cached data in real-time
         
         Args:
             user_facility_patterns: Dictionary with keys 'main_facility', 'supporting_above', 'supporting_below'
@@ -299,34 +387,46 @@ class WebMonitoringService(BaseMonitoringService):
             Filtered status dictionary or None if no cached data available
         """
         try:
-            # Get the full cached status first
+            # Get comprehensive cached controller data
             cached_data = self.get_cached_status()
             if cached_data is None:
                 return None
             
-            # If no user patterns provided, return unfiltered data
+            # Get all active controllers from cache
+            all_controllers = cached_data.get('all_controllers', [])
+            
+            # If no user patterns provided, return default view with empty filtering
             if not user_facility_patterns or not any(user_facility_patterns.values()):
-                cached_data['using_user_config'] = False
-                return cached_data
+                # Create default response with empty controllers but preserve cache metadata
+                return {
+                    'status': 'all_offline',
+                    'facility_name': 'Monitored Facilities',
+                    'main_controllers': [],
+                    'supporting_above': [],
+                    'supporting_below': [],
+                    'using_user_config': False,
+                    'facility_names': {
+                        'main_facility': 'Main Facility',
+                        'supporting_above': 'Supporting Above',
+                        'supporting_below': 'Supporting Below'
+                    },
+                    'timestamp': cached_data.get('timestamp'),
+                    'cache_age_seconds': cached_data.get('cache_age_seconds'),
+                    'last_updated': cached_data.get('last_updated'),
+                    'success': cached_data.get('success'),
+                    'total_controllers': cached_data.get('total_controllers', 0),
+                    'config': cached_data.get('config', {}),
+                    'monitoring_service': cached_data.get('monitoring_service', {})
+                }
             
-            logging.debug(f"Filtering cached data with user patterns: {user_facility_patterns}")
+            logging.debug(f"Filtering {len(all_controllers)} controllers with user patterns: {user_facility_patterns}")
             
-            # Get all controllers from cached data
-            all_controllers = (
-                cached_data.get('main_controllers', []) +
-                cached_data.get('supporting_above', []) +
-                cached_data.get('supporting_below', [])
-            )
+            # Create VATSIMCore instance for filtering (config doesn't matter for filtering)
+            vatsim_core = VATSIMCore(self.config)
             
-            # Filter controllers by user's patterns
-            filtered_main = self._filter_controllers_by_patterns(
-                all_controllers, user_facility_patterns.get('main_facility', [])
-            )
-            filtered_above = self._filter_controllers_by_patterns(
-                all_controllers, user_facility_patterns.get('supporting_above', [])
-            )
-            filtered_below = self._filter_controllers_by_patterns(
-                all_controllers, user_facility_patterns.get('supporting_below', [])
+            # Filter controllers using VATSIMCore filtering methods
+            filtered_main, filtered_above, filtered_below = vatsim_core.filter_comprehensive_data(
+                all_controllers, user_facility_patterns
             )
             
             # Determine user-specific status
@@ -335,55 +435,36 @@ class WebMonitoringService(BaseMonitoringService):
             # Create user-specific facility names for display
             user_facility_names = self._get_user_facility_display_names(user_facility_patterns)
             
-            # Create filtered response
-            filtered_data = cached_data.copy()
-            filtered_data.update({
+            # Create filtered response with comprehensive cache metadata
+            filtered_data = {
                 'status': user_status,
                 'facility_name': 'Your Monitored Facilities',
                 'main_controllers': filtered_main,
                 'supporting_above': filtered_above,
                 'supporting_below': filtered_below,
                 'using_user_config': True,
-                'facility_names': user_facility_names
-            })
+                'facility_names': user_facility_names,
+                'timestamp': cached_data.get('timestamp'),
+                'cache_age_seconds': cached_data.get('cache_age_seconds'),
+                'last_updated': cached_data.get('last_updated'),
+                'success': cached_data.get('success'),
+                'total_controllers': cached_data.get('total_controllers', 0),
+                'filtered_counts': {
+                    'main': len(filtered_main),
+                    'supporting_above': len(filtered_above),
+                    'supporting_below': len(filtered_below)
+                },
+                'config': cached_data.get('config', {}),
+                'monitoring_service': cached_data.get('monitoring_service', {})
+            }
             
+            logging.debug(f"User filtered status: {user_status} ({len(filtered_main)}/{len(filtered_above)}/{len(filtered_below)} controllers)")
             return filtered_data
             
         except Exception as e:
             logging.error(f"Error filtering cached status for user: {e}")
             return None
     
-    def _filter_controllers_by_patterns(self, controllers: List[Dict[str, Any]], patterns: List[str]) -> List[Dict[str, Any]]:
-        """
-        Filter controllers by regex patterns
-        
-        Args:
-            controllers: List of controller dictionaries
-            patterns: List of regex patterns to match against callsigns
-        
-        Returns:
-            List of controllers matching the patterns
-        """
-        if not patterns:
-            return []
-        
-        import re
-        filtered_controllers = []
-        
-        for controller in controllers:
-            callsign = controller.get('callsign', '')
-            for pattern in patterns:
-                try:
-                    if re.match(pattern, callsign):
-                        filtered_controllers.append(controller)
-                        break  # Don't add the same controller multiple times
-                except re.error:
-                    # If regex fails, try exact match
-                    if pattern == callsign:
-                        filtered_controllers.append(controller)
-                        break
-        
-        return filtered_controllers
     
     def _determine_user_status(self, main_controllers: List, supporting_above: List, supporting_below: List) -> str:
         """
@@ -457,36 +538,37 @@ class WebMonitoringService(BaseMonitoringService):
         return facility_names
     
     def start(self):
-        """Start the web monitoring service (overrides base to add database check)"""
+        """Start the web monitoring service"""
+        # Note: Database interface is still needed for notifications, but not for monitoring status collection
         if not self.db_interface.enabled:
-            logging.error("Cannot start web monitoring service - database interface not available")
-            return
+            logging.warning("Database interface not available - bulk notifications will be disabled")
         
         super().start()
-        logging.info("Web monitoring service started successfully")
+        logging.info("Web monitoring service started successfully (comprehensive data collection mode)")
     
     def force_check(self):
-        """Force an immediate status check (overrides base to add web-specific logic)"""
+        """Force an immediate comprehensive status check"""
         if not self.is_running():
             logging.warning("Cannot force check - monitoring service not running")
             return
         
-        logging.info("Forcing immediate status check...")
+        logging.info("Forcing immediate comprehensive status check...")
         try:
             # Use base class force check mechanism
             super().force_check()
             
             # Additional web-specific force check handling
-            current_result = self.check_status_with_aggregated_config()
+            current_result = self.check_status_comprehensive()
             
             if current_result.get('success') and self.notification_manager:
-                # Always trigger bulk notifications on force check
+                # Trigger bulk notifications on force check
+                # Note: Notifications still use individual user patterns, but monitoring collects comprehensive data
                 self.notification_manager.send_bulk_pushover_notification(
                     title="Manual Status Check",
-                    message="Forced status check triggered",
-                    status=current_result['status']
+                    message="Forced comprehensive status check triggered",
+                    status="manual_check"
                 )
-                logging.info("Force check completed successfully")
+                logging.info(f"Force check completed successfully - collected {current_result.get('total_controllers', 0)} controllers")
             else:
                 logging.warning(f"Force check failed: {current_result.get('error', 'Unknown error')}")
                 

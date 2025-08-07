@@ -19,16 +19,42 @@ api_bp = Blueprint('api', __name__)
 
 @api_bp.route('/status')
 def get_status():
-    """Get current VATSIM monitoring status"""
+    """Get current VATSIM monitoring status (using comprehensive cache for instant response)"""
     try:
-        # Check if user is authenticated to provide user-specific configuration
-        user_id = None
-        if current_user.is_authenticated:
-            user_id = current_user.id
-            logging.debug(f"Getting status for authenticated user: {current_user.email}")
+        user_authenticated = False
+        cached_data = None
         
-        status_data = status_api.get_current_status(user_id=user_id)
-        return jsonify(status_data)
+        # Check if user is authenticated and get their facility patterns
+        if current_user.is_authenticated:
+            user_authenticated = True
+            logging.debug(f"Getting status for authenticated user: {current_user.email}")
+            
+            # Get user's facility patterns
+            oak_settings = current_user.get_service_settings('oak_tower_watcher')
+            if oak_settings:
+                user_patterns = oak_settings.get_all_facility_patterns()
+                
+                # Get user-filtered status from comprehensive cached data (real-time filtering)
+                cached_data = web_monitoring_service.get_user_filtered_status(user_patterns)
+            else:
+                # User has no settings, get default view from comprehensive cache
+                cached_data = web_monitoring_service.get_user_filtered_status({})
+        else:
+            # User not authenticated, get default view from comprehensive cache
+            cached_data = web_monitoring_service.get_user_filtered_status({})
+        
+        if cached_data is None:
+            # No cached data available - service might be starting up, fallback to direct API call
+            logging.warning("Comprehensive cache not available, falling back to direct API call")
+            user_id = current_user.id if current_user.is_authenticated else None
+            status_data = status_api.get_current_status(user_id=user_id)
+            return jsonify(status_data)
+        
+        # Add user authentication metadata
+        cached_data['user_authenticated'] = user_authenticated
+        
+        return jsonify(cached_data)
+        
     except Exception as e:
         logging.error(f"API error: {e}")
         return jsonify({
@@ -54,14 +80,14 @@ def get_cached_status():
             if oak_settings:
                 user_patterns = oak_settings.get_all_facility_patterns()
                 
-                # Get user-filtered status from monitoring service
+                # Get user-filtered status from comprehensive cached data (real-time filtering)
                 cached_data = web_monitoring_service.get_user_filtered_status(user_patterns)
             else:
-                # User has no settings, get unfiltered cached status
-                cached_data = web_monitoring_service.get_cached_status()
+                # User has no settings, get default view from comprehensive cache
+                cached_data = web_monitoring_service.get_user_filtered_status({})
         else:
-            # User not authenticated, get unfiltered cached status
-            cached_data = web_monitoring_service.get_cached_status()
+            # User not authenticated, get default view from comprehensive cache
+            cached_data = web_monitoring_service.get_user_filtered_status({})
         
         if cached_data is None:
             # No cached data available - service might be starting up
@@ -507,7 +533,18 @@ def web_monitor_status():
         is_running = web_monitoring_service.is_running()
         db_enabled = web_monitoring_service.db_interface.enabled
         
-        # Get aggregated patterns info
+        # Get comprehensive cache info
+        cached_data = web_monitoring_service.get_cached_status()
+        total_controllers = 0
+        cache_age_seconds = 0
+        last_updated = None
+        
+        if cached_data:
+            total_controllers = cached_data.get('total_controllers', 0)
+            cache_age_seconds = cached_data.get('cache_age_seconds', 0)
+            last_updated = cached_data.get('last_updated')
+        
+        # Get aggregated patterns info (for backwards compatibility and notifications)
         aggregated_config = web_monitoring_service.get_aggregated_config()
         pattern_counts = {}
         total_patterns = 0
@@ -525,9 +562,15 @@ def web_monitor_status():
                 "running": is_running,
                 "database_enabled": db_enabled,
                 "check_interval": web_monitoring_service.check_interval,
-                "previous_status": web_monitoring_service.previous_status
+                "previous_status": web_monitoring_service.previous_status,
+                "using_comprehensive_cache": True
             },
-            "facility_monitoring": {
+            "comprehensive_monitoring": {
+                "total_controllers_cached": total_controllers,
+                "cache_age_seconds": cache_age_seconds,
+                "last_updated": last_updated
+            },
+            "legacy_facility_monitoring": {
                 "total_patterns": total_patterns,
                 "pattern_counts": pattern_counts,
                 "using_aggregated_config": aggregated_config is not None
@@ -549,9 +592,9 @@ def web_monitor_status():
 @login_required
 @email_verification_required
 def web_monitor_force_check():
-    """Force immediate status check with web monitoring service"""
+    """Force immediate comprehensive status check with web monitoring service"""
     try:
-        logging.info(f"Web monitor force check requested by user: {current_user.email}")
+        logging.info(f"Web monitor comprehensive force check requested by user: {current_user.email}")
         
         if not web_monitoring_service.is_running():
             return jsonify({
@@ -561,12 +604,17 @@ def web_monitor_force_check():
                 "timestamp": datetime.now().isoformat()
             }), 400
         
-        # Force immediate check
+        # Force immediate comprehensive check
         web_monitoring_service.force_check()
+        
+        # Get the result of the check
+        cached_data = web_monitoring_service.get_cached_status()
+        total_controllers = cached_data.get('total_controllers', 0) if cached_data else 0
         
         return jsonify({
             "success": True,
-            "message": "Force check completed - notifications sent to users with facility changes",
+            "message": f"Comprehensive force check completed - collected {total_controllers} controllers, notifications sent to users based on their individual patterns",
+            "total_controllers": total_controllers,
             "timestamp": datetime.now().isoformat()
         })
         
