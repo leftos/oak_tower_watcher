@@ -209,8 +209,15 @@ class OAKTowerStatus {
             case 'supporting_above_online':
                 indicator.classList.add('status-partial');
                 indicator.textContent = '🟡';
-                title.textContent = `${supportingFacilityName} Online`;
-                description.textContent = `${mainFacilityName} offline, but ${supportingFacilityName} active`;
+                // Use actual online controller name instead of generic facility name
+                const actualSupportingController = this.getActualControllerName(status.supportingAbove) || supportingFacilityName;
+                title.textContent = `${actualSupportingController} Online`;
+                // Handle description for multiple controllers
+                const isMultiple = status.supportingAbove && status.supportingAbove.length > 1;
+                const descriptionText = isMultiple ?
+                    `${mainFacilityName} offline, but multiple supporting controllers active` :
+                    `${mainFacilityName} offline, but ${actualSupportingController} active`;
+                description.textContent = descriptionText;
                 break;
             case 'all_offline':
                 indicator.classList.add('status-offline');
@@ -524,6 +531,16 @@ class OAKTowerStatus {
     getFacilityName(controllers) {
         // Extract facility name from first controller's callsign
         if (controllers && controllers.length > 0) {
+            return controllers[0].callsign;
+        }
+        return null;
+    }
+
+    getActualControllerName(controllers) {
+        // Handle multiple controllers case
+        if (controllers && controllers.length > 1) {
+            return "Multiple Supporting Controllers";
+        } else if (controllers && controllers.length === 1) {
             return controllers[0].callsign;
         }
         return null;
