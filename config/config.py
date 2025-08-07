@@ -8,7 +8,7 @@ Callsign Configuration:
 - Each category (main_facility, supporting_above, supporting_below) contains a list of regex patterns
 - Patterns are case-insensitive and use full string matching (^ and $ anchors)
 - Examples:
-  - ^OAK_(?:\d+_)?TWR$ matches OAK_TWR, OAK_1_TWR, OAK_2_TWR, etc.
+  - ^OAK_(?:[A-Z\d]+_)?TWR$ matches OAK_TWR, OAK_1_TWR, OAK_N_TWR, OAK_N1_TWR, etc.
   - ^OAK_\d+_CTR$ matches OAK_36_CTR, OAK_62_CTR, etc.
 """
 
@@ -27,9 +27,9 @@ def load_config():
             "github_repo": "leftos/oak_tower_watcher",
         },
         "callsigns": {
-            "main_facility": [r"^OAK_(?:\d+_)?TWR$"],
+            "main_facility": [r"^OAK_(?:[A-Z\d]+_)?TWR$"],
             "supporting_above": [r"^NCT_APP$", r"^OAK_\d+_CTR$"],
-            "supporting_below": [r"^OAK_(?:\d+_)?GND$", r"^OAK_(?:\d+_)?DEL$"],
+            "supporting_below": [r"^OAK_(?:[A-Z\d]+_)?GND$", r"^OAK_(?:[A-Z\d]+_)?DEL$"],
         },
         "api": {
             "vatsim_url": "https://data.vatsim.net/v3/vatsim-data.json",

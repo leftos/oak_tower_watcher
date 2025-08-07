@@ -30,10 +30,10 @@
                         <small class="form-help">
                             Main facility controllers (e.g., Tower). One pattern per line.
                             <br><strong>Examples:</strong>
-                            <code>^OAK_(?:\d+_)?TWR$</code> (matches OAK_TWR, OAK_1_TWR, etc.)
+                            <code>^OAK_(?:[A-Z\d]+_)?TWR$</code> (matches OAK_TWR, OAK_1_TWR, OAK_N_TWR, OAK_N1_TWR, etc.)
                         </small>
                     </div>
-                    {{ form.main_facility_patterns(class="form-textarea regex-input", placeholder="^OAK_(?:\\d+_)?TWR$", rows="3") }}
+                    {{ form.main_facility_patterns(class="form-textarea regex-input", placeholder="^OAK_(?:[A-Z\\d]+_)?TWR$", rows="3") }}
                     {% for error in form.main_facility_patterns.errors %}
                         <span class="error">{{ error }}</span>
                     {% endfor %}
@@ -62,10 +62,10 @@
                         <small class="form-help">
                             Supporting controllers below main facility (e.g., Ground, Delivery). One pattern per line.
                             <br><strong>Examples:</strong>
-                            <code>^OAK_(?:\d+_)?GND$</code>, <code>^OAK_(?:\d+_)?DEL$</code>
+                            <code>^OAK_(?:[A-Z\d]+_)?GND$</code>, <code>^OAK_(?:[A-Z\d]+_)?DEL$</code>
                         </small>
                     </div>
-                    {{ form.supporting_below_patterns(class="form-textarea regex-input", placeholder="^OAK_(?:\\d+_)?GND$\n^OAK_(?:\\d+_)?DEL$", rows="3") }}
+                    {{ form.supporting_below_patterns(class="form-textarea regex-input", placeholder="^OAK_(?:[A-Z\\d]+_)?GND$\n^OAK_(?:[A-Z\\d]+_)?DEL$", rows="3") }}
                     {% for error in form.supporting_below_patterns.errors %}
                         <span class="error">{{ error }}</span>
                     {% endfor %}
@@ -80,7 +80,7 @@
                         <li><strong>\d</strong> - Any digit (0-9)</li>
                         <li><strong>+</strong> - One or more occurrences</li>
                         <li><strong>?</strong> - Zero or one occurrence</li>
-                        <li><strong>(?:\d+_)?</strong> - Optional digit(s) followed by underscore</li>
+                        <li><strong>(?:[A-Z\d]+_)?</strong> - Optional capital letters and/or digit(s) followed by underscore</li>
                         <li><strong>|</strong> - OR operator (match either pattern)</li>
                     </ul>
                     <p class="common-patterns">
@@ -145,9 +145,9 @@
             <h3>Default Configuration</h3>
             <p>If you don't configure custom patterns, the system will use these defaults for Oakland Tower:</p>
             <ul>
-                <li><strong>Main:</strong> <code>^OAK_(?:\d+_)?TWR$</code></li>
+                <li><strong>Main:</strong> <code>^OAK_(?:[A-Z\d]+_)?TWR$</code></li>
                 <li><strong>Above:</strong> <code>^NCT_APP$</code>, <code>^OAK_\d+_CTR$</code></li>
-                <li><strong>Below:</strong> <code>^OAK_(?:\d+_)?GND$</code>, <code>^OAK_(?:\d+_)?DEL$</code></li>
+                <li><strong>Below:</strong> <code>^OAK_(?:[A-Z\d]+_)?GND$</code>, <code>^OAK_(?:[A-Z\d]+_)?DEL$</code></li>
             </ul>
         </div>
     </div>
