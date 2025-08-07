@@ -157,6 +157,83 @@ class WebMonitoringService(BaseMonitoringService):
             logging.error(f"Error creating aggregated config: {e}")
             return None
     
+    def _clean_regex_pattern_to_callsign(self, pattern: str, facility_type: Optional[str] = None) -> str:
+        r"""
+        Extract a clean, user-friendly callsign from a regex pattern
+        
+        Args:
+            pattern: The regex pattern to clean (e.g., "^OAK_(?:[A-Z\d]+_)?TWR$")
+            facility_type: Optional facility type for fallback naming
+            
+        Returns:
+            Cleaned callsign string (e.g., "OAK_TWR")
+        """
+        import re
+        
+        try:
+            # Check if it's already a simple callsign (no regex special characters)
+            if re.match(r'^[A-Z0-9_]+$', pattern) and not any(char in pattern for char in ['^', '$', '\\', '(', ')', '?', '+', '*', '[', ']', '{', '}']):
+                logging.debug(f"Pattern is already a plain callsign: {pattern}")
+                return pattern
+            
+            # Remove regex anchors
+            clean_pattern = pattern.replace('^', '').replace('$', '')
+            
+            # Handle simple patterns first (like SAN_TWR, SCT_APP, SAN_GND)
+            simple_match = re.search(r'^([A-Z]{3,4}_[A-Z]{2,4})$', clean_pattern)
+            if simple_match:
+                result = simple_match.group(1)
+                logging.debug(f"Extracted simple callsign: {result} from pattern: {pattern}")
+                return result
+            
+            # Handle complex patterns - look for core facility identifiers first
+            # This handles patterns like "OAK_(?:[A-Z\d]+_)?TWR" -> "OAK_TWR"
+            core_match = re.search(r'([A-Z]{3,4})_.*?([A-Z]{2,4})$', clean_pattern)
+            if core_match:
+                result = f"{core_match.group(1)}_{core_match.group(2)}"
+                logging.debug(f"Extracted core callsign: {result} from pattern: {pattern}")
+                return result
+            
+            # Apply generic cleaning for more complex cases
+            clean_pattern = clean_pattern.replace('\\d+', '').replace('\\', '').replace('(?:', '').replace(')?', '').replace('_+', '_')
+            clean_pattern = re.sub(r'_+', '_', clean_pattern).strip('_')
+            
+            # Look for common callsign patterns
+            callsign_match = re.search(r'([A-Z]{3,4})_([A-Z]{2,4})', clean_pattern)
+            if callsign_match:
+                result = f"{callsign_match.group(1)}_{callsign_match.group(2)}"
+                logging.debug(f"Extracted callsign after cleaning: {result} from pattern: {pattern}")
+                return result
+            
+            # Try to find any combination of letters and underscores as fallback
+            letters_match = re.search(r'([A-Z_]+)', clean_pattern)
+            if letters_match:
+                name = letters_match.group(1).strip('_')
+                # If it doesn't have an underscore, try to complete it based on facility type
+                if '_' not in name and facility_type:
+                    suffix_map = {
+                        'main_facility': '_TWR',
+                        'supporting_above': '_APP',
+                        'supporting_below': '_GND'
+                    }
+                    name += suffix_map.get(facility_type, '')
+                
+                logging.debug(f"Extracted fallback callsign: {name} from pattern: {pattern}")
+                return name
+            
+            # Final fallback - return a generic name based on facility type
+            if facility_type:
+                fallback = f"{facility_type.replace('_', ' ').title()}"
+                logging.debug(f"Using fallback name: {fallback} for pattern: {pattern}")
+                return fallback
+            
+            logging.warning(f"Could not extract callsign from pattern: {pattern}")
+            return "Unknown Facility"
+            
+        except Exception as e:
+            logging.error(f"Error cleaning regex pattern '{pattern}': {e}")
+            return facility_type.replace('_', ' ').title() if facility_type else "Unknown Facility"
+    
     def _get_facility_display_names(self) -> Dict[str, str]:
         """
         Extract representative facility names from configuration patterns
@@ -175,58 +252,9 @@ class WebMonitoringService(BaseMonitoringService):
             for facility_type in ['main_facility', 'supporting_above', 'supporting_below']:
                 patterns = callsigns.get(facility_type, [])
                 if patterns:
-                    # Try to extract a clean callsign from the first pattern
-                    pattern = patterns[0]
-                    
-                    # Extract facility name from regex pattern
-                    import re
-                    
-                    # Check if it's already a simple callsign (no regex special characters)
-                    # If it only contains letters, numbers, and underscores, treat it as an exact callsign
-                    if re.match(r'^[A-Z0-9_]+$', pattern) and not any(char in pattern for char in ['^', '$', '\\', '(', ')', '?', '+', '*', '[', ']', '{', '}']):
-                        # It's already a plain callsign like "SAN_TWR", "SCT_APP", "SAN_GND", "OAK_12_TWR", "OAK_N_TWR"
-                        facility_names[facility_type] = pattern
-                        logging.debug(f"Using exact callsign: {pattern}")
-                    else:
-                        # Remove regex anchors and escape characters, but preserve the core callsign
-                        clean_pattern = pattern.replace('^', '').replace('$', '')
-                        
-                        # Handle simple patterns first (like ^SAN_TWR$, ^SCT_APP$, ^SAN_GND$)
-                        simple_match = re.search(r'^([A-Z]{3,4}_[A-Z]{2,4})$', clean_pattern)
-                        if simple_match:
-                            facility_names[facility_type] = simple_match.group(1)
-                            logging.debug(f"Extracted simple facility name: {simple_match.group(1)} from pattern: {pattern}")
-                        else:
-                            # Handle more complex patterns
-                            clean_pattern = clean_pattern.replace('\\d+', '').replace('\\', '').replace('(?:', '').replace(')?', '').replace('_+', '_')
-                            # Clean up consecutive underscores and trim
-                            clean_pattern = re.sub(r'_+', '_', clean_pattern).strip('_')
-                            
-                            # Look for common callsign patterns like XXX_TWR, XXX_APP, XXX_GND, etc.
-                            callsign_match = re.search(r'([A-Z]{3,4})_([A-Z]{2,4})', clean_pattern)
-                            if callsign_match:
-                                facility_names[facility_type] = f"{callsign_match.group(1)}_{callsign_match.group(2)}"
-                                logging.debug(f"Extracted complex facility name: {callsign_match.group(1)}_{callsign_match.group(2)} from pattern: {pattern}")
-                            else:
-                                # Try to find any combination of letters and underscores
-                                letters_match = re.search(r'([A-Z_]+)', clean_pattern)
-                                if letters_match:
-                                    # Clean up the matched pattern
-                                    name = letters_match.group(1).strip('_')
-                                    # If it doesn't have an underscore, it's probably incomplete
-                                    if '_' not in name:
-                                        # Try common facility type mappings based on context
-                                        if facility_type == 'main_facility':
-                                            name += '_TWR'
-                                        elif facility_type == 'supporting_above':
-                                            name += '_APP'
-                                        elif facility_type == 'supporting_below':
-                                            name += '_GND'
-                                    facility_names[facility_type] = name
-                                    logging.debug(f"Extracted fallback facility name: {name} from pattern: {pattern}")
-                                else:
-                                    facility_names[facility_type] = f"{facility_type.replace('_', ' ').title()}"
-                                    logging.debug(f"Using default facility name for {facility_type}")
+                    # Use the first pattern to derive a display name
+                    cleaned_name = self._clean_regex_pattern_to_callsign(patterns[0], facility_type)
+                    facility_names[facility_type] = cleaned_name
                 else:
                     facility_names[facility_type] = f"{facility_type.replace('_', ' ').title()}"
                     
@@ -395,9 +423,13 @@ class WebMonitoringService(BaseMonitoringService):
             # Get all active controllers from cache
             all_controllers = cached_data.get('all_controllers', [])
             
-            # If no user patterns provided, return default view with empty filtering
+            # If no user patterns provided, use default config patterns for facility name extraction
             if not user_facility_patterns or not any(user_facility_patterns.values()):
-                # Create default response with empty controllers but preserve cache metadata
+                # Use default config patterns to generate proper facility names
+                default_config_patterns = self.config.get('callsigns', {})
+                default_facility_names = self._get_user_facility_display_names(default_config_patterns)
+                
+                # Create default response with empty controllers but use cleaned facility names from default config
                 return {
                     'status': 'all_offline',
                     'facility_name': 'Monitored Facilities',
@@ -405,7 +437,7 @@ class WebMonitoringService(BaseMonitoringService):
                     'supporting_above': [],
                     'supporting_below': [],
                     'using_user_config': False,
-                    'facility_names': {
+                    'facility_names': default_facility_names or {
                         'main_facility': 'Main Facility',
                         'supporting_above': 'Supporting Above',
                         'supporting_below': 'Supporting Below'
@@ -513,18 +545,45 @@ class WebMonitoringService(BaseMonitoringService):
                 # It's already a plain callsign
                 display_name = pattern
             else:
-                # Remove regex anchors and try to extract the core callsign
+                # Remove regex anchors and escape characters, but preserve the core callsign
                 clean_pattern = pattern.replace('^', '').replace('$', '')
                 
-                # Look for common callsign patterns
+                # Handle simple patterns first (like ^SAN_TWR$, ^SCT_APP$, ^SAN_GND$)
                 simple_match = re.search(r'^([A-Z]{3,4}_[A-Z]{2,4})$', clean_pattern)
                 if simple_match:
                     display_name = simple_match.group(1)
                 else:
-                    # Try more complex extraction
-                    callsign_match = re.search(r'([A-Z]{3,4})_([A-Z]{2,4})', clean_pattern)
-                    if callsign_match:
-                        display_name = f"{callsign_match.group(1)}_{callsign_match.group(2)}"
+                    # Handle more complex patterns - look for core facility identifiers first
+                    # Try to extract the base pattern by looking for fixed parts
+                    core_match = re.search(r'([A-Z]{3,4})_.*?([A-Z]{2,4})$', clean_pattern)
+                    if core_match:
+                        display_name = f"{core_match.group(1)}_{core_match.group(2)}"
+                    else:
+                        # Apply more generic cleaning logic as fallback
+                        clean_pattern = clean_pattern.replace('\\d+', '').replace('\\', '').replace('(?:', '').replace(')?', '').replace('_+', '_')
+                        # Clean up consecutive underscores and trim
+                        clean_pattern = re.sub(r'_+', '_', clean_pattern).strip('_')
+                        
+                        # Look for common callsign patterns like XXX_TWR, XXX_APP, XXX_GND, etc.
+                        callsign_match = re.search(r'([A-Z]{3,4})_([A-Z]{2,4})', clean_pattern)
+                        if callsign_match:
+                            display_name = f"{callsign_match.group(1)}_{callsign_match.group(2)}"
+                        else:
+                            # Try to find any combination of letters and underscores
+                            letters_match = re.search(r'([A-Z_]+)', clean_pattern)
+                            if letters_match:
+                                # Clean up the matched pattern
+                                name = letters_match.group(1).strip('_')
+                                # If it doesn't have an underscore, it's probably incomplete
+                                if '_' not in name:
+                                    # Try common facility type mappings based on context
+                                    if facility_type == 'main_facility':
+                                        name += '_TWR'
+                                    elif facility_type == 'supporting_above':
+                                        name += '_APP'
+                                    elif facility_type == 'supporting_below':
+                                        name += '_GND'
+                                display_name = name
             
             # If we have multiple patterns, show count
             if len(patterns) > 1:
