@@ -691,7 +691,7 @@ class VATSIMMonitor(QApplication):
         """Start monitoring VATSIM"""
         if not self.monitoring:
             self.monitoring = True
-            self.worker.start()
+            self.worker.start_monitoring()
 
             self.start_action.setEnabled(False)
             self.stop_action.setEnabled(True)
