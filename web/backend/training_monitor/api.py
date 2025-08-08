@@ -548,3 +548,84 @@ def get_notification_history():
             'message': 'An error occurred while getting notification history',
             'timestamp': datetime.utcnow().isoformat()
         }), 500
+
+@training_api_bp.route('/test-pushover', methods=['POST'])
+@login_required
+@email_verification_required
+def test_pushover():
+    """Send a test Pushover notification for training session monitor"""
+    try:
+        # Check if user has access to training monitor
+        if not current_user.has_app_access('training_monitor'):
+            return jsonify({
+                'success': False,
+                'error': 'Access denied',
+                'message': 'You do not have permission to access the OAK ARTCC Training Session Monitor',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 403
+        
+        logger.info(f"Training monitor test pushover notification requested by user: {current_user.email}")
+        
+        # Check if Pushover is configured
+        if not current_user.pushover_api_token or not current_user.pushover_user_key:
+            return jsonify({
+                'success': False,
+                'error': 'Pushover credentials not configured',
+                'message': 'Please configure your Pushover API Token and User Key in General Settings first',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 400
+        
+        # Get user's training session settings
+        settings = TrainingSessionSettings.query.filter_by(
+            user_id=current_user.id,
+            service_name='oak_training_monitor'
+        ).first()
+        
+        # Check if notifications are enabled (if user has settings)
+        if settings and not settings.notifications_enabled:
+            return jsonify({
+                'success': False,
+                'error': 'Notifications are disabled',
+                'message': 'Please enable notifications in your Training Session Settings first',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 400
+        
+        # Import PushoverService
+        import sys
+        import os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+        from shared.pushover_service import PushoverService
+        
+        # Create Pushover service with user's credentials
+        pushover_service = PushoverService(
+            api_token=current_user.pushover_api_token,
+            user_key=current_user.pushover_user_key
+        )
+        
+        # Send test notification
+        result = pushover_service.send_test_notification()
+        
+        if result["success"]:
+            logger.info(f"Training monitor test pushover notification sent successfully for user: {current_user.email}")
+            return jsonify({
+                'success': True,
+                'message': 'Test notification sent successfully! Check your device.',
+                'timestamp': datetime.utcnow().isoformat()
+            })
+        else:
+            logger.error(f"Training monitor test pushover notification failed for user {current_user.email}: {result['error']}")
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Unknown error'),
+                'message': f'Failed to send test notification: {result.get("error", "Unknown error")}',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 400
+    
+    except Exception as e:
+        logger.error(f"Error during training monitor test pushover for user {current_user.email}: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error',
+            'message': 'An unexpected error occurred while sending the test notification',
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500

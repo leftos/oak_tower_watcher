@@ -320,7 +320,13 @@ class TrainingStatusPage {
         btnText.textContent = '⏳ Testing...';
         
         try {
-            const response = await fetch('/api/test-pushover', { method: 'POST' });
+            const response = await fetch('/api/training/test-pushover', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin'
+            });
             const data = await response.json();
             
             if (response.ok && data.success) {
