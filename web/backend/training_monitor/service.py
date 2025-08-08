@@ -208,18 +208,21 @@ class TrainingMonitoringService(BaseMonitoringService):
                     'total_notifications_sent': 0
                 }
     
-    def perform_global_training_scrape(self) -> Dict[str, Any]:
+    def perform_global_training_scrape(self, force_refresh: bool = False) -> Dict[str, Any]:
         """
         Perform global scraping of training sessions using service session key
         Store results in global cache for all users to filter from
         
         NOTE: This method is called from within an app context, so no additional context needed
         
+        Args:
+            force_refresh: If True, bypass cache staleness check and force a fresh scrape
+        
         Returns:
             Dict with scrape results
         """
         try:
-            logger.info("Starting global training session scrape")
+            logger.info(f"Starting global training session scrape (force_refresh={force_refresh})")
             
             # Check if service has a session key configured
             if not self.scraper.has_service_session_key():
@@ -236,8 +239,8 @@ class TrainingMonitoringService(BaseMonitoringService):
                 global_cache = GlobalTrainingSessionCache()
                 db.session.add(global_cache)
             
-            # Check if cache is still fresh
-            if not global_cache.is_cache_stale():
+            # Check if cache is still fresh (unless forcing refresh)
+            if not force_refresh and not global_cache.is_cache_stale():
                 logger.debug("Global cache is still fresh, skipping scrape")
                 sessions = global_cache.get_all_sessions()
                 return {
@@ -751,6 +754,33 @@ class TrainingMonitoringService(BaseMonitoringService):
         except Exception as e:
             logger.error(f"Error getting cached status: {e}")
             return None
+    
+    def _perform_initial_check(self):
+        """
+        Override base method to handle Flask app context and force global cache refresh
+        """
+        if not self.app:
+            logger.warning("Flask app not set - skipping initial training session check")
+            return
+        
+        logger.info("Performing initial training session check with global cache refresh...")
+        
+        try:
+            with self.app.app_context():
+                # First ensure we have fresh global data
+                global_scrape_result = self.perform_global_training_scrape(force_refresh=True)
+                
+                if global_scrape_result['success']:
+                    logger.info(f"Initial global cache refresh successful: {global_scrape_result.get('total_sessions', 0)} sessions cached")
+                else:
+                    logger.warning(f"Initial global cache refresh failed: {global_scrape_result.get('error', 'Unknown error')}")
+                
+                # Then perform the standard initial check
+                super()._perform_initial_check()
+                
+        except Exception as e:
+            logger.error(f"Error during initial training session check: {e}", exc_info=True)
+            self.on_error(f"Initial check failed: {str(e)}")
     
     def start(self):
         """Start the training monitoring service"""

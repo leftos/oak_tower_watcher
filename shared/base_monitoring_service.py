@@ -234,9 +234,44 @@ class BaseMonitoringService(ABC):
             return
         
         self.running = True
+        
+        # Perform initial status check before starting the monitoring loop
+        self._perform_initial_check()
+        
         self.monitor_thread = threading.Thread(target=self.monitoring_loop, daemon=True)
         self.monitor_thread.start()
         logging.info(f"{self.__class__.__name__} started successfully")
+    
+    def _perform_initial_check(self):
+        """
+        Perform an initial status check on startup
+        This ensures fresh data is available immediately after service start
+        """
+        logging.info(f"Performing initial status check for {self.__class__.__name__}...")
+        
+        try:
+            current_result = self.check_status()
+            
+            if current_result.get('success'):
+                logging.info(f"Initial status check successful for {self.__class__.__name__}")
+                
+                # Check if status has changed and handle transitions
+                if self.has_status_changed(current_result):
+                    logging.info("Status change detected during initial check")
+                    self.on_status_changed(current_result)
+                    self.update_previous_status(current_result)
+                
+                # Always call status updated hook (for caching, etc.)
+                self.on_status_updated(current_result)
+            else:
+                error_msg = current_result.get('error', 'Unknown error during initial check')
+                logging.warning(f"Initial status check failed for {self.__class__.__name__}: {error_msg}")
+                self.on_error(error_msg)
+                
+        except Exception as e:
+            error_msg = f"Error during initial status check for {self.__class__.__name__}: {e}"
+            logging.error(error_msg, exc_info=True)
+            self.on_error(error_msg)
     
     def stop(self):
         """Stop monitoring service"""
