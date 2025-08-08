@@ -109,32 +109,21 @@
                     <h2>🔍 Test Session Key</h2>
                     <p>Test your PHP session key to ensure it can access the OAK ARTCC training page.</p>
                     
-                    <form method="POST" action="{{ url_for('auth.training_session_settings') }}" class="settings-form">
-                        {{ test_form.hidden_tag() }}
-                        
+                    <form id="test-session-form" class="settings-form">
                         <div class="form-group">
-                            {{ test_form.php_session_key.label(class="form-label") }}
-                            {{ test_form.php_session_key(class="form-control") }}
-                            <small class="form-text text-muted">
-                                {{ test_form.php_session_key.description }}
-                            </small>
+                            <label for="test-php-session-key" class="form-label">PHP Session Key to Test</label>
+                            <input type="text" id="test-php-session-key" name="php_session_key" class="form-control" placeholder="e.g., 12345abcdef567abcdef84123d" required>
+                            <small class="form-text text-muted">Enter the PHP session key to validate</small>
                         </div>
 
                         <div class="form-actions">
-                            {{ test_form.test_submit(class="btn btn-info") }}
+                            <button type="submit" id="test-submit-btn" class="btn btn-info">Test Session Key</button>
                         </div>
                     </form>
 
-                    {% if test_result %}
-                        <div class="alert alert-{{ 'success' if test_result.valid else 'danger' }} mt-3">
-                            {% if test_result.valid %}
-                                ✅ Session key is valid and working!
-                            {% else %}
-                                ❌ Session key test failed
-                            {% endif %}
-                            <br><small>{{ test_result.message }}</small>
-                        </div>
-                    {% endif %}
+                    <div id="test-result" class="mt-3" style="display: none;">
+                        <!-- Test result will be displayed here -->
+                    </div>
                 </div>
 
                 <!-- Current Status -->
@@ -223,13 +212,7 @@
         </footer>
     </div>
 
-    <script>
-        // Auto-scroll to alerts
-        const alerts = document.querySelectorAll('.alert');
-        if (alerts.length > 0) {
-            alerts[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    </script>
+    <script src="{{ url_for('static', filename='training-session-settings.js') }}"></script>
 
     <style>
         .rating-checkboxes {

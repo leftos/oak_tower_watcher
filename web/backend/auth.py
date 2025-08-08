@@ -8,9 +8,8 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from .models import db, User, UserSettings
 from .forms import LoginForm, RegistrationForm, UserSettingsForm, PasswordResetRequestForm, PasswordResetForm, FacilityConfigForm, GeneralSettingsForm
-from .training_monitor.forms import TrainingSessionSettingsForm, TestSessionKeyForm
+from .training_monitor.forms import TrainingSessionSettingsForm
 from .training_monitor.models import TrainingSessionSettings, get_available_rating_patterns
-from .training_monitor.scraper import TrainingSessionScraper
 from .email_service import send_verification_email, send_welcome_email, send_password_reset_email
 from .security import email_verification_required
 
@@ -333,7 +332,6 @@ def training_session_settings():
         db.session.commit()
     
     form = TrainingSessionSettingsForm()
-    test_form = TestSessionKeyForm()
     test_result = None
     
     # Handle form submissions
@@ -380,26 +378,6 @@ def training_session_settings():
             db.session.rollback()
             flash('An error occurred while saving your settings. Please try again.')
     
-    # Handle session key test
-    elif test_form.test_submit.data and test_form.validate_on_submit():
-        try:
-            session_key = (test_form.php_session_key.data or '').strip()
-            logger.info(f"Testing PHP session key for user: {current_user.email}")
-            
-            scraper = TrainingSessionScraper()
-            test_result = scraper.validate_session_key(session_key)
-            
-            if test_result['valid']:
-                logger.info(f"Session key test successful for user: {current_user.email}")
-                flash('✅ Session key is valid and working!')
-            else:
-                logger.warning(f"Session key test failed for user {current_user.email}: {test_result['message']}")
-                flash(f"❌ Session key test failed: {test_result['message']}")
-                
-        except Exception as e:
-            logger.error(f"Error testing session key for user {current_user.email}: {str(e)}", exc_info=True)
-            flash('An error occurred while testing the session key.')
-            test_result = {'valid': False, 'message': 'Test failed due to an error'}
     
     # Load settings into form for GET requests or after errors
     elif request.method == 'GET':
@@ -413,8 +391,6 @@ def training_session_settings():
     context = {
         'title': 'OAK ARTCC Training Session Monitor Settings',
         'form': form,
-        'test_form': test_form,
-        'test_result': test_result,
         'notifications_enabled': settings.notifications_enabled,
         'session_key_configured': bool(settings.php_session_key),
         'session_key_last_validated': settings.session_key_last_validated,

@@ -30,7 +30,7 @@ class TrainingSessionSettingsForm(FlaskForm):
         description='Your PHP session ID from oakartcc.org (found in browser cookies as PHPSESSID)',
         validators=[Optional(), Length(min=10, max=100)],
         render_kw={
-            'placeholder': 'e.g., 94e3jaq64t8mfrtv246krkm5nb',
+            'placeholder': 'e.g., 12345abcdef567abcdef84123d',
             'class': 'form-control'
         }
     )
@@ -61,7 +61,7 @@ class TestSessionKeyForm(FlaskForm):
         description='Enter the PHP session key to validate',
         validators=[DataRequired(), Length(min=10, max=100)],
         render_kw={
-            'placeholder': 'e.g., 94e3jaq64t8mfrtv246krkm5nb',
+            'placeholder': 'e.g., 12345abcdef567abcdef84123d',
             'class': 'form-control'
         }
     )
