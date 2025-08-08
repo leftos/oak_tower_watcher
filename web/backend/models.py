@@ -42,8 +42,9 @@ class User(UserMixin, db.Model):
     pushover_api_token = db.Column(db.String(255), nullable=True)
     pushover_user_key = db.Column(db.String(255), nullable=True)
     
-    # Relationship to user settings
+    # Relationship to user settings and app access
     settings = db.relationship('UserSettings', backref='user', lazy=True, cascade='all, delete-orphan')
+    app_access = db.relationship('UserAppAccess', backref='user', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
         """Set password hash"""
@@ -266,6 +267,140 @@ class User(UserMixin, db.Model):
             logger.error(f"Error resetting password for user {self.email}: {str(e)}", exc_info=True)
             return False
     
+    def has_app_access(self, app_name):
+        """Check if user has access to a specific app"""
+        try:
+            logger.debug(f"Checking app access for user {self.email}, app: {app_name}")
+            access = UserAppAccess.query.filter_by(
+                user_id=self.id,
+                app_name=app_name
+            ).first()
+            
+            if access:
+                has_access = access.has_access
+                logger.debug(f"User {self.email} app access for {app_name}: {has_access}")
+                return has_access
+            else:
+                # No access record exists, check default access rules
+                default_access = self._get_default_app_access(app_name)
+                logger.debug(f"User {self.email} using default access for {app_name}: {default_access}")
+                return default_access
+                
+        except Exception as e:
+            logger.error(f"Error checking app access for user {self.email}, app {app_name}: {str(e)}", exc_info=True)
+            return False
+    
+    def _get_default_app_access(self, app_name):
+        """Get default access for an app (based on business rules)"""
+        # Default access rules: facility_watcher = True, training_monitor = False
+        default_rules = {
+            'facility_watcher': True,
+            'training_monitor': False
+        }
+        return default_rules.get(app_name, False)
+    
+    def grant_app_access(self, app_name, admin_username=None):
+        """Grant access to an app for this user"""
+        try:
+            logger.info(f"Granting app access for user {self.email}, app: {app_name}, admin: {admin_username}")
+            
+            access = UserAppAccess.query.filter_by(
+                user_id=self.id,
+                app_name=app_name
+            ).first()
+            
+            if not access:
+                access = UserAppAccess()
+                access.user_id = self.id
+                access.app_name = app_name
+                db.session.add(access)
+            
+            access.has_access = True
+            access.granted_at = datetime.utcnow()
+            access.granted_by_admin = admin_username
+            access.revoked_at = None
+            access.revoked_by_admin = None
+            
+            db.session.commit()
+            logger.info(f"App access granted successfully for user {self.email}, app: {app_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error granting app access for user {self.email}, app {app_name}: {str(e)}", exc_info=True)
+            db.session.rollback()
+            return False
+    
+    def revoke_app_access(self, app_name, admin_username=None):
+        """Revoke access to an app for this user"""
+        try:
+            logger.info(f"Revoking app access for user {self.email}, app: {app_name}, admin: {admin_username}")
+            
+            access = UserAppAccess.query.filter_by(
+                user_id=self.id,
+                app_name=app_name
+            ).first()
+            
+            if not access:
+                access = UserAppAccess()
+                access.user_id = self.id
+                access.app_name = app_name
+                db.session.add(access)
+            
+            access.has_access = False
+            access.revoked_at = datetime.utcnow()
+            access.revoked_by_admin = admin_username
+            
+            db.session.commit()
+            logger.info(f"App access revoked successfully for user {self.email}, app: {app_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error revoking app access for user {self.email}, app {app_name}: {str(e)}", exc_info=True)
+            db.session.rollback()
+            return False
+    
+    def get_app_access_list(self):
+        """Get list of all app access permissions for this user"""
+        try:
+            # Define all available apps
+            available_apps = ['facility_watcher', 'training_monitor']
+            app_access_list = []
+            
+            for app_name in available_apps:
+                access_record = UserAppAccess.query.filter_by(
+                    user_id=self.id,
+                    app_name=app_name
+                ).first()
+                
+                if access_record:
+                    app_access_list.append({
+                        'app_name': app_name,
+                        'has_access': access_record.has_access,
+                        'granted_at': access_record.granted_at,
+                        'granted_by_admin': access_record.granted_by_admin,
+                        'revoked_at': access_record.revoked_at,
+                        'revoked_by_admin': access_record.revoked_by_admin,
+                        'is_default': False
+                    })
+                else:
+                    # Use default access
+                    default_access = self._get_default_app_access(app_name)
+                    app_access_list.append({
+                        'app_name': app_name,
+                        'has_access': default_access,
+                        'granted_at': None,
+                        'granted_by_admin': None,
+                        'revoked_at': None,
+                        'revoked_by_admin': None,
+                        'is_default': True
+                    })
+            
+            return app_access_list
+            
+        except Exception as e:
+            logger.error(f"Error getting app access list for user {self.email}: {str(e)}", exc_info=True)
+            return []
+
     def __repr__(self):
         return f'<User {self.email}>'
 
@@ -356,3 +491,22 @@ class UserSettings(db.Model):
     
     def __repr__(self):
         return f'<UserSettings ID={self.id}:{self.service_name}>'
+
+class UserAppAccess(db.Model):
+    """User access control for individual sub-applications"""
+    __tablename__ = 'user_app_access'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    app_name = db.Column(db.String(50), nullable=False)  # e.g., 'facility_watcher', 'training_monitor'
+    has_access = db.Column(db.Boolean, default=False, nullable=False)
+    granted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    granted_by_admin = db.Column(db.String(120), nullable=True)  # Admin who granted access
+    revoked_at = db.Column(db.DateTime, nullable=True)
+    revoked_by_admin = db.Column(db.String(120), nullable=True)  # Admin who revoked access
+    
+    # Unique constraint to ensure one access record per user per app
+    __table_args__ = (db.UniqueConstraint('user_id', 'app_name', name='unique_user_app_access'),)
+    
+    def __repr__(self):
+        return f'<UserAppAccess {self.user_id}:{self.app_name}={self.has_access}>'

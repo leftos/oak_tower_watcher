@@ -8,6 +8,7 @@
     </div>
     
     <div class="services-grid">
+        {% if has_facility_watcher_access %}
         <div class="service-card">
             <div class="service-icon">🏗️</div>
             <h2>VATSIM Facility Watcher</h2>
@@ -20,7 +21,7 @@
                     <span class="status-badge status-pending">⚠ Pushover Setup Required</span>
                 {% endif %}
                 
-                {% if oak_settings.notifications_enabled %}
+                {% if oak_settings and oak_settings.notifications_enabled %}
                     <span class="status-badge status-enabled">🔔 Notifications On</span>
                 {% else %}
                     <span class="status-badge status-disabled">🔕 Notifications Off</span>
@@ -29,9 +30,9 @@
             
             <div class="service-info">
                 <p><strong>Service Status:</strong>
-                    {% if oak_settings.notifications_enabled and current_user.pushover_api_token and current_user.pushover_user_key %}
+                    {% if oak_settings and oak_settings.notifications_enabled and current_user.pushover_api_token and current_user.pushover_user_key %}
                         Ready to send notifications
-                    {% elif oak_settings.notifications_enabled %}
+                    {% elif oak_settings and oak_settings.notifications_enabled %}
                         Notifications enabled but Pushover not configured
                     {% else %}
                         Notifications disabled
@@ -42,12 +43,14 @@
             <div class="service-actions">
                 <a href="{{ url_for('auth.oak_tower_settings') }}" class="btn btn-primary">Configure Settings</a>
                 <a href="{{ url_for('oak_tower_status') }}" class="btn btn-secondary">View Status</a>
-                {% if current_user.pushover_api_token and current_user.pushover_user_key and oak_settings.notifications_enabled %}
+                {% if current_user.pushover_api_token and current_user.pushover_user_key and oak_settings and oak_settings.notifications_enabled %}
                     <button id="test-pushover-btn" class="btn btn-success">Test Notification</button>
                 {% endif %}
             </div>
         </div>
+        {% endif %}
         
+        {% if has_training_monitor_access %}
         <div class="service-card">
             <div class="service-icon">🎓</div>
             <h2>OAK ARTCC Training Session Monitor</h2>
@@ -55,12 +58,21 @@
             
             <div class="service-status">
                 <span class="status-badge status-info">📅 Hourly Checks</span>
-                <span class="status-badge status-pending">⚙️ Configure Settings</span>
+                {% if training_settings and training_settings.php_session_key %}
+                    <span class="status-badge status-configured">✓ Session Key Configured</span>
+                {% else %}
+                    <span class="status-badge status-pending">⚙️ Configure Settings</span>
+                {% endif %}
             </div>
             
             <div class="service-info">
-                <p><strong>Status:</strong> Configure your settings to get started</p>
-                <p><strong>Monitoring:</strong> Training sessions with selected ratings</p>
+                {% if training_settings and training_settings.php_session_key %}
+                    <p><strong>Status:</strong> Ready to monitor training sessions</p>
+                    <p><strong>Monitoring:</strong> Training sessions with selected ratings</p>
+                {% else %}
+                    <p><strong>Status:</strong> Configure your settings to get started</p>
+                    <p><strong>Monitoring:</strong> Training sessions with selected ratings</p>
+                {% endif %}
                 <p><strong>Frequency:</strong> Checked every hour</p>
             </div>
             
@@ -69,6 +81,23 @@
                 <a href="{{ url_for('training_session_status') }}" class="btn btn-secondary">View Status</a>
             </div>
         </div>
+        {% endif %}
+        
+        {% if not has_facility_watcher_access and not has_training_monitor_access %}
+        <div class="service-card no-access">
+            <div class="service-icon">🔒</div>
+            <h2>No Applications Available</h2>
+            <p>You don't currently have access to any applications. Please contact an administrator to request access.</p>
+            
+            <div class="service-info">
+                <p><strong>Available Applications:</strong></p>
+                <ul>
+                    <li>VATSIM Facility Watcher - Real-time monitoring of VATSIM network facilities</li>
+                    <li>OAK ARTCC Training Session Monitor - Monitor new training sessions</li>
+                </ul>
+            </div>
+        </div>
+        {% endif %}
     </div>
     
     <div class="general-settings-section">

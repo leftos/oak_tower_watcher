@@ -304,6 +304,92 @@
         </div>
     </div>
     
+    <!-- App Access Management -->
+    <div class="action-section">
+        <h3>Application Access Management</h3>
+        <p>Manage which applications this user can access and configure.</p>
+        
+        <div class="app-access-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+            {% for app_access in app_access_list %}
+            <div class="app-access-item" style="background: #f8f9fa; border-radius: 8px; padding: 1.5rem; border-left: 4px solid {% if app_access.has_access %}#27ae60{% else %}#e74c3c{% endif %};">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                    <div>
+                        <h4 style="margin: 0 0 0.5rem 0; color: #333;">
+                            {% if app_access.app_name == 'facility_watcher' %}
+                                🏗️ VATSIM Facility Watcher
+                            {% elif app_access.app_name == 'training_monitor' %}
+                                🎓 OAK ARTCC Training Monitor
+                            {% else %}
+                                {{ app_access.app_name|replace('_', ' ')|title }}
+                            {% endif %}
+                        </h4>
+                        <div style="margin-bottom: 0.5rem;">
+                            {% if app_access.has_access %}
+                                <span class="status-badge status-active">✓ Access Granted</span>
+                            {% else %}
+                                <span class="status-badge status-banned">✗ Access Denied</span>
+                            {% endif %}
+                            {% if app_access.is_default %}
+                                <span class="status-badge" style="background: #e9ecef; color: #6c757d;">Default Setting</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                {% if not app_access.is_default %}
+                <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
+                    {% if app_access.has_access %}
+                        <div><strong>Granted:</strong> {{ app_access.granted_at.strftime('%Y-%m-%d %H:%M UTC') if app_access.granted_at else 'Unknown' }}</div>
+                        <div><strong>By Admin:</strong> {{ app_access.granted_by_admin or 'Unknown' }}</div>
+                    {% else %}
+                        <div><strong>Revoked:</strong> {{ app_access.revoked_at.strftime('%Y-%m-%d %H:%M UTC') if app_access.revoked_at else 'Unknown' }}</div>
+                        <div><strong>By Admin:</strong> {{ app_access.revoked_by_admin or 'Unknown' }}</div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <div class="app-actions" style="display: flex; gap: 0.5rem;">
+                    {% if app_access.has_access %}
+                        <form method="POST" action="{{ url_for('admin.revoke_app_access', user_id=user.id, app_name=app_access.app_name) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-danger" style="font-size: 0.8rem; padding: 0.5rem 1rem;"
+                                    onclick="return confirm('Are you sure you want to revoke {{ app_access.app_name|replace('_', ' ')|title }} access for this user?')">
+                                🚫 Revoke Access
+                            </button>
+                        </form>
+                    {% else %}
+                        <form method="POST" action="{{ url_for('admin.grant_app_access', user_id=user.id, app_name=app_access.app_name) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-success" style="font-size: 0.8rem; padding: 0.5rem 1rem;">
+                                ✅ Grant Access
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Bulk Actions -->
+        <div style="background: #e9ecef; border-radius: 8px; padding: 1.5rem;">
+            <h4 style="margin: 0 0 1rem 0;">Bulk Actions</h4>
+            <form method="POST" action="{{ url_for('admin.bulk_grant_app_access', user_id=user.id) }}" style="display: inline;">
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                        <input type="checkbox" name="apps" value="facility_watcher" style="margin-right: 0.5rem;">
+                        🏗️ VATSIM Facility Watcher
+                    </label>
+                    <label style="display: flex; align-items: center;">
+                        <input type="checkbox" name="apps" value="training_monitor" style="margin-right: 0.5rem;">
+                        🎓 OAK ARTCC Training Monitor
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-success" style="font-size: 0.9rem;"
+                        onclick="return confirm('Grant access to selected applications for this user?')">
+                    ✅ Grant Selected Access
+                </button>
+            </form>
+        </div>
+    </div>
+    
     <!-- Admin Actions -->
     <div class="action-section">
         <h3>Administrative Actions</h3>

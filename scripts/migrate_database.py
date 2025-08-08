@@ -184,6 +184,43 @@ class DatabaseMigrator:
                 ]
             ))
         
+        # Migration 2: Add user_app_access table for sub-app permissions
+        if self.current_version < 2:
+            migrations.append((
+                2,
+                "Add user_app_access table for sub-application access control",
+                [
+                    # Create user_app_access table
+                    """CREATE TABLE IF NOT EXISTS user_app_access (
+                        id INTEGER PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id),
+                        app_name VARCHAR(50) NOT NULL,
+                        has_access BOOLEAN DEFAULT 0,
+                        granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        granted_by_admin VARCHAR(120),
+                        revoked_at TIMESTAMP,
+                        revoked_by_admin VARCHAR(120),
+                        UNIQUE(user_id, app_name)
+                    )""",
+                    
+                    # Create index for better performance
+                    "CREATE INDEX IF NOT EXISTS idx_user_app_access_user_id ON user_app_access(user_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_user_app_access_app_name ON user_app_access(app_name)",
+                    
+                    # Grant default access to facility_watcher for existing users
+                    """INSERT OR IGNORE INTO user_app_access (user_id, app_name, has_access, granted_at, granted_by_admin)
+                       SELECT id, 'facility_watcher', 1, CURRENT_TIMESTAMP, 'migration_default'
+                       FROM users
+                       WHERE is_active = 1 AND email_verified = 1""",
+                    
+                    # Set default no access to training_monitor for existing users (explicit record)
+                    """INSERT OR IGNORE INTO user_app_access (user_id, app_name, has_access, granted_at, granted_by_admin)
+                       SELECT id, 'training_monitor', 0, CURRENT_TIMESTAMP, 'migration_default'
+                       FROM users
+                       WHERE is_active = 1 AND email_verified = 1"""
+                ]
+            ))
+        
         return migrations
     
     def migrate_to_version(self, target_version: int) -> bool:

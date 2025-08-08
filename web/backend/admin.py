@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, abort
 from werkzeug.security import check_password_hash, generate_password_hash
-from .models import db, User, UserSettings
+from .models import db, User, UserSettings, UserAppAccess
 from .facility_monitor.models import UserFacilityRegex
 from .security import rate_limit
 
@@ -166,6 +166,19 @@ def user_detail(user_id):
         # Get user settings with facility configurations
         user_settings = UserSettings.query.filter_by(user_id=user.id).all()
         
+        # Get user's app access information
+        app_access_list = user.get_app_access_list()
+        
+        # Convert datetime objects to strings for JSON serialization
+        app_access_json = []
+        for access in app_access_list:
+            access_json = access.copy()
+            if access_json.get('granted_at'):
+                access_json['granted_at'] = access_json['granted_at'].isoformat()
+            if access_json.get('revoked_at'):
+                access_json['revoked_at'] = access_json['revoked_at'].isoformat()
+            app_access_json.append(access_json)
+        
         # Build comprehensive user data for JSON display
         user_data = {
             'basic_info': {
@@ -180,6 +193,7 @@ def user_detail(user_id):
                 'email_verified': user.email_verified,
                 'email_verification_sent_at': user.email_verification_sent_at.isoformat() if user.email_verification_sent_at else None
             },
+            'app_access': app_access_json,
             'settings': []
         }
         
@@ -189,16 +203,17 @@ def user_detail(user_id):
                 'id': setting.id,
                 'service_name': setting.service_name,
                 'notifications_enabled': setting.notifications_enabled,
-                'has_pushover_config': bool(setting.pushover_api_token and setting.pushover_user_key),
+                'has_pushover_config': bool(user.pushover_api_token and user.pushover_user_key),
                 'created_at': setting.created_at.isoformat() if setting.created_at else None,
                 'updated_at': setting.updated_at.isoformat() if setting.updated_at else None,
                 'facility_patterns': facility_patterns
             }
             user_data['settings'].append(setting_data)
         
-        return render_template('admin/user_detail.html', 
-                             user=user, 
+        return render_template('admin/user_detail.html',
+                             user=user,
                              user_data=user_data,
+                             app_access_list=app_access_list,
                              user_data_json=json.dumps(user_data, indent=2))
         
     except Exception as e:
@@ -266,3 +281,102 @@ def api_user_stats():
     except Exception as e:
         logger.error(f"Error getting user stats: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to get user statistics'}), 500
+
+@admin_bp.route('/user/<int:user_id>/app-access/<app_name>/grant', methods=['POST'])
+@require_admin()
+def grant_app_access(user_id, app_name):
+    """Grant app access to a user"""
+    try:
+        user = User.query.get_or_404(user_id)
+        
+        # Validate app name
+        valid_apps = ['facility_watcher', 'training_monitor']
+        if app_name not in valid_apps:
+            flash(f'Invalid app name: {app_name}', 'error')
+            return redirect(url_for('admin.user_detail', user_id=user_id))
+        
+        # Get admin username from session or environment
+        admin_username = session.get('admin_username') or os.environ.get('ADMIN_USERNAME', 'admin')
+        
+        # Grant access
+        if user.grant_app_access(app_name, admin_username):
+            flash(f'Successfully granted {app_name.replace("_", " ").title()} access to {user.email}', 'success')
+            logger.info(f"Admin granted {app_name} access to user: {user.email}")
+        else:
+            flash(f'Failed to grant {app_name} access to {user.email}', 'error')
+        
+        return redirect(url_for('admin.user_detail', user_id=user_id))
+        
+    except Exception as e:
+        logger.error(f"Error granting app access to user ID {user_id}, app {app_name}: {str(e)}", exc_info=True)
+        flash('Error granting app access.', 'error')
+        return redirect(url_for('admin.users'))
+
+@admin_bp.route('/user/<int:user_id>/app-access/<app_name>/revoke', methods=['POST'])
+@require_admin()
+def revoke_app_access(user_id, app_name):
+    """Revoke app access from a user"""
+    try:
+        user = User.query.get_or_404(user_id)
+        
+        # Validate app name
+        valid_apps = ['facility_watcher', 'training_monitor']
+        if app_name not in valid_apps:
+            flash(f'Invalid app name: {app_name}', 'error')
+            return redirect(url_for('admin.user_detail', user_id=user_id))
+        
+        # Get admin username from session or environment
+        admin_username = session.get('admin_username') or os.environ.get('ADMIN_USERNAME', 'admin')
+        
+        # Revoke access
+        if user.revoke_app_access(app_name, admin_username):
+            flash(f'Successfully revoked {app_name.replace("_", " ").title()} access from {user.email}', 'success')
+            logger.info(f"Admin revoked {app_name} access from user: {user.email}")
+        else:
+            flash(f'Failed to revoke {app_name} access from {user.email}', 'error')
+        
+        return redirect(url_for('admin.user_detail', user_id=user_id))
+        
+    except Exception as e:
+        logger.error(f"Error revoking app access from user ID {user_id}, app {app_name}: {str(e)}", exc_info=True)
+        flash('Error revoking app access.', 'error')
+        return redirect(url_for('admin.users'))
+
+@admin_bp.route('/user/<int:user_id>/bulk-grant-access', methods=['POST'])
+@require_admin()
+def bulk_grant_app_access(user_id):
+    """Grant access to multiple apps for a user"""
+    try:
+        user = User.query.get_or_404(user_id)
+        apps_to_grant = request.form.getlist('apps')
+        
+        # Validate apps
+        valid_apps = ['facility_watcher', 'training_monitor']
+        invalid_apps = [app for app in apps_to_grant if app not in valid_apps]
+        
+        if invalid_apps:
+            flash(f'Invalid app names: {invalid_apps}', 'error')
+            return redirect(url_for('admin.user_detail', user_id=user_id))
+        
+        # Get admin username
+        admin_username = session.get('admin_username') or os.environ.get('ADMIN_USERNAME', 'admin')
+        
+        # Grant access to each app
+        success_count = 0
+        for app_name in apps_to_grant:
+            if user.grant_app_access(app_name, admin_username):
+                success_count += 1
+        
+        if success_count > 0:
+            app_names = [app.replace("_", " ").title() for app in apps_to_grant[:success_count]]
+            flash(f'Successfully granted access to {", ".join(app_names)} for {user.email}', 'success')
+            logger.info(f"Admin bulk granted access to {apps_to_grant} for user: {user.email}")
+        else:
+            flash(f'Failed to grant app access to {user.email}', 'error')
+        
+        return redirect(url_for('admin.user_detail', user_id=user_id))
+        
+    except Exception as e:
+        logger.error(f"Error bulk granting app access to user ID {user_id}: {str(e)}", exc_info=True)
+        flash('Error granting app access.', 'error')
+        return redirect(url_for('admin.users'))

@@ -204,20 +204,38 @@ def logout():
 @email_verification_required
 def dashboard():
     """User dashboard"""
-    # Get user's OAK Tower Watcher settings
-    oak_settings = current_user.get_service_settings('oak_tower_watcher')
-    if not oak_settings:
-        # Create default settings if they don't exist
-        oak_settings = UserSettings()
-        oak_settings.user_id = current_user.id
-        oak_settings.service_name = 'oak_tower_watcher'
-        oak_settings.notifications_enabled = True
-        db.session.add(oak_settings)
-        db.session.commit()
+    # Check app access for each available application
+    has_facility_watcher_access = current_user.has_app_access('facility_watcher')
+    has_training_monitor_access = current_user.has_app_access('training_monitor')
+    
+    oak_settings = None
+    training_settings = None
+    
+    # Only get settings if user has access to the app
+    if has_facility_watcher_access:
+        oak_settings = current_user.get_service_settings('oak_tower_watcher')
+        if not oak_settings:
+            # Create default settings if they don't exist and user has access
+            oak_settings = UserSettings()
+            oak_settings.user_id = current_user.id
+            oak_settings.service_name = 'oak_tower_watcher'
+            oak_settings.notifications_enabled = True
+            db.session.add(oak_settings)
+            db.session.commit()
+    
+    if has_training_monitor_access:
+        from .training_monitor.models import TrainingSessionSettings
+        training_settings = TrainingSessionSettings.query.filter_by(
+            user_id=current_user.id,
+            service_name='oak_training_monitor'
+        ).first()
     
     return render_template('auth/dashboard.html',
                          title='Dashboard',
-                         oak_settings=oak_settings)
+                         oak_settings=oak_settings,
+                         training_settings=training_settings,
+                         has_facility_watcher_access=has_facility_watcher_access,
+                         has_training_monitor_access=has_training_monitor_access)
 
 @auth_bp.route('/settings/general', methods=['GET', 'POST'])
 @login_required
@@ -260,6 +278,11 @@ def general_settings():
 @email_verification_required
 def oak_tower_settings():
     """OAK Tower Watcher settings page"""
+    # Check if user has access to facility watcher
+    if not current_user.has_app_access('facility_watcher'):
+        flash('Access denied. You do not have permission to access the VATSIM Facility Watcher.', 'error')
+        return redirect(url_for('auth.dashboard'))
+    
     settings = current_user.get_service_settings('oak_tower_watcher')
     if not settings:
         settings = UserSettings()
@@ -318,6 +341,11 @@ def oak_tower_settings():
 @email_verification_required
 def training_session_settings():
     """Training Session Monitor settings page"""
+    # Check if user has access to training monitor
+    if not current_user.has_app_access('training_monitor'):
+        flash('Access denied. You do not have permission to access the OAK ARTCC Training Session Monitor.', 'error')
+        return redirect(url_for('auth.dashboard'))
+    
     # Get or create user settings
     settings = TrainingSessionSettings.query.filter_by(
         user_id=current_user.id,

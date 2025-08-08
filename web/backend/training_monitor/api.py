@@ -104,6 +104,15 @@ def get_training_status():
 def get_training_settings():
     """Get user's training session monitoring settings"""
     try:
+        # Check if user has access to training monitor
+        if not current_user.has_app_access('training_monitor'):
+            return jsonify({
+                'success': False,
+                'error': 'Access denied',
+                'message': 'You do not have permission to access the OAK ARTCC Training Session Monitor',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 403
+        
         logger.info(f"Getting training settings for user: {current_user.email}")
         
         # Get or create user settings
@@ -158,6 +167,15 @@ def get_training_settings():
 def update_training_settings():
     """Update user's training session monitoring settings"""
     try:
+        # Check if user has access to training monitor
+        if not current_user.has_app_access('training_monitor'):
+            return jsonify({
+                'success': False,
+                'error': 'Access denied',
+                'message': 'You do not have permission to access the OAK ARTCC Training Session Monitor',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 403
+        
         data = request.get_json()
         if not data:
             return jsonify({
@@ -260,6 +278,15 @@ def update_training_settings():
 def test_session_key():
     """Test user's PHP session key"""
     try:
+        # Check if user has access to training monitor
+        if not current_user.has_app_access('training_monitor'):
+            return jsonify({
+                'success': False,
+                'error': 'Access denied',
+                'message': 'You do not have permission to access the OAK ARTCC Training Session Monitor',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 403
+        
         data = request.get_json()
         if not data or 'php_session_key' not in data:
             return jsonify({
@@ -327,6 +354,15 @@ def test_session_key():
 def get_user_sessions():
     """Get user's cached training sessions"""
     try:
+        # Check if user has access to training monitor
+        if not current_user.has_app_access('training_monitor'):
+            return jsonify({
+                'success': False,
+                'error': 'Access denied',
+                'message': 'You do not have permission to access the OAK ARTCC Training Session Monitor',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 403
+        
         logger.debug(f"Getting training sessions for user: {current_user.email}")
         
         # Get user settings
@@ -388,6 +424,15 @@ def get_user_sessions():
 def refresh_sessions():
     """Force refresh of user's training sessions"""
     try:
+        # Check if user has access to training monitor
+        if not current_user.has_app_access('training_monitor'):
+            return jsonify({
+                'success': False,
+                'error': 'Access denied',
+                'message': 'You do not have permission to access the OAK ARTCC Training Session Monitor',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 403
+        
         logger.info(f"Manual session refresh requested by user: {current_user.email}")
         
         # Get user settings
@@ -443,6 +488,15 @@ def refresh_sessions():
 def get_notification_history():
     """Get user's training session notification history"""
     try:
+        # Check if user has access to training monitor
+        if not current_user.has_app_access('training_monitor'):
+            return jsonify({
+                'success': False,
+                'error': 'Access denied',
+                'message': 'You do not have permission to access the OAK ARTCC Training Session Monitor',
+                'timestamp': datetime.utcnow().isoformat()
+            }), 403
+        
         logger.debug(f"Getting notification history for user: {current_user.email}")
         
         # Get user settings

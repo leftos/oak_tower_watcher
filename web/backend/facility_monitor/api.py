@@ -121,6 +121,15 @@ def get_cached_status():
 def test_pushover():
     """Send a test Pushover notification using user's credentials"""
     try:
+        # Check if user has access to facility watcher
+        if not current_user.has_app_access('facility_watcher'):
+            return jsonify({
+                "success": False,
+                "error": "Access denied",
+                "message": "You do not have permission to access the VATSIM Facility Watcher",
+                "timestamp": datetime.now().isoformat()
+            }), 403
+        
         # Get user's OAK Tower Watcher settings
         oak_settings = current_user.get_service_settings('oak_tower_watcher')
         
@@ -188,6 +197,15 @@ def test_pushover():
 def test_status_notification():
     """Send a test notification with current status information to the current user only"""
     try:
+        # Check if user has access to facility watcher
+        if not current_user.has_app_access('facility_watcher'):
+            return jsonify({
+                "success": False,
+                "error": "Access denied",
+                "message": "You do not have permission to access the VATSIM Facility Watcher",
+                "timestamp": datetime.now().isoformat()
+            }), 403
+        
         logging.info(f"Test status notification requested by user: {current_user.email}")
         
         # Get user's OAK Tower Watcher settings
