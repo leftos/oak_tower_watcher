@@ -605,14 +605,15 @@ class TrainingMonitoringService(BaseMonitoringService):
                 logger.warning(f"No pushover credentials configured for user {user_settings.user_id}")
                 return False
             
-            # Format notification message
+            # Format notification message with proper name formatting
             title = f"🎓 New Training Session: {session['rating_pattern']}"
             
-            message = f"Student: {session['student_name']}"
-            if session.get('student_rating'):
-                message += f" ({session['student_rating']})"
+            # Format names from "Last, First" to "First Last" (same as web UI)
+            student_name = self._format_name_with_rating(session['student_name'], session.get('student_rating'))
+            instructor_name = self._format_name(session['instructor_name'])
             
-            message += f"\nInstructor: {session['instructor_name']}"
+            message = f"Student: {student_name}"
+            message += f"\nInstructor: {instructor_name}"
             message += f"\nModule: {session['module_name']}"
             message += f"\nDate: {session['session_date']}"
             message += f"\nTime: {session['session_time']}"
@@ -710,6 +711,66 @@ class TrainingMonitoringService(BaseMonitoringService):
                 
         except Exception as e:
             logger.error(f"Error sending session key expiration notification: {e}", exc_info=True)
+    
+    def _format_name(self, name: str) -> str:
+        """
+        Format names from "Last, First Rating" or "Last, First" to "First Last" format
+        This matches the formatting used in the web UI JavaScript
+        
+        Args:
+            name: Name in "Last, First" format, possibly with embedded rating
+            
+        Returns:
+            Formatted name in "First Last" format with rating in parentheses if found
+        """
+        if not name:
+            return ''
+        
+        # Known rating suffixes that might be embedded in names
+        rating_suffixes = ['S1', 'S2', 'S3', 'C1', 'C2', 'C3', 'I1', 'I2', 'I3', 'SUP', 'OBS']
+        
+        working_name = name.strip()
+        extracted_rating = None
+        
+        # Check if name ends with a known rating
+        for rating in rating_suffixes:
+            if working_name.endswith(' ' + rating):
+                extracted_rating = rating
+                working_name = working_name[:-len(rating)-1].strip()
+                break
+        
+        # Now parse "Last, First" format
+        if ',' in working_name:
+            parts = working_name.split(',', 1)  # Split on first comma only
+            if len(parts) == 2:
+                last_name = parts[0].strip()
+                first_name = parts[1].strip()
+                formatted_name = f"{first_name} {last_name}"
+                return f"{formatted_name} ({extracted_rating})" if extracted_rating else formatted_name
+        
+        # If no comma, return as-is but still add rating if found
+        return f"{working_name} ({extracted_rating})" if extracted_rating else working_name
+    
+    def _format_name_with_rating(self, name: str, rating: Optional[str] = None) -> str:
+        """
+        Format name with rating, similar to the web UI JavaScript formatNameWithRating function
+        
+        Args:
+            name: Name to format
+            rating: Optional separate rating to add if not already embedded
+            
+        Returns:
+            Formatted name with rating
+        """
+        # For training sessions, the rating might already be embedded in the name
+        # So we primarily use the name parsing, but fall back to separate rating if provided
+        formatted_name = self._format_name(name)
+        
+        # If no rating was extracted from the name and we have a separate rating, add it
+        if rating and '(' not in formatted_name:
+            return f"{formatted_name} ({rating})"
+        
+        return formatted_name
     
     def update_cached_status(self, status_result: Dict[str, Any]):
         """Update cached status data for UI consumption"""
