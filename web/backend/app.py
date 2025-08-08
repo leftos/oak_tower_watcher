@@ -11,7 +11,7 @@ from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from flask import Flask, jsonify, send_from_directory, render_template, request, abort
 from flask_cors import CORS
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user
 from flask_sqlalchemy import SQLAlchemy
 
 # Import shared components using new structure
@@ -147,7 +147,35 @@ def create_app():
     @rate_limit(max_requests=20, window_minutes=5)
     def training_session_status():
         """Serve the training session status page"""
-        return render_template('training-session-status.html')
+        # Default values for non-authenticated users
+        notifications_enabled = False
+        pushover_configured = False
+        
+        # If user is authenticated, get their settings
+        if current_user.is_authenticated:
+            # Import here to avoid circular imports
+            from .training_monitor.models import TrainingSessionSettings
+            
+            # Get training session settings
+            settings = TrainingSessionSettings.query.filter_by(
+                user_id=current_user.id,
+                service_name='oak_training_monitor'
+            ).first()
+            
+            if settings:
+                notifications_enabled = settings.notifications_enabled
+            
+            # Check if pushover is configured (both API token and user key required)
+            pushover_configured = bool(
+                current_user.pushover_api_token and
+                current_user.pushover_user_key and
+                current_user.pushover_api_token.strip() and
+                current_user.pushover_user_key.strip()
+            )
+        
+        return render_template('training-session-status.html',
+                             notifications_enabled=notifications_enabled,
+                             pushover_configured=pushover_configured)
 
     @app.route('/robots.txt')
     def robots_txt():
