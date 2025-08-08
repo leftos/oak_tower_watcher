@@ -1,0 +1,4 @@
+- Refactor facility watcher into its own subfolder within web
+- What is "Recent Notifications"?
+- Remove user's ability to trigger refreshes, only the monitoring service should pull the page
+- Pushover notifications should be moved out to general settings in the user dashboard

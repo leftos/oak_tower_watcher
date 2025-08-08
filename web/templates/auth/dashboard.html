@@ -52,6 +52,28 @@
                 {% endif %}
             </div>
         </div>
+        
+        <div class="service-card">
+            <div class="service-icon">🎓</div>
+            <h2>OAK ARTCC Training Session Monitor</h2>
+            <p>Monitor new training sessions for your selected ratings from oakartcc.org</p>
+            
+            <div class="service-status">
+                <span class="status-badge status-info">📅 Hourly Checks</span>
+                <span class="status-badge status-pending">⚙️ Configure Settings</span>
+            </div>
+            
+            <div class="service-info">
+                <p><strong>Status:</strong> Configure your settings to get started</p>
+                <p><strong>Monitoring:</strong> Training sessions with selected ratings</p>
+                <p><strong>Frequency:</strong> Checked every hour</p>
+            </div>
+            
+            <div class="service-actions">
+                <a href="{{ url_for('auth.training_session_settings') }}" class="btn btn-primary">Configure Settings</a>
+                <a href="{{ url_for('training_session_status') }}" class="btn btn-secondary">View Status</a>
+            </div>
+        </div>
     </div>
     
     <div class="account-info">

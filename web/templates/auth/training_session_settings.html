@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAK ARTCC Training Session Monitor - Settings</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='auth.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('index') }}" class="nav-brand">🏢 leftos.dev Dashboard</a>
+            <div class="nav-links">
+                <a href="{{ url_for('auth.dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('auth.logout') }}">Logout ({{ current_user.email }})</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <div class="header-nav">
+                <a href="{{ url_for('training_session_status') }}" class="back-btn">← Back to Training Monitor</a>
+                <a href="{{ url_for('auth.dashboard') }}" class="back-btn">← Back to Dashboard</a>
+            </div>
+            <h1>🎓 OAK ARTCC Training Session Monitor Settings</h1>
+            <p>Configure notifications for new training sessions matching your selected ratings</p>
+        </header>
+
+        <main class="settings-main">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="settings-grid">
+                <!-- Training Session Settings -->
+                <div class="settings-card">
+                    <h2>📅 Training Session Settings</h2>
+                    <form method="POST" class="settings-form">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="form-group">
+                            {{ form.notifications_enabled.label(class="form-label") }}
+                            <div class="form-check">
+                                {{ form.notifications_enabled(class="form-check-input") }}
+                                <label class="form-check-label" for="{{ form.notifications_enabled.id }}">
+                                    {{ form.notifications_enabled.description }}
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            {{ form.php_session_key.label(class="form-label") }}
+                            {{ form.php_session_key(class="form-control") }}
+                            <small class="form-text text-muted">
+                                {{ form.php_session_key.description }}
+                                <br>
+                                <strong>How to get your session key:</strong>
+                                <ol>
+                                    <li>Log in to <a href="https://oakartcc.org" target="_blank">oakartcc.org</a></li>
+                                    <li>Open browser Developer Tools (F12)</li>
+                                    <li>Go to Application/Storage > Cookies > https://oakartcc.org</li>
+                                    <li>Copy the value of the "PHPSESSID" cookie</li>
+                                </ol>
+                            </small>
+                            {% if session_key_configured %}
+                                <div class="alert alert-info mt-2">
+                                    ✅ Session key is configured
+                                    {% if session_key_last_validated %}
+                                        <br><small>Last validated: {{ session_key_last_validated.strftime('%Y-%m-%d %H:%M UTC') }}</small>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-group">
+                            {{ form.monitored_ratings.label(class="form-label") }}
+                            <small class="form-text text-muted mb-2">
+                                {{ form.monitored_ratings.description }}
+                            </small>
+                            <div class="rating-checkboxes">
+                                {% for subfield in form.monitored_ratings %}
+                                    <div class="form-check rating-check">
+                                        {{ subfield(class="form-check-input") }}
+                                        {{ subfield.label(class="form-check-label rating-label") }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Session Key Test -->
+                <div class="settings-card">
+                    <h2>🔍 Test Session Key</h2>
+                    <p>Test your PHP session key to ensure it can access the OAK ARTCC training page.</p>
+                    
+                    <form method="POST" action="{{ url_for('auth.training_session_settings') }}" class="settings-form">
+                        {{ test_form.hidden_tag() }}
+                        
+                        <div class="form-group">
+                            {{ test_form.php_session_key.label(class="form-label") }}
+                            {{ test_form.php_session_key(class="form-control") }}
+                            <small class="form-text text-muted">
+                                {{ test_form.php_session_key.description }}
+                            </small>
+                        </div>
+
+                        <div class="form-actions">
+                            {{ test_form.test_submit(class="btn btn-info") }}
+                        </div>
+                    </form>
+
+                    {% if test_result %}
+                        <div class="alert alert-{{ 'success' if test_result.valid else 'danger' }} mt-3">
+                            {% if test_result.valid %}
+                                ✅ Session key is valid and working!
+                            {% else %}
+                                ❌ Session key test failed
+                            {% endif %}
+                            <br><small>{{ test_result.message }}</small>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Current Status -->
+                <div class="settings-card">
+                    <h2>📊 Current Status</h2>
+                    <div class="status-info">
+                        <div class="status-item">
+                            <span class="status-label">Notifications:</span>
+                            <span class="status-value {{ 'text-success' if notifications_enabled else 'text-warning' }}">
+                                {{ 'Enabled' if notifications_enabled else 'Disabled' }}
+                            </span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Session Key:</span>
+                            <span class="status-value {{ 'text-success' if session_key_configured else 'text-warning' }}">
+                                {{ 'Configured' if session_key_configured else 'Not configured' }}
+                            </span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Monitored Ratings:</span>
+                            <span class="status-value">
+                                {% if monitored_ratings %}
+                                    <div class="monitored-ratings-list">
+                                        {% for rating in monitored_ratings %}
+                                            <span class="rating-badge">{{ rating }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-warning">None selected</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Service Status:</span>
+                            <span class="status-value text-info">
+                                Checks every hour
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="quick-actions mt-3">
+                        <a href="{{ url_for('training_session_status') }}" class="btn btn-secondary">
+                            📊 View Status Page
+                        </a>
+                        {% if session_key_configured and monitored_ratings %}
+                            <button id="refresh-now-btn" class="btn btn-info">
+                                🔄 Check Now
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Help & Tips -->
+                <div class="settings-card">
+                    <h2>💡 Help & Tips</h2>
+                    <div class="help-content">
+                        <h4>Getting Started:</h4>
+                        <ol>
+                            <li><strong>Configure Session Key:</strong> Get your PHPSESSID from oakartcc.org cookies</li>
+                            <li><strong>Select Ratings:</strong> Choose which training session ratings to monitor</li>
+                            <li><strong>Test Setup:</strong> Use the test button to verify your session key works</li>
+                            <li><strong>Enable Notifications:</strong> Make sure notifications are enabled</li>
+                        </ol>
+
+                        <h4>Available Ratings:</h4>
+                        <div class="available-ratings">
+                            {% for rating in available_ratings %}
+                                <span class="rating-badge">{{ rating }}</span>
+                            {% endfor %}
+                        </div>
+
+                        <h4>How it Works:</h4>
+                        <ul>
+                            <li>The service checks for new training sessions every hour</li>
+                            <li>Only sessions matching your selected ratings trigger notifications</li>
+                            <li>Notifications are sent via Pushover (configure in Dashboard)</li>
+                            <li>Session keys are validated weekly and you'll be notified if expired</li>
+                        </ul>
+
+                        <div class="alert alert-info mt-3">
+                            <strong>Privacy Note:</strong> Your session key is encrypted and only used to access the training page. 
+                            We don't store or transmit any other data from oakartcc.org.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 OAK ARTCC Training Session Monitor</p>
+        </footer>
+    </div>
+
+    <script>
+        // Add functionality for refresh now button
+        document.getElementById('refresh-now-btn')?.addEventListener('click', async function() {
+            const btn = this;
+            const originalText = btn.textContent;
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Checking...';
+            
+            try {
+                const response = await fetch('/api/training/refresh-sessions', { method: 'POST' });
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    alert('✅ Training sessions refreshed successfully!');
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Failed to refresh sessions'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('❌ Network error occurred');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        });
+
+        // Auto-scroll to alerts
+        const alerts = document.querySelectorAll('.alert');
+        if (alerts.length > 0) {
+            alerts[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    </script>
+
+    <style>
+        .rating-checkboxes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .rating-check {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-bottom: 0 !important;
+        }
+        
+        .rating-label {
+            font-family: monospace;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        
+        .rating-badge {
+            display: inline-block;
+            background: #3b82f6;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin: 0.1rem;
+        }
+        
+        .monitored-ratings-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+        
+        .status-info {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .status-label {
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .status-value {
+            text-align: right;
+            flex: 1;
+            margin-left: 1rem;
+        }
+        
+        .available-ratings {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            margin-top: 0.5rem;
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .help-content h4 {
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            color: #1f2937;
+        }
+        
+        .help-content ul, .help-content ol {
+            margin-left: 1.5rem;
+        }
+        
+        .text-success { color: #059669 !important; }
+        .text-warning { color: #d97706 !important; }
+        .text-info { color: #0284c7 !important; }
+    </style>
+</body>
+</html>

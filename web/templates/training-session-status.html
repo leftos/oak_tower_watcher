@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAK ARTCC Training Session Monitor - Status</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='status-page.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='auth.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('index') }}" class="nav-brand">🏢 leftos.dev Dashboard</a>
+            <div class="nav-links">
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('auth.dashboard') }}">Dashboard</a>
+                    <a href="{{ url_for('auth.logout') }}">Logout ({{ current_user.email }})</a>
+                {% else %}
+                    <a href="{{ url_for('auth.login') }}">Login</a>
+                    <a href="{{ url_for('auth.register') }}">Register</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <div class="header-nav">
+                <a href="{{ url_for('index') }}" class="back-btn">← Back to Dashboard</a>
+            </div>
+            <h1>🎓 OAK ARTCC Training Session Monitor</h1>
+            <p>Monitor new training sessions for your selected ratings</p>
+        </header>
+
+        <main>
+            <!-- Current Status Section -->
+            <section class="status-section">
+                <div class="status-card main-status">
+                    <h2>Current Status</h2>
+                    <div class="status-display">
+                        <div class="status-indicator-large" id="main-status-indicator"></div>
+                        <div class="status-text">
+                            <h3 id="status-title">Loading...</h3>
+                            <p id="status-description">Checking training sessions...</p>
+                        </div>
+                    </div>
+                    <div class="last-updated">
+                        Last updated: <span id="last-check">Never</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Training Sessions Information -->
+            <section class="controllers-section">
+                <div class="controllers-grid">
+                    <!-- Current Sessions -->
+                    <div class="controller-card">
+                        <h3>📅 Current Sessions</h3>
+                        <div id="current-sessions" class="controller-list">
+                            <div class="loading-placeholder">
+                                <div class="loading"></div>
+                                <span>Loading training sessions...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monitored Ratings -->
+                    <div class="controller-card">
+                        <h3>🎯 Monitored Ratings</h3>
+                        <div id="monitored-ratings" class="controller-list">
+                            <div class="loading-placeholder">
+                                <div class="loading"></div>
+                                <span>Loading monitored ratings...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Notifications -->
+                    <div class="controller-card">
+                        <h3>🔔 Recent Notifications</h3>
+                        <div id="recent-notifications" class="controller-list">
+                            <div class="loading-placeholder">
+                                <div class="loading"></div>
+                                <span>Loading notifications...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Service Information -->
+            <section class="info-section">
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h3>📊 Service Stats</h3>
+                        <div class="stats-list">
+                            <div class="stat-item">
+                                <span class="stat-label">Monitoring Status:</span>
+                                <span class="stat-value" id="monitoring-status">Unknown</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Check Interval:</span>
+                                <span class="stat-value" id="check-interval">1 hour</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Session Key Status:</span>
+                                <span class="stat-value" id="session-key-status">Unknown</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <h3>🔧 Actions</h3>
+                        <div class="actions-list">
+                            {% if current_user.is_authenticated %}
+                                <a href="{{ url_for('auth.training_session_settings') }}" class="btn btn-secondary">
+                                    ⚙️ Configure Settings
+                                </a>
+                                <button id="refresh-sessions-btn" class="btn btn-info">
+                                    <span id="refresh-sessions-text">🔄 Refresh Sessions</span>
+                                </button>
+                            {% endif %}
+                            <button id="test-notification-btn" class="btn btn-success">
+                                <span id="test-notification-text">🔔 Test Notification</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <h3>ℹ️ About</h3>
+                        <p>This service monitors OAK ARTCC training sessions and sends notifications when new sessions matching your selected ratings are scheduled. Sessions are checked hourly and notifications are sent via Pushover when new matches are found.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 OAK ARTCC Training Session Monitor</p>
+        </footer>
+    </div>
+
+    <!-- First Visit Modal -->
+    <div id="firstVisitModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" id="modalCloseBtn" aria-label="Close modal">&times;</button>
+            <div class="modal-header">
+                <div class="modal-icon">🎓</div>
+                <h2>Welcome to OAK ARTCC Training Session Monitor!</h2>
+            </div>
+            <div class="modal-body">
+                <p>This service monitors training sessions on the OAK ARTCC website and sends notifications for new sessions matching your selected ratings.</p>
+                
+                <div class="highlight">
+                    <strong>Getting Started:</strong><br>
+                    To receive notifications, you'll need to:
+                    <ol>
+                        <li>Configure your PHP session key from oakartcc.org</li>
+                        <li>Select which ratings you want to monitor</li>
+                        <li>Ensure you have Pushover configured in your dashboard</li>
+                    </ol>
+                </div>
+                
+                <p id="authMessage">
+                    <!-- This will be populated by JavaScript based on auth status -->
+                </p>
+            </div>
+            <div class="modal-actions" id="modalActions">
+                <!-- Buttons will be populated by JavaScript based on auth status -->
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='training-status-page.js') }}"></script>
+</body>
+</html>

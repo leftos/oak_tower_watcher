@@ -8,6 +8,9 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from .models import db, User, UserSettings
 from .forms import LoginForm, RegistrationForm, UserSettingsForm, PasswordResetRequestForm, PasswordResetForm, FacilityConfigForm
+from .training_monitor.forms import TrainingSessionSettingsForm, TestSessionKeyForm
+from .training_monitor.models import TrainingSessionSettings, get_available_rating_patterns
+from .training_monitor.scraper import TrainingSessionScraper
 from .email_service import send_verification_email, send_welcome_email, send_password_reset_email
 from .security import email_verification_required
 
@@ -277,6 +280,117 @@ def oak_tower_settings():
     return render_template('auth/oak_tower_settings.html',
                          title='VATSIM Facility Watcher Settings',
                          form=form)
+
+@auth_bp.route('/settings/training_session_monitor', methods=['GET', 'POST'])
+@login_required
+@email_verification_required
+def training_session_settings():
+    """Training Session Monitor settings page"""
+    # Get or create user settings
+    settings = TrainingSessionSettings.query.filter_by(
+        user_id=current_user.id,
+        service_name='oak_training_monitor'
+    ).first()
+    
+    if not settings:
+        settings = TrainingSessionSettings()
+        settings.user_id = current_user.id
+        settings.service_name = 'oak_training_monitor'
+        settings.notifications_enabled = True
+        db.session.add(settings)
+        db.session.commit()
+    
+    form = TrainingSessionSettingsForm()
+    test_form = TestSessionKeyForm()
+    test_result = None
+    
+    # Handle form submissions
+    if form.submit.data and form.validate_on_submit():
+        try:
+            logger.debug(f"Processing training session settings form for user: {current_user.email}")
+            
+            # Update settings
+            settings.notifications_enabled = form.notifications_enabled.data
+            
+            # Update PHP session key if provided
+            if form.php_session_key.data:
+                new_session_key = form.php_session_key.data.strip()
+                if new_session_key != settings.php_session_key:
+                    settings.php_session_key = new_session_key
+                    settings.session_key_last_validated = None  # Reset validation
+            elif not form.php_session_key.data and settings.php_session_key:
+                # Clear session key if field is empty
+                settings.php_session_key = None
+                settings.session_key_last_validated = None
+            
+            # Update monitored ratings
+            old_ratings = settings.get_monitored_ratings()
+            if form.monitored_ratings.data:
+                settings.set_monitored_ratings(form.monitored_ratings.data)
+            else:
+                settings.set_monitored_ratings([])
+            
+            db.session.commit()
+            
+            # Check if monitored ratings changed - if so, the status page will immediately show updated results
+            new_ratings = settings.get_monitored_ratings()
+            if set(old_ratings) != set(new_ratings):
+                logger.info(f"Monitored ratings changed for user {current_user.email}: {old_ratings} -> {new_ratings}")
+                flash('Your training session monitoring settings have been updated! The status page will immediately reflect your new rating filters.')
+            else:
+                flash('Your training session monitoring settings have been updated!')
+            
+            logger.info(f"Training session settings updated successfully for user: {current_user.email}")
+            return redirect(url_for('auth.dashboard'))
+            
+        except Exception as e:
+            logger.error(f"Error updating training session settings for user {current_user.email}: {str(e)}", exc_info=True)
+            db.session.rollback()
+            flash('An error occurred while saving your settings. Please try again.')
+    
+    # Handle session key test
+    elif test_form.test_submit.data and test_form.validate_on_submit():
+        try:
+            session_key = (test_form.php_session_key.data or '').strip()
+            logger.info(f"Testing PHP session key for user: {current_user.email}")
+            
+            scraper = TrainingSessionScraper()
+            test_result = scraper.validate_session_key(session_key)
+            
+            if test_result['valid']:
+                logger.info(f"Session key test successful for user: {current_user.email}")
+                flash('✅ Session key is valid and working!')
+            else:
+                logger.warning(f"Session key test failed for user {current_user.email}: {test_result['message']}")
+                flash(f"❌ Session key test failed: {test_result['message']}")
+                
+        except Exception as e:
+            logger.error(f"Error testing session key for user {current_user.email}: {str(e)}", exc_info=True)
+            flash('An error occurred while testing the session key.')
+            test_result = {'valid': False, 'message': 'Test failed due to an error'}
+    
+    # Load settings into form for GET requests or after errors
+    elif request.method == 'GET':
+        form.notifications_enabled.data = settings.notifications_enabled
+        form.php_session_key.data = settings.php_session_key or ''
+        form.monitored_ratings.data = settings.get_monitored_ratings()
+        
+        logger.debug(f"Loaded training session settings for user: {current_user.email}")
+    
+    # Prepare template context
+    context = {
+        'title': 'OAK ARTCC Training Session Monitor Settings',
+        'form': form,
+        'test_form': test_form,
+        'test_result': test_result,
+        'notifications_enabled': settings.notifications_enabled,
+        'session_key_configured': bool(settings.php_session_key),
+        'session_key_last_validated': settings.session_key_last_validated,
+        'monitored_ratings': settings.get_monitored_ratings(),
+        'available_ratings': get_available_rating_patterns()
+    }
+    
+    return render_template('auth/training_session_settings.html', **context)
 
 @auth_bp.route('/verify-email/<token>')
 def verify_email(token):

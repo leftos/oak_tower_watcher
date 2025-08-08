@@ -53,6 +53,25 @@
                     </div>
                 </div>
 
+                <div class="service-card">
+                    <div class="service-icon">🎓</div>
+                    <h2>OAK ARTCC Training Session Monitor</h2>
+                    <p>Monitor new training sessions for your selected ratings from oakartcc.org</p>
+                    <div class="service-features">
+                        <span class="feature">Hourly Checks</span>
+                        <span class="feature">Push Notifications</span>
+                        <span class="feature">Rating Filters</span>
+                    </div>
+                    <div class="service-actions">
+                        <a href="{{ url_for('training_session_status') }}" class="btn btn-primary">View Status</a>
+                        {% if current_user.is_authenticated %}
+                            <a href="{{ url_for('auth.training_session_settings') }}" class="btn btn-secondary">Configure Settings</a>
+                        {% else %}
+                            <a href="{{ url_for('auth.login') }}" class="btn btn-secondary">Configure Settings</a>
+                        {% endif %}
+                    </div>
+                </div>
+
             </div>
         </main>
 

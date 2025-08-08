@@ -30,6 +30,9 @@ from .email_service import init_mail
 from .api import api_bp
 from .security import init_security, rate_limit
 from .web_monitoring_service import web_monitoring_service
+from .training_monitor.api import training_api_bp
+from .training_monitor.service import training_monitoring_service
+from .training_monitor.models import create_training_tables
  
 def create_app():
     """Application factory with environment-specific configuration"""
@@ -79,6 +82,7 @@ def create_app():
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(training_api_bp, url_prefix='/api/training')
     
     # Configure environment-specific logging
     configure_logging(app, log_config)
@@ -97,6 +101,7 @@ def create_app():
     with app.app_context():
         try:
             db.create_all()
+            create_training_tables()
             app.logger.info("Database tables created successfully")
         except Exception as e:
             # Check if it's just a "table already exists" error, which is fine
@@ -106,21 +111,25 @@ def create_app():
                 app.logger.error(f"Error creating database tables: {e}")
                 raise
     
-    # Start web monitoring service if database is available
-    def start_web_monitoring():
-        """Start web monitoring service in background"""
+    # Start monitoring services if database is available
+    def start_monitoring_services():
+        """Start monitoring services in background"""
         try:
             web_monitoring_service.start()
             app.logger.info("Web monitoring service started successfully")
+            
+            # Also start training monitoring service
+            training_monitoring_service.start()
+            app.logger.info("Training monitoring service started successfully")
         except Exception as e:
-            app.logger.error(f"Failed to start web monitoring service: {e}")
+            app.logger.error(f"Failed to start monitoring services: {e}")
     
     # Start monitoring service after a short delay to ensure app is fully initialized
     if web_monitoring_service.db_interface.enabled:
         import threading
-        threading.Timer(2.0, start_web_monitoring).start()
+        threading.Timer(2.0, start_monitoring_services).start()
     else:
-        app.logger.warning("Web monitoring service disabled - database interface not available")
+        app.logger.warning("Monitoring services disabled - database interface not available")
     
     @app.route('/')
     @rate_limit(max_requests=30, window_minutes=5)  # More lenient for homepage
@@ -133,6 +142,12 @@ def create_app():
     def oak_tower_status():
         """Serve the oak tower status page"""
         return render_template('oak-tower-status.html')
+
+    @app.route('/training-session-status')
+    @rate_limit(max_requests=20, window_minutes=5)
+    def training_session_status():
+        """Serve the training session status page"""
+        return render_template('training-session-status.html')
 
     @app.route('/robots.txt')
     def robots_txt():
@@ -291,7 +306,8 @@ def cleanup_on_exit():
     """Cleanup function for application shutdown"""
     try:
         web_monitoring_service.stop()
-        app.logger.info("Web monitoring service stopped during shutdown")
+        training_monitoring_service.stop()
+        app.logger.info("Monitoring services stopped during shutdown")
     except Exception as e:
         app.logger.error(f"Error stopping web monitoring service: {e}")
 
