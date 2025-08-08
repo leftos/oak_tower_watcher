@@ -25,6 +25,10 @@ class MinimalUser(Base):
     is_active = Column(Boolean, default=True)
     email_verified = Column(Boolean, default=False)
     
+    # General Pushover settings (shared across all apps)
+    pushover_api_token = Column(String(255))
+    pushover_user_key = Column(String(255))
+    
     # Relationship to settings
     settings = relationship('MinimalUserSettings', back_populates='user')
 
@@ -35,8 +39,6 @@ class MinimalUserSettings(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     service_name = Column(String(50), nullable=False)
-    pushover_api_token = Column(String(255))
-    pushover_user_key = Column(String(255))
     notifications_enabled = Column(Boolean, default=True)
     
     # Relationship to user
@@ -141,10 +143,10 @@ class DatabaseInterface:
             ).filter(
                 MinimalUserSettings.service_name == service_name,
                 MinimalUserSettings.notifications_enabled == True,
-                MinimalUserSettings.pushover_api_token.isnot(None),
-                MinimalUserSettings.pushover_user_key.isnot(None),
-                MinimalUserSettings.pushover_api_token != '',
-                MinimalUserSettings.pushover_user_key != '',
+                MinimalUser.pushover_api_token.isnot(None),
+                MinimalUser.pushover_user_key.isnot(None),
+                MinimalUser.pushover_api_token != '',
+                MinimalUser.pushover_user_key != '',
                 MinimalUser.is_active == True,
                 MinimalUser.email_verified == True
             ).all()
@@ -157,8 +159,8 @@ class DatabaseInterface:
                 user_settings.append({
                     'user_id': user.id,
                     'user_email': user.email,
-                    'pushover_api_token': settings.pushover_api_token,
-                    'pushover_user_key': settings.pushover_user_key,
+                    'pushover_api_token': user.pushover_api_token,
+                    'pushover_user_key': user.pushover_user_key,
                     'service_name': settings.service_name,
                     'facility_patterns': facility_patterns
                 })

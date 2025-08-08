@@ -51,8 +51,7 @@ config.json
 docs/
 README.md
 
-# Scripts not needed in container
-scripts/
+# Scripts directory is needed for database migrations
 launch.bat
 
 # GUI components not needed for headless

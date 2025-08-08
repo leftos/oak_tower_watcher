@@ -92,38 +92,15 @@
             </div>
             
             <div class="form-section">
-                <h3>Pushover Configuration</h3>
-                <p class="form-description">
-                    Configure your Pushover API credentials to receive push notifications when controllers come online or go offline.
-                    <a href="https://pushover.net/" target="_blank">Get your Pushover credentials here</a>.
-                </p>
-                
-                <div class="form-group">
-                    {{ form.pushover_api_token.label(class="form-label") }}
-                    {{ form.pushover_api_token(class="form-input", placeholder="Your Pushover API Token") }}
-                    {% for error in form.pushover_api_token.errors %}
-                        <span class="error">{{ error }}</span>
-                    {% endfor %}
-                    <small class="form-help">This is your application's API token from Pushover</small>
-                </div>
-                
-                <div class="form-group">
-                    {{ form.pushover_user_key.label(class="form-label") }}
-                    {{ form.pushover_user_key(class="form-input", placeholder="Your Pushover User Key") }}
-                    {% for error in form.pushover_user_key.errors %}
-                        <span class="error">{{ error }}</span>
-                    {% endfor %}
-                    <small class="form-help">This is your personal user key from Pushover</small>
-                </div>
-            </div>
-            
-            <div class="form-section">
                 <h3>Notification Preferences</h3>
+                <p class="form-description">
+                    Configure your Pushover API credentials in <a href="{{ url_for('auth.general_settings') }}">General Settings</a> to receive push notifications.
+                </p>
                 
                 <div class="form-group checkbox-group">
                     {{ form.notifications_enabled(class="form-checkbox") }}
                     {{ form.notifications_enabled.label(class="checkbox-label") }}
-                    <small class="form-help">Enable or disable all notifications for this service</small>
+                    <small class="form-help">Enable or disable notifications for this service (requires Pushover credentials in General Settings)</small>
                 </div>
             </div>
             

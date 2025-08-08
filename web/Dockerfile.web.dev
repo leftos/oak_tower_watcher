@@ -41,12 +41,15 @@ COPY web/robots.txt ./
 COPY shared/ shared/
 COPY config/ config/
 COPY assets/ assets/
+COPY scripts/ scripts/
 
 # Copy development entrypoint script
 COPY web/docker-entrypoint-web-dev.sh ./docker-entrypoint-web-dev.sh
 
 # Make entrypoint script executable and ensure proper ownership
 RUN chmod +x docker-entrypoint-web-dev.sh && \
+    chmod +x scripts/migrate_database.sh && \
+    chmod +x scripts/migrate_database.py && \
     chown -R vatsim:vatsim /app
 
 # Set environment variables

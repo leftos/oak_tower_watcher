@@ -55,8 +55,7 @@ def test_database_models():
             test_settings.user_id = test_user.id
             test_settings.service_name = 'oak_tower_watcher'
             test_settings.notifications_enabled = True
-            test_settings.pushover_api_token = "test_token"
-            test_settings.pushover_user_key = "test_key"
+            # Pushover tokens are now stored on the User model, not UserSettings
             
             db.session.add(test_settings)
             db.session.flush()

@@ -38,6 +38,10 @@ class User(UserMixin, db.Model):
     password_reset_token = db.Column(db.String(255), unique=True, nullable=True)
     password_reset_sent_at = db.Column(db.DateTime, nullable=True)
     
+    # General Pushover settings (shared across all apps)
+    pushover_api_token = db.Column(db.String(255), nullable=True)
+    pushover_user_key = db.Column(db.String(255), nullable=True)
+    
     # Relationship to user settings
     settings = db.relationship('UserSettings', backref='user', lazy=True, cascade='all, delete-orphan')
     
@@ -272,8 +276,6 @@ class UserSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     service_name = db.Column(db.String(50), nullable=False)  # e.g., 'oak_tower_watcher'
-    pushover_api_token = db.Column(db.String(255))
-    pushover_user_key = db.Column(db.String(255))
     notifications_enabled = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

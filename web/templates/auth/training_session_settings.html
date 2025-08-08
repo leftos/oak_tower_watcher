@@ -54,6 +54,9 @@
                                     {{ form.notifications_enabled.description }}
                                 </label>
                             </div>
+                            <small class="form-text text-muted">
+                                Configure your Pushover API credentials in <a href="{{ url_for('auth.general_settings') }}">General Settings</a> to receive notifications.
+                            </small>
                         </div>
 
                         <div class="form-group">
@@ -202,7 +205,7 @@
                         <ul>
                             <li>The service checks for new training sessions every hour</li>
                             <li>Only sessions matching your selected ratings trigger notifications</li>
-                            <li>Notifications are sent via Pushover (configure in Dashboard)</li>
+                            <li>Notifications are sent via Pushover (configure in <a href="{{ url_for('auth.general_settings') }}">General Settings</a>)</li>
                             <li>Session keys are validated weekly and you'll be notified if expired</li>
                         </ul>
 

@@ -7,7 +7,7 @@ import logging
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from .models import db, User, UserSettings
-from .forms import LoginForm, RegistrationForm, UserSettingsForm, PasswordResetRequestForm, PasswordResetForm, FacilityConfigForm
+from .forms import LoginForm, RegistrationForm, UserSettingsForm, PasswordResetRequestForm, PasswordResetForm, FacilityConfigForm, GeneralSettingsForm
 from .training_monitor.forms import TrainingSessionSettingsForm, TestSessionKeyForm
 from .training_monitor.models import TrainingSessionSettings, get_available_rating_patterns
 from .training_monitor.scraper import TrainingSessionScraper
@@ -215,9 +215,45 @@ def dashboard():
         db.session.add(oak_settings)
         db.session.commit()
     
-    return render_template('auth/dashboard.html', 
-                         title='Dashboard', 
+    return render_template('auth/dashboard.html',
+                         title='Dashboard',
                          oak_settings=oak_settings)
+
+@auth_bp.route('/settings/general', methods=['GET', 'POST'])
+@login_required
+@email_verification_required
+def general_settings():
+    """General user settings page"""
+    form = GeneralSettingsForm()
+    
+    if form.validate_on_submit():
+        try:
+            logger.debug(f"Processing general settings form for user: {current_user.email}")
+            
+            # Update pushover settings on user
+            current_user.pushover_api_token = form.pushover_api_token.data
+            current_user.pushover_user_key = form.pushover_user_key.data
+            
+            db.session.commit()
+            logger.info(f"General settings updated successfully for user: {current_user.email}")
+            flash('Your general settings have been updated!')
+            return redirect(url_for('auth.dashboard'))
+            
+        except Exception as e:
+            logger.error(f"Error updating general settings for user {current_user.email}: {str(e)}", exc_info=True)
+            db.session.rollback()
+            flash('An error occurred while saving your settings. Please try again.')
+            
+    elif request.method == 'GET':
+        # Load existing settings into form
+        form.pushover_api_token.data = current_user.pushover_api_token
+        form.pushover_user_key.data = current_user.pushover_user_key
+        
+        logger.debug(f"Loaded general settings for user: {current_user.email}")
+    
+    return render_template('auth/general_settings.html',
+                         title='General Settings',
+                         form=form)
 
 @auth_bp.route('/settings/oak_tower_watcher', methods=['GET', 'POST'])
 @login_required
@@ -239,9 +275,7 @@ def oak_tower_settings():
         try:
             logger.debug(f"Processing facility config form for user: {current_user.email}")
             
-            # Update pushover settings
-            settings.pushover_api_token = form.pushover_api_token.data
-            settings.pushover_user_key = form.pushover_user_key.data
+            # Update notifications setting
             settings.notifications_enabled = form.notifications_enabled.data
             
             # Update facility patterns
@@ -265,8 +299,6 @@ def oak_tower_settings():
             
     elif request.method == 'GET':
         # Load existing settings into form
-        form.pushover_api_token.data = settings.pushover_api_token
-        form.pushover_user_key.data = settings.pushover_user_key
         form.notifications_enabled.data = settings.notifications_enabled
         
         # Load existing facility patterns

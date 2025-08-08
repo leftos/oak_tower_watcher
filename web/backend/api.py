@@ -155,11 +155,11 @@ def test_pushover():
             }), 404
         
         # Check if Pushover is configured
-        if not oak_settings.pushover_api_token or not oak_settings.pushover_user_key:
+        if not current_user.pushover_api_token or not current_user.pushover_user_key:
             return jsonify({
                 "success": False,
                 "error": "Pushover credentials not configured",
-                "message": "Please configure your Pushover API Token and User Key first",
+                "message": "Please configure your Pushover API Token and User Key in General Settings first",
                 "timestamp": datetime.now().isoformat()
             }), 400
         
@@ -174,8 +174,8 @@ def test_pushover():
         
         # Create Pushover service with user's credentials
         pushover_service = PushoverService(
-            api_token=oak_settings.pushover_api_token,
-            user_key=oak_settings.pushover_user_key
+            api_token=current_user.pushover_api_token,
+            user_key=current_user.pushover_user_key
         )
         
         # Send test notification
@@ -415,11 +415,11 @@ def test_status_notification():
             }), 404
         
         # Check if Pushover is configured
-        if not oak_settings.pushover_api_token or not oak_settings.pushover_user_key:
+        if not current_user.pushover_api_token or not current_user.pushover_user_key:
             return jsonify({
                 "success": False,
                 "error": "Pushover credentials not configured",
-                "message": "Please configure your Pushover API Token and User Key first",
+                "message": "Please configure your Pushover API Token and User Key in General Settings first",
                 "timestamp": datetime.now().isoformat()
             }), 400
         
@@ -473,8 +473,8 @@ def test_status_notification():
         
         # Create Pushover service with user's credentials
         pushover_service = PushoverService(
-            api_token=oak_settings.pushover_api_token,
-            user_key=oak_settings.pushover_user_key
+            api_token=current_user.pushover_api_token,
+            user_key=current_user.pushover_user_key
         )
         
         # Send notification

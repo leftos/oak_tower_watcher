@@ -48,10 +48,13 @@ COPY web/robots.txt ./
 COPY shared/ shared/
 COPY config/ config/
 COPY assets/ assets/
+COPY scripts/ scripts/
 COPY web/docker-entrypoint-web.sh .
 
 # Make entrypoint script executable and create logs and database directories
 RUN chmod +x docker-entrypoint-web.sh && \
+    chmod +x scripts/migrate_database.sh && \
+    chmod +x scripts/migrate_database.py && \
     chown vatsim:vatsim /app
 
 

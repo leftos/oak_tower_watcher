@@ -353,9 +353,8 @@ class TrainingMonitoringService(BaseMonitoringService):
                 logger.error(f"User {user_settings.user_id} not found")
                 return False
             
-            # Get user's general pushover settings (will be refactored later)
-            oak_settings = user.get_service_settings('oak_tower_watcher')
-            if not oak_settings or not oak_settings.pushover_api_token or not oak_settings.pushover_user_key:
+            # Get user's general pushover settings
+            if not user.pushover_api_token or not user.pushover_user_key:
                 logger.warning(f"No pushover credentials configured for user {user_settings.user_id}")
                 return False
             
@@ -373,8 +372,8 @@ class TrainingMonitoringService(BaseMonitoringService):
             
             # Send pushover notification
             pushover_service = PushoverService(
-                api_token=oak_settings.pushover_api_token,
-                user_key=oak_settings.pushover_user_key
+                api_token=user.pushover_api_token,
+                user_key=user.pushover_user_key
             )
             
             result = pushover_service.send_notification(
@@ -431,8 +430,7 @@ class TrainingMonitoringService(BaseMonitoringService):
                 return
             
             # Get user's pushover settings
-            oak_settings = user.get_service_settings('oak_tower_watcher')
-            if not oak_settings or not oak_settings.pushover_api_token or not oak_settings.pushover_user_key:
+            if not user.pushover_api_token or not user.pushover_user_key:
                 return
             
             # Send notification
@@ -440,8 +438,8 @@ class TrainingMonitoringService(BaseMonitoringService):
             message = f"Your OAK ARTCC training session monitoring has stopped working.\n\nError: {error_message}\n\nPlease update your PHP session key in the training monitor settings."
             
             pushover_service = PushoverService(
-                api_token=oak_settings.pushover_api_token,
-                user_key=oak_settings.pushover_user_key
+                api_token=user.pushover_api_token,
+                user_key=user.pushover_user_key
             )
             
             result = pushover_service.send_notification(

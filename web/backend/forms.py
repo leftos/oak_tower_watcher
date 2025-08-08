@@ -49,6 +49,16 @@ class UserSettingsForm(FlaskForm):
     notifications_enabled = BooleanField('Enable Notifications', default=True)
     submit = SubmitField('Save Settings')
 
+class GeneralSettingsForm(FlaskForm):
+    """General user settings form for global configuration"""
+    pushover_api_token = StringField('Pushover API Token', validators=[
+        Length(max=255, message='API Token too long')
+    ])
+    pushover_user_key = StringField('Pushover User Key', validators=[
+        Length(max=255, message='User Key too long')
+    ])
+    submit = SubmitField('Save Settings')
+
 class PasswordResetRequestForm(FlaskForm):
     """Password reset request form"""
     email = StringField('Email', validators=[DataRequired(), Email()])
@@ -84,13 +94,7 @@ class FacilityRegexPatternForm(FlaskForm):
 
 class FacilityConfigForm(FlaskForm):
     """Form for facility regex configuration"""
-    # Pushover settings
-    pushover_api_token = StringField('Pushover API Token', validators=[
-        Length(max=255, message='API Token too long')
-    ])
-    pushover_user_key = StringField('Pushover User Key', validators=[
-        Length(max=255, message='User Key too long')
-    ])
+    # App-specific notification setting
     notifications_enabled = BooleanField('Enable Notifications', default=True)
     
     # Facility regex patterns - stored as text areas for easier editing

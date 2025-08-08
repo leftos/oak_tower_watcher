@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="settings-container">
+    <div class="settings-header">
+        <h1>General Settings</h1>
+        <p>Configure your Pushover credentials and global preferences</p>
+        <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">← Back to Dashboard</a>
+    </div>
+    
+    <div class="settings-card">
+        <form method="POST" class="settings-form">
+            {{ form.hidden_tag() }}
+            
+            <!-- Pushover Configuration Section -->
+            <div class="form-section">
+                <h3>Pushover Configuration</h3>
+                <p class="form-description">
+                    Configure your Pushover API credentials to receive push notifications across all applications.
+                    These settings are shared by all your monitoring services.
+                    <a href="https://pushover.net/" target="_blank" rel="noopener noreferrer">Get your Pushover credentials here</a>.
+                </p>
+                
+                <div class="form-group">
+                    {{ form.pushover_api_token.label(class="form-label") }}
+                    {{ form.pushover_api_token(class="form-input", placeholder="Your Pushover API Token") }}
+                    {% for error in form.pushover_api_token.errors %}
+                        <span class="error">{{ error }}</span>
+                    {% endfor %}
+                    <small class="form-help">This is your application's API token from Pushover</small>
+                </div>
+                
+                <div class="form-group">
+                    {{ form.pushover_user_key.label(class="form-label") }}
+                    {{ form.pushover_user_key(class="form-input", placeholder="Your Pushover User Key") }}
+                    {% for error in form.pushover_user_key.errors %}
+                        <span class="error">{{ error }}</span>
+                    {% endfor %}
+                    <small class="form-help">This is your personal user key from Pushover</small>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+        
+        <div class="settings-info">
+            <h3>About Pushover Settings</h3>
+            <ul>
+                <li><strong>Global Configuration:</strong> These Pushover credentials are used by all your monitoring services</li>
+                <li><strong>Per-Service Control:</strong> Enable or disable notifications for each service in their individual settings pages</li>
+                <li><strong>Security:</strong> Your credentials are stored securely and only used to send you notifications</li>
+            </ul>
+            
+            <h3>Getting Started</h3>
+            <ol>
+                <li>Create an account at <a href="https://pushover.net/" target="_blank" rel="noopener noreferrer">pushover.net</a></li>
+                <li>Note your User Key from your dashboard</li>
+                <li>Create a new application to get your API Token</li>
+                <li>Enter both credentials above</li>
+                <li>Configure notification preferences in each service's settings</li>
+            </ol>
+        </div>
+    </div>
+</div>
+{% endblock %}
