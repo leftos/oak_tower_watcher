@@ -49,11 +49,6 @@ class TrainingStatusPage {
             testNotificationBtn.addEventListener('click', () => this.testNotification());
         }
         
-        // Refresh sessions button
-        const refreshSessionsBtn = document.getElementById('refresh-sessions-btn');
-        if (refreshSessionsBtn) {
-            refreshSessionsBtn.addEventListener('click', () => this.refreshSessions());
-        }
         
         // Close modal when clicking outside
         const modal = document.getElementById('firstVisitModal');
@@ -340,41 +335,6 @@ class TrainingStatusPage {
         }
     }
     
-    async refreshSessions() {
-        if (!this.isAuthenticated) {
-            this.showError('Please log in to refresh sessions');
-            return;
-        }
-        
-        const btn = document.getElementById('refresh-sessions-btn');
-        const btnText = document.getElementById('refresh-sessions-text');
-        
-        if (!btn || !btnText) return;
-        
-        // Update button to show loading
-        btn.disabled = true;
-        btnText.textContent = '⏳ Refreshing...';
-        
-        try {
-            const response = await fetch('/api/training/refresh-sessions', { method: 'POST' });
-            const data = await response.json();
-            
-            if (response.ok && data.success) {
-                this.showSuccess('Training sessions refreshed successfully!');
-                // Reload status to show updated data
-                this.loadTrainingStatus();
-            } else {
-                this.showError(data.error || 'Failed to refresh sessions');
-            }
-        } catch (error) {
-            console.error('Error refreshing sessions:', error);
-            this.showError('Network error refreshing sessions');
-        } finally {
-            // Reset button
-            btn.disabled = false;
-            btnText.textContent = '🔄 Refresh Sessions';
-        }
-    }
     
     showFirstVisitModal() {
         const modal = document.getElementById('firstVisitModal');

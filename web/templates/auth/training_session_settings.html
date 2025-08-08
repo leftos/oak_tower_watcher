@@ -176,11 +176,6 @@
                         <a href="{{ url_for('training_session_status') }}" class="btn btn-secondary">
                             📊 View Status Page
                         </a>
-                        {% if session_key_configured and monitored_ratings %}
-                            <button id="refresh-now-btn" class="btn btn-info">
-                                🔄 Check Now
-                            </button>
-                        {% endif %}
                     </div>
                 </div>
 
@@ -226,32 +221,6 @@
     </div>
 
     <script>
-        // Add functionality for refresh now button
-        document.getElementById('refresh-now-btn')?.addEventListener('click', async function() {
-            const btn = this;
-            const originalText = btn.textContent;
-            
-            btn.disabled = true;
-            btn.textContent = '⏳ Checking...';
-            
-            try {
-                const response = await fetch('/api/training/refresh-sessions', { method: 'POST' });
-                const data = await response.json();
-                
-                if (response.ok && data.success) {
-                    alert('✅ Training sessions refreshed successfully!');
-                } else {
-                    alert('❌ Error: ' + (data.error || 'Failed to refresh sessions'));
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('❌ Network error occurred');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = originalText;
-            }
-        });
-
         // Auto-scroll to alerts
         const alerts = document.querySelectorAll('.alert');
         if (alerts.length > 0) {
