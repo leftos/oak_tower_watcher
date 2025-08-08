@@ -141,7 +141,7 @@ class OAKTowerStatus {
     async fetchStatus() {
         try {
             // Use cached status from monitoring service to prevent VATSIM API spam
-            const response = await fetch('/api/cached-status');
+            const response = await fetch('/api/facility/cached-status');
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -468,7 +468,7 @@ class OAKTowerStatus {
         testBtn.textContent = '📤 Sending...';
         
         try {
-            const response = await fetch('/api/test-status-notification', {
+            const response = await fetch('/api/facility/test-status-notification', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -612,7 +612,7 @@ class FirstVisitModal {
 
         // Check authentication status from the API
         try {
-            const response = await fetch('/api/cached-status');
+            const response = await fetch('/api/facility/cached-status');
             if (response.ok) {
                 const data = await response.json();
                 this.userAuthenticated = data.user_authenticated || false;

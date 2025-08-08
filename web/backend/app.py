@@ -33,6 +33,8 @@ from .web_monitoring_service import web_monitoring_service
 from .training_monitor.api import training_api_bp
 from .training_monitor.service import training_monitoring_service
 from .training_monitor.models import create_training_tables
+from .facility_monitor.api import facility_api_bp
+from .facility_monitor.models import create_facility_tables
  
 def create_app():
     """Application factory with environment-specific configuration"""
@@ -83,6 +85,7 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(training_api_bp, url_prefix='/api/training')
+    app.register_blueprint(facility_api_bp, url_prefix='/api/facility')
     
     # Configure environment-specific logging
     configure_logging(app, log_config)
@@ -102,6 +105,7 @@ def create_app():
         try:
             db.create_all()
             create_training_tables()
+            create_facility_tables()
             app.logger.info("Database tables created successfully")
         except Exception as e:
             # Check if it's just a "table already exists" error, which is fine
@@ -118,7 +122,8 @@ def create_app():
             web_monitoring_service.start()
             app.logger.info("Web monitoring service started successfully")
             
-            # Also start training monitoring service
+            # Also start training monitoring service - set Flask app for context
+            training_monitoring_service.set_app(app)
             training_monitoring_service.start()
             app.logger.info("Training monitoring service started successfully")
         except Exception as e:

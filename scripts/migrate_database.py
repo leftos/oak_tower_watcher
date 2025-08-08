@@ -302,11 +302,13 @@ def main():
     # Determine which databases to process
     db_files = []
     if args.db:
-        if os.path.exists(args.db):
-            db_files.append(args.db)
-        else:
-            logger.error(f"Database file not found: {args.db}")
-            return 1
+        # For explicit database path, create it if it doesn't exist
+        db_path = args.db
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        db_files.append(db_path)
+        if not os.path.exists(db_path):
+            logger.info(f"Database file will be created: {db_path}")
     elif args.all:
         db_files = find_database_files()
         if not db_files:

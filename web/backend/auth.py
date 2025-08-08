@@ -7,7 +7,8 @@ import logging
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from .models import db, User, UserSettings
-from .forms import LoginForm, RegistrationForm, UserSettingsForm, PasswordResetRequestForm, PasswordResetForm, FacilityConfigForm, GeneralSettingsForm
+from .forms import LoginForm, RegistrationForm, UserSettingsForm, PasswordResetRequestForm, PasswordResetForm, GeneralSettingsForm
+from .facility_monitor.forms import FacilityConfigForm
 from .training_monitor.forms import TrainingSessionSettingsForm
 from .training_monitor.models import TrainingSessionSettings, get_available_rating_patterns
 from .email_service import send_verification_email, send_welcome_email, send_password_reset_email

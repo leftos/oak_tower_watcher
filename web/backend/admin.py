@@ -9,7 +9,8 @@ import os
 from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, abort
 from werkzeug.security import check_password_hash, generate_password_hash
-from .models import db, User, UserSettings, UserFacilityRegex
+from .models import db, User, UserSettings
+from .facility_monitor.models import UserFacilityRegex
 from .security import rate_limit
 
 # Configure logger

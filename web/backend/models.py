@@ -280,8 +280,15 @@ class UserSettings(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Relationships
-    facility_regexes = db.relationship('UserFacilityRegex', backref='user_settings', lazy=True, cascade='all, delete-orphan')
+    # Relationships - import facility models when needed
+    @property
+    def facility_regexes(self):
+        """Get facility regex patterns - dynamically import to avoid circular imports"""
+        try:
+            from .facility_monitor.models import UserFacilityRegex
+            return UserFacilityRegex.query.filter_by(user_settings_id=self.id).all()
+        except ImportError:
+            return []
     
     # Unique constraint to ensure one setting per user per service
     __table_args__ = (db.UniqueConstraint('user_id', 'service_name', name='unique_user_service'),)
@@ -289,6 +296,7 @@ class UserSettings(db.Model):
     def get_facility_patterns(self, facility_type):
         """Get facility regex patterns for a specific type"""
         try:
+            from .facility_monitor.models import UserFacilityRegex
             patterns = UserFacilityRegex.query.filter_by(
                 user_settings_id=self.id,
                 facility_type=facility_type
@@ -319,6 +327,7 @@ class UserSettings(db.Model):
     def set_facility_patterns(self, facility_type, patterns):
         """Set facility regex patterns for a specific type"""
         try:
+            from .facility_monitor.models import UserFacilityRegex
             logger.debug(f"Setting facility patterns for user settings ID {self.id}, type {facility_type}")
             
             # Delete existing patterns for this type
@@ -347,38 +356,3 @@ class UserSettings(db.Model):
     
     def __repr__(self):
         return f'<UserSettings ID={self.id}:{self.service_name}>'
-
-
-class UserFacilityRegex(db.Model):
-    """User-specific facility regex patterns"""
-    __tablename__ = 'user_facility_regexes'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_settings_id = db.Column(db.Integer, db.ForeignKey('user_settings.id'), nullable=False)
-    facility_type = db.Column(db.String(50), nullable=False)  # 'main_facility', 'supporting_above', 'supporting_below'
-    regex_pattern = db.Column(db.String(255), nullable=False)
-    sort_order = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f'<UserFacilityRegex {self.facility_type}:{self.regex_pattern}>'
-
-class UserFacilityStatusCache(db.Model):
-    """Cache for user facility status to enable transition notifications"""
-    __tablename__ = 'user_facility_status_cache'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_settings_id = db.Column(db.Integer, db.ForeignKey('user_settings.id'), nullable=False)
-    status = db.Column(db.String(100), nullable=False)
-    main_controllers = db.Column(db.Text)  # JSON string
-    supporting_above = db.Column(db.Text)  # JSON string
-    supporting_below = db.Column(db.Text)  # JSON string
-    last_checked_at = db.Column(db.DateTime, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Unique constraint to ensure one cache entry per user settings
-    __table_args__ = (db.UniqueConstraint('user_settings_id', name='unique_user_settings_cache'),)
-    
-    def __repr__(self):
-        return f'<UserFacilityStatusCache user_settings_id={self.user_settings_id} status={self.status}>'

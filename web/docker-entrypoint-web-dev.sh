@@ -56,18 +56,9 @@ log "  - APP_ENV: $APP_ENV"
 log "  - DATABASE_URL: $DATABASE_URL"
 log "  - PYTHONPATH: $PYTHONPATH"
 
-# Run database migrations before starting the application
-log "Running database migrations..."
-if [ -f "/app/scripts/migrate_database.sh" ]; then
-    cd /app && bash scripts/migrate_database.sh
-    if [ $? -ne 0 ]; then
-        log "ERROR: Database migration failed!"
-        exit 1
-    fi
-    log "Database migrations completed successfully"
-else
-    log "WARNING: Migration script not found at /app/scripts/migrate_database.sh"
-fi
+# Database migrations are now handled by the web-migration init container
+# This ensures migrations run only once before any workers start
+log "Migrations are handled by init container - skipping here"
 
 log "Starting application as 'vatsim' user..."
 

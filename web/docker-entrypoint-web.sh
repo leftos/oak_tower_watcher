@@ -25,18 +25,9 @@ load_config()  # This will create the default config.json if it doesn't exist
     chown vatsim:vatsim /app/config.json
 fi
 
-# Run database migrations before starting the application
-log "Running database migrations..."
-if [ -f "/app/scripts/migrate_database.sh" ]; then
-    cd /app && bash scripts/migrate_database.sh
-    if [ $? -ne 0 ]; then
-        log "ERROR: Database migration failed!"
-        exit 1
-    fi
-    log "Database migrations completed successfully"
-else
-    log "WARNING: Migration script not found at /app/scripts/migrate_database.sh"
-fi
+# Database migrations are now handled by the web-migration init container
+# This ensures migrations run only once before any workers start
+log "Migrations are handled by init container - skipping here"
 
 # Set default values for Gunicorn if not provided
 export GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}

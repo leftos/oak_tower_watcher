@@ -18,9 +18,10 @@ def test_imports():
     
     try:
         from backend.app import create_app
-        from backend.models import db, User, UserSettings, UserFacilityRegex
-        from backend.forms import FacilityConfigForm
-        from backend.status_service import StatusAPI
+        from backend.models import db, User, UserSettings
+        from backend.facility_monitor.models import UserFacilityRegex, UserFacilityStatusCache
+        from backend.facility_monitor.forms import FacilityConfigForm
+        from backend.facility_monitor.service import FacilityStatusService
         from shared.bulk_notification_service import BulkNotificationService
         print("✅ All modules imported successfully")
         return True
@@ -34,7 +35,8 @@ def test_database_models():
     
     try:
         from backend.app import create_app
-        from backend.models import db, User, UserSettings, UserFacilityRegex
+        from backend.models import db, User, UserSettings
+        from backend.facility_monitor.models import UserFacilityRegex
         
         app = create_app()
         with app.app_context():
@@ -104,7 +106,7 @@ def test_forms():
     print("\n🧪 Testing form validation...")
     
     try:
-        from backend.forms import FacilityConfigForm
+        from backend.facility_monitor.forms import FacilityConfigForm
         
         # Test valid patterns
         form_data = {
@@ -138,19 +140,19 @@ def test_status_service():
     print("\n🧪 Testing status service...")
     
     try:
-        from backend.status_service import StatusAPI
+        from backend.facility_monitor.service import FacilityStatusService
         
-        # Initialize status API
-        status_api = StatusAPI()
+        # Initialize status service
+        status_service = FacilityStatusService()
         
         # Test default status (no user)
-        default_status = status_api.get_current_status()
+        default_status = status_service.get_current_status()
         assert 'status' in default_status, "Status response missing 'status' field"
         assert 'using_user_config' in default_status, "Status response missing 'using_user_config' field"
         assert default_status['using_user_config'] == False, "Default status should not use user config"
         
         # Test with non-existent user
-        user_status = status_api.get_current_status(user_id=99999)
+        user_status = status_service.get_current_status(user_id=99999)
         assert user_status['using_user_config'] == False, "Non-existent user should fallback to default config"
         
         print("✅ Status service working correctly")
@@ -201,7 +203,7 @@ def test_integration():
     try:
         from backend.app import create_app
         from backend.models import db, User, UserSettings
-        from backend.status_service import StatusAPI
+        from backend.facility_monitor.service import FacilityStatusService
         
         app = create_app()
         with app.app_context():
@@ -230,8 +232,8 @@ def test_integration():
             db.session.commit()
             
             # Test status service with this user
-            status_api = StatusAPI()
-            user_status = status_api.get_current_status(user_id=test_user.id)
+            status_service = FacilityStatusService()
+            user_status = status_service.get_current_status(user_id=test_user.id)
             
             # Should use user config
             assert user_status['using_user_config'] == True, "Should use user configuration"

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VATSIM Status Service - handles status API operations
+VATSIM Facility Status Service - handles facility status API operations
 """
 
 import json
@@ -12,7 +12,7 @@ from datetime import datetime
 # Import shared components using new structure
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 from config.config import load_config
 from shared.vatsim_core import VATSIMCore
@@ -20,13 +20,13 @@ from shared.utils import load_artcc_roster, get_controller_name, get_facility_di
 
 # Import web models for user configuration support
 try:
-    from .models import User, UserSettings
+    from ..models import User, UserSettings
     WEB_MODELS_AVAILABLE = True
 except ImportError:
     WEB_MODELS_AVAILABLE = False
     logging.warning("Web models not available - user configurations disabled")
 
-class StatusAPI:
+class FacilityStatusService:
     def __init__(self):
         self.config = load_config()
         
@@ -39,7 +39,7 @@ class StatusAPI:
         # Create a core VATSIM client instance with default config
         self.vatsim_core = VATSIMCore(self.config)
         
-        logging.info("Status API initialized")
+        logging.info("Facility Status Service initialized")
     
     def _get_user_facility_patterns(self, user_id):
         """Get user-specific facility patterns if available"""
@@ -163,5 +163,5 @@ class StatusAPI:
                 "timestamp": datetime.now().isoformat()
             }
 
-# Create global status API instance
-status_api = StatusAPI()
+# Create global facility status service instance
+facility_status_service = FacilityStatusService()

@@ -33,10 +33,11 @@ class TrainingMonitoringService(BaseMonitoringService):
     Runs hourly checks for new training sessions matching user preferences
     """
     
-    def __init__(self):
+    def __init__(self, app=None):
         # Initialize with 1-hour check interval (3600 seconds)
         super().__init__()
         self.check_interval = 3600  # 1 hour
+        self.app = app  # Store Flask app instance for context
         
         # Training-specific components
         self.scraper = TrainingSessionScraper()
@@ -45,6 +46,10 @@ class TrainingMonitoringService(BaseMonitoringService):
         self.last_cache_update = None
         
         logger.info("Training monitoring service initialized")
+    
+    def set_app(self, app):
+        """Set Flask app instance for context"""
+        self.app = app
     
     def check_status(self) -> Dict[str, Any]:
         """Check training session status (implements abstract method)"""
@@ -101,101 +106,114 @@ class TrainingMonitoringService(BaseMonitoringService):
         Returns:
             Dict with overall check results and statistics
         """
-        try:
-            logger.info("Starting centralized training session check")
-            
-            # Step 1: Perform global scraping using service session key
-            global_scrape_result = self.perform_global_training_scrape()
-            
-            if not global_scrape_result['success']:
-                logger.error(f"Global training scrape failed: {global_scrape_result['error']}")
-                return {
-                    'success': False,
-                    'error': f"Global scrape failed: {global_scrape_result['error']}",
-                    'timestamp': datetime.utcnow().isoformat(),
-                    'total_users': 0,
-                    'total_notifications_sent': 0
-                }
-            
-            # Step 2: Get all users with training session settings
-            try:
-                users_settings = TrainingSessionSettings.query.join(User).filter(
-                    TrainingSessionSettings.notifications_enabled == True,
-                    TrainingSessionSettings.php_session_key.isnot(None),
-                    User.is_active == True,
-                    User.email_verified == True,
-                    User.is_banned != True
-                ).all()
-            except Exception as db_error:
-                logger.error(f"Database error getting user settings: {db_error}")
-                return {
-                    'success': False,
-                    'error': f'Database error: {str(db_error)}',
-                    'timestamp': datetime.utcnow().isoformat(),
-                    'total_users': 0,
-                    'total_notifications_sent': 0
-                }
-            
-            if not users_settings:
-                logger.info("No users found with training session monitoring configured")
-                return {
-                    'success': True,
-                    'message': 'No users configured for training session monitoring - global scrape completed',
-                    'timestamp': datetime.utcnow().isoformat(),
-                    'total_users': 0,
-                    'total_notifications_sent': 0,
-                    'total_sessions_scraped': global_scrape_result.get('total_sessions', 0)
-                }
-            
-            logger.info(f"Found {len(users_settings)} users with training session monitoring enabled")
-            
-            # Step 3: Process each user by filtering global cache
-            total_notifications_sent = 0
-            user_results = []
-            
-            for user_settings in users_settings:
-                try:
-                    user_result = self.process_user_from_global_cache(user_settings)
-                    user_results.append(user_result)
-                    
-                    if user_result.get('notifications_sent', 0) > 0:
-                        total_notifications_sent += user_result['notifications_sent']
-                        
-                except Exception as user_error:
-                    logger.error(f"Error processing user {user_settings.user_id}: {user_error}", exc_info=True)
-                    user_results.append({
-                        'user_id': user_settings.user_id,
-                        'success': False,
-                        'error': str(user_error),
-                        'notifications_sent': 0
-                    })
-            
-            logger.info(f"Training session check completed: {global_scrape_result.get('total_sessions', 0)} sessions scraped, {len(users_settings)} users processed, {total_notifications_sent} notifications sent")
-            
-            return {
-                'success': True,
-                'message': f'Training session check completed for {len(users_settings)} users',
-                'timestamp': datetime.utcnow().isoformat(),
-                'total_users': len(users_settings),
-                'total_notifications_sent': total_notifications_sent,
-                'total_sessions_scraped': global_scrape_result.get('total_sessions', 0),
-                'user_results': user_results
-            }
-            
-        except Exception as e:
-            logger.error(f"Error in training session check: {e}", exc_info=True)
+        if not self.app:
+            logger.error("Flask app not set - cannot access database")
             return {
                 'success': False,
-                'error': str(e),
+                'error': 'Flask app not configured',
                 'timestamp': datetime.utcnow().isoformat(),
                 'total_users': 0,
                 'total_notifications_sent': 0
             }
+        
+        with self.app.app_context():
+            try:
+                logger.info("Starting centralized training session check")
+                
+                # Step 1: Perform global scraping using service session key
+                global_scrape_result = self.perform_global_training_scrape()
+                
+                if not global_scrape_result['success']:
+                    logger.error(f"Global training scrape failed: {global_scrape_result['error']}")
+                    return {
+                        'success': False,
+                        'error': f"Global scrape failed: {global_scrape_result['error']}",
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'total_users': 0,
+                        'total_notifications_sent': 0
+                    }
+                
+                # Step 2: Get all users with training session settings
+                try:
+                    users_settings = TrainingSessionSettings.query.join(User).filter(
+                        TrainingSessionSettings.notifications_enabled == True,
+                        TrainingSessionSettings.php_session_key.isnot(None),
+                        User.is_active == True,
+                        User.email_verified == True,
+                        User.is_banned != True
+                    ).all()
+                except Exception as db_error:
+                    logger.error(f"Database error getting user settings: {db_error}")
+                    return {
+                        'success': False,
+                        'error': f'Database error: {str(db_error)}',
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'total_users': 0,
+                        'total_notifications_sent': 0
+                    }
+                
+                if not users_settings:
+                    logger.info("No users found with training session monitoring configured")
+                    return {
+                        'success': True,
+                        'message': 'No users configured for training session monitoring - global scrape completed',
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'total_users': 0,
+                        'total_notifications_sent': 0,
+                        'total_sessions_scraped': global_scrape_result.get('total_sessions', 0)
+                    }
+                
+                logger.info(f"Found {len(users_settings)} users with training session monitoring enabled")
+                
+                # Step 3: Process each user by filtering global cache
+                total_notifications_sent = 0
+                user_results = []
+                
+                for user_settings in users_settings:
+                    try:
+                        user_result = self.process_user_from_global_cache(user_settings)
+                        user_results.append(user_result)
+                        
+                        if user_result.get('notifications_sent', 0) > 0:
+                            total_notifications_sent += user_result['notifications_sent']
+                            
+                    except Exception as user_error:
+                        logger.error(f"Error processing user {user_settings.user_id}: {user_error}", exc_info=True)
+                        user_results.append({
+                            'user_id': user_settings.user_id,
+                            'success': False,
+                            'error': str(user_error),
+                            'notifications_sent': 0
+                        })
+                
+                logger.info(f"Training session check completed: {global_scrape_result.get('total_sessions', 0)} sessions scraped, {len(users_settings)} users processed, {total_notifications_sent} notifications sent")
+                
+                return {
+                    'success': True,
+                    'message': f'Training session check completed for {len(users_settings)} users',
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'total_users': len(users_settings),
+                    'total_notifications_sent': total_notifications_sent,
+                    'total_sessions_scraped': global_scrape_result.get('total_sessions', 0),
+                    'user_results': user_results
+                }
+                
+            except Exception as e:
+                logger.error(f"Error in training session check: {e}", exc_info=True)
+                return {
+                    'success': False,
+                    'error': str(e),
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'total_users': 0,
+                    'total_notifications_sent': 0
+                }
     
     def perform_global_training_scrape(self) -> Dict[str, Any]:
         """
         Perform global scraping of training sessions using service session key
         Store results in global cache for all users to filter from
+        
+        NOTE: This method is called from within an app context, so no additional context needed
         
         Returns:
             Dict with scrape results

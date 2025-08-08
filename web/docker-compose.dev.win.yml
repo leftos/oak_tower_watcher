@@ -2,6 +2,46 @@
 # This file extends docker-compose.yml with development-specific configurations
 
 services:
+  # Override web-migration service for Windows development
+  web-migration:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile.web.dev
+    container_name: vatsim-web-migration-dev
+    restart: "no"  # Only run once
+    
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=UTC
+      - APP_ENV=development
+      - FLASK_ENV=development
+    
+    env_file:
+      - ../env/.env
+    
+    volumes:
+      - ./per_env/dev/logs:/app/web/per_env/dev/logs
+      - ./per_env/dev/data:/app/web/per_env/dev/data
+    
+    entrypoint: []
+    command: >
+      bash -c "
+        echo 'Running database migrations (Windows DEV)...' &&
+        echo 'Running in Docker container' &&
+        echo 'Creating database directories...' &&
+        mkdir -p /app/web/per_env/dev/data &&
+        mkdir -p /app/web/per_env/dev/logs &&
+        chown -R vatsim:vatsim /app/web/per_env/dev/ &&
+        echo 'Searching for database files...' &&
+        ls -la /app/web/per_env/dev/data/ || echo 'Directory empty' &&
+        cd /app && python3 scripts/migrate_database.py --db /app/web/per_env/dev/data/users.db &&
+        echo '' &&
+        echo '✅ Database migration completed successfully'
+      "
+    
+    networks:
+      - app-network
+
   # Override web-api service for development
   web-api:
     build:
@@ -15,6 +55,10 @@ services:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
       - DATABASE_URL=sqlite:////app/web/per_env/dev/data/users.db
+    
+    depends_on:
+      web-migration:
+        condition: service_completed_successfully
     
     # Mount source code for live reloading
     volumes:

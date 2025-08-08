@@ -1,4 +1,43 @@
 services:
+  # Database migration init container
+  web-migration:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile.web
+    container_name: vatsim-web-migration
+    restart: "no"  # Only run once
+    
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=UTC
+      - APP_ENV=production
+    
+    env_file:
+      - ../env/.env
+    
+    volumes:
+      - ./per_env/prod/logs:/app/web/per_env/prod/logs
+      - ./per_env/prod/data:/app/web/per_env/prod/data
+    
+    entrypoint: []
+    command: >
+      bash -c "
+        echo 'Running database migrations...' &&
+        echo 'Running in Docker container' &&
+        echo 'Creating database directories...' &&
+        mkdir -p /app/web/per_env/prod/data &&
+        mkdir -p /app/web/per_env/prod/logs &&
+        chown -R vatsim:vatsim /app/web/per_env/prod/ &&
+        echo 'Searching for database files...' &&
+        ls -la /app/web/per_env/prod/data/ || echo 'Directory empty' &&
+        cd /app && python3 scripts/migrate_database.py --db /app/web/per_env/prod/data/users.db &&
+        echo '' &&
+        echo '✅ Database migration completed successfully'
+      "
+    
+    networks:
+      - app-network
+
   # Web API service
   web-api:
     build:
@@ -37,6 +76,10 @@ services:
                --access-logfile '-'
                --error-logfile '-'
                'backend.app:app'
+    
+    depends_on:
+      web-migration:
+        condition: service_completed_successfully
      
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
