@@ -68,37 +68,16 @@ class WebMonitoringService(BaseMonitoringService):
 
     def has_status_changed(self, current_result: Dict[str, Any]) -> bool:
         """
-        Check if comprehensive status has changed
-        Override base method since comprehensive data has different structure
+        Always trigger notifications for user-centric monitoring
+        The notification system will handle checking individual user changes
         
         Args:
             current_result: Current comprehensive status check result
             
         Returns:
-            True if status has changed, False otherwise
+            True if VATSIM data was successfully retrieved, False otherwise
         """
-        if not current_result.get('success'):
-            return False
-        
-        # For comprehensive monitoring, we consider status changed if:
-        # 1. The total number of controllers changed significantly (±5)
-        # 2. It's been more than 5 minutes since last change notification
-        
-        current_total = current_result.get('total_controllers', 0)
-        
-        # Get previous total from our tracking
-        previous_total = getattr(self, '_previous_total_controllers', 0)
-        
-        # Check for significant change in controller count
-        if abs(current_total - previous_total) >= 5:
-            logging.info(f"Controller count changed from {previous_total} to {current_total}")
-            self._previous_total_controllers = current_total
-            return True
-        
-        # For comprehensive monitoring, we don't track individual facility status changes
-        # since those are handled by real-time filtering. We only notify on significant
-        # network-wide changes or periodically.
-        return False
+        return current_result.get('success', False)
 
     def update_previous_status(self, current_result: Dict[str, Any]):
         """
@@ -109,17 +88,16 @@ class WebMonitoringService(BaseMonitoringService):
             current_result: Current comprehensive status check result
         """
         if current_result.get('success'):
-            # For comprehensive monitoring, we only track total controller count
-            self._previous_total_controllers = current_result.get('total_controllers', 0)
-            # Set a generic status for base class compatibility
-            self.previous_status = f"comprehensive_monitoring_{self._previous_total_controllers}_controllers"
+            # For user-centric monitoring, we set a generic status for base class compatibility
+            total_controllers = current_result.get('total_controllers', 0)
+            self.previous_status = f"user_centric_monitoring_{total_controllers}_controllers"
             # Clear controller lists since we don't use them in comprehensive mode
             self.previous_controllers = {
                 'main': [],
                 'supporting_above': [],
                 'supporting_below': []
             }
-
+    
     def get_aggregated_config(self) -> Optional[Dict[str, Any]]:
         """
         Get configuration with aggregated facility patterns from all users
