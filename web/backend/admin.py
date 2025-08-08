@@ -66,7 +66,12 @@ def login():
         
         if not username or not password:
             flash('Username and password are required.', 'error')
-            return render_template('admin/login.html')
+            nav_context = {
+                'icon': '🔧',
+                'brand_name': 'Admin Panel',
+                'site_name': 'leftos.dev Admin'
+            }
+            return render_template('admin/login.html', nav_context=nav_context)
         
         if authenticate_admin(username, password):
             session['admin_authenticated'] = True
@@ -75,9 +80,19 @@ def login():
             return redirect(url_for('admin.dashboard'))
         else:
             flash('Invalid admin credentials.', 'error')
-            return render_template('admin/login.html')
+            nav_context = {
+                'icon': '🔧',
+                'brand_name': 'Admin Panel',
+                'site_name': 'leftos.dev Admin'
+            }
+            return render_template('admin/login.html', nav_context=nav_context)
     
-    return render_template('admin/login.html')
+    nav_context = {
+        'icon': '🔧',
+        'brand_name': 'Admin Panel',
+        'site_name': 'leftos.dev Admin'
+    }
+    return render_template('admin/login.html', nav_context=nav_context)
 
 @admin_bp.route('/logout')
 def logout():
@@ -109,12 +124,22 @@ def dashboard():
             'recent_users': recent_users
         }
         
-        return render_template('admin/dashboard.html', stats=stats)
+        nav_context = {
+            'icon': '🔧',
+            'brand_name': 'Admin Panel',
+            'site_name': 'leftos.dev Admin'
+        }
+        return render_template('admin/dashboard.html', stats=stats, nav_context=nav_context)
         
     except Exception as e:
         logger.error(f"Error loading admin dashboard: {str(e)}", exc_info=True)
         flash('Error loading dashboard.', 'error')
-        return render_template('admin/dashboard.html', stats={})
+        nav_context = {
+            'icon': '🔧',
+            'brand_name': 'Admin Panel',
+            'site_name': 'leftos.dev Admin'
+        }
+        return render_template('admin/dashboard.html', stats={}, nav_context=nav_context)
 
 @admin_bp.route('/users')
 @require_admin()
@@ -146,15 +171,26 @@ def users():
             page=page, per_page=per_page, error_out=False
         )
         
-        return render_template('admin/users.html', 
+        nav_context = {
+            'icon': '🔧',
+            'brand_name': 'Admin Panel',
+            'site_name': 'leftos.dev Admin'
+        }
+        return render_template('admin/users.html',
                              users=users_pagination,
                              status_filter=status_filter,
-                             search=search)
+                             search=search,
+                             nav_context=nav_context)
         
     except Exception as e:
         logger.error(f"Error loading users list: {str(e)}", exc_info=True)
         flash('Error loading users list.', 'error')
-        return render_template('admin/users.html', users=None)
+        nav_context = {
+            'icon': '🔧',
+            'brand_name': 'Admin Panel',
+            'site_name': 'leftos.dev Admin'
+        }
+        return render_template('admin/users.html', users=None, nav_context=nav_context)
 
 @admin_bp.route('/user/<int:user_id>')
 @require_admin()
@@ -210,11 +246,17 @@ def user_detail(user_id):
             }
             user_data['settings'].append(setting_data)
         
+        nav_context = {
+            'icon': '🔧',
+            'brand_name': 'Admin Panel',
+            'site_name': 'leftos.dev Admin'
+        }
         return render_template('admin/user_detail.html',
                              user=user,
                              user_data=user_data,
                              app_access_list=app_access_list,
-                             user_data_json=json.dumps(user_data, indent=2))
+                             user_data_json=json.dumps(user_data, indent=2),
+                             nav_context=nav_context)
         
     except Exception as e:
         logger.error(f"Error loading user detail for ID {user_id}: {str(e)}", exc_info=True)

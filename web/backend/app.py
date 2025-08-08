@@ -153,9 +153,16 @@ def create_app():
             has_facility_watcher_access = True  # Default is available
             has_training_monitor_access = False  # Default is unavailable
         
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev Dashboard',
+            'site_name': 'leftos.dev'
+        }
+        
         return render_template('index.html',
                              has_facility_watcher_access=has_facility_watcher_access,
-                             has_training_monitor_access=has_training_monitor_access)
+                             has_training_monitor_access=has_training_monitor_access,
+                             nav_context=nav_context)
 
     @app.route('/oak-tower-status')
     @rate_limit(max_requests=20, window_minutes=5)
@@ -164,7 +171,13 @@ def create_app():
         # Check if user has access to facility watcher
         if current_user.is_authenticated and not current_user.has_app_access('facility_watcher'):
             abort(403)
-        return render_template('oak-tower-status.html')
+        nav_context = {
+            'icon': '🏗️',
+            'brand_name': 'VATSIM Facility Watcher',
+            'site_name': 'VATSIM Facility Watcher'
+        }
+        
+        return render_template('oak-tower-status.html', nav_context=nav_context)
 
     @app.route('/training-session-status')
     @rate_limit(max_requests=20, window_minutes=5)
@@ -200,9 +213,16 @@ def create_app():
                 current_user.pushover_user_key.strip()
             )
         
+        nav_context = {
+            'icon': '🎓',
+            'brand_name': 'OAK ARTCC Training Monitor',
+            'site_name': 'OAK ARTCC Training Monitor'
+        }
+        
         return render_template('training-session-status.html',
                              notifications_enabled=notifications_enabled,
-                             pushover_configured=pushover_configured)
+                             pushover_configured=pushover_configured,
+                             nav_context=nav_context)
 
     @app.route('/robots.txt')
     def robots_txt():

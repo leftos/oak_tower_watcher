@@ -32,14 +32,24 @@ def login():
     
     if request.method == 'GET':
         logger.info("Serving login form")
-        return render_template('auth/login.html', title='Sign In', form=form)
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev',
+            'site_name': 'leftos.dev'
+        }
+        return render_template('auth/login.html', title='Sign In', form=form, nav_context=nav_context)
     
     # POST request - process login
     logger.info("Processing login form submission")
     
     if not form.validate_on_submit():
         logger.warning(f"Form validation failed. Errors: {form.errors}")
-        return render_template('auth/login.html', title='Sign In', form=form)
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev',
+            'site_name': 'leftos.dev'
+        }
+        return render_template('auth/login.html', title='Sign In', form=form, nav_context=nav_context)
     
     email = form.email.data
     password = form.password.data
@@ -78,7 +88,12 @@ def login():
         if not user.email_verified:
             logger.warning(f"Login failed - Email not verified for user: {email}")
             flash('Please verify your email address before logging in. Check your inbox for the verification email.')
-            return render_template('auth/login.html', title='Sign In', form=form, show_resend_link=True, user_email=email)
+            nav_context = {
+                'icon': '🏢',
+                'brand_name': 'leftos.dev',
+                'site_name': 'leftos.dev'
+            }
+            return render_template('auth/login.html', title='Sign In', form=form, show_resend_link=True, user_email=email, nav_context=nav_context)
         
         # Check password
         logger.debug(f"Checking password for user: {email}")
@@ -131,14 +146,24 @@ def register():
     
     if request.method == 'GET':
         logger.info("Serving registration form")
-        return render_template('auth/register.html', title='Register', form=form)
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev',
+            'site_name': 'leftos.dev'
+        }
+        return render_template('auth/register.html', title='Register', form=form, nav_context=nav_context)
     
     # POST request - process registration
     logger.info("Processing registration form submission")
     
     if not form.validate_on_submit():
         logger.warning(f"Registration form validation failed. Errors: {form.errors}")
-        return render_template('auth/register.html', title='Register', form=form)
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev',
+            'site_name': 'leftos.dev'
+        }
+        return render_template('auth/register.html', title='Register', form=form, nav_context=nav_context)
     
     email = form.email.data
     logger.info(f"Registration attempt for email: {email}")
@@ -181,7 +206,12 @@ def register():
         logger.error(f"Error during registration for {email}: {str(e)}", exc_info=True)
         db.session.rollback()
         flash('An error occurred during registration. Please try again.')
-        return render_template('auth/register.html', title='Register', form=form)
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev',
+            'site_name': 'leftos.dev'
+        }
+        return render_template('auth/register.html', title='Register', form=form, nav_context=nav_context)
 
 @auth_bp.route('/logout')
 @login_required
@@ -230,12 +260,19 @@ def dashboard():
             service_name='oak_training_monitor'
         ).first()
     
+    nav_context = {
+        'icon': '🏢',
+        'brand_name': 'leftos.dev Dashboard',
+        'site_name': 'leftos.dev'
+    }
+    
     return render_template('auth/dashboard.html',
                          title='Dashboard',
                          oak_settings=oak_settings,
                          training_settings=training_settings,
                          has_facility_watcher_access=has_facility_watcher_access,
-                         has_training_monitor_access=has_training_monitor_access)
+                         has_training_monitor_access=has_training_monitor_access,
+                         nav_context=nav_context)
 
 @auth_bp.route('/settings/general', methods=['GET', 'POST'])
 @login_required
@@ -269,9 +306,16 @@ def general_settings():
         
         logger.debug(f"Loaded general settings for user: {current_user.email}")
     
+    nav_context = {
+        'icon': '🏢',
+        'brand_name': 'leftos.dev Dashboard',
+        'site_name': 'leftos.dev'
+    }
+    
     return render_template('auth/general_settings.html',
                          title='General Settings',
-                         form=form)
+                         form=form,
+                         nav_context=nav_context)
 
 @auth_bp.route('/settings/oak_tower_watcher', methods=['GET', 'POST'])
 @login_required
@@ -332,9 +376,16 @@ def oak_tower_settings():
         
         logger.debug(f"Loaded facility config for user: {current_user.email}")
     
+    nav_context = {
+        'icon': '🏗️',
+        'brand_name': 'VATSIM Facility Watcher',
+        'site_name': 'VATSIM Facility Watcher'
+    }
+    
     return render_template('auth/oak_tower_settings.html',
                          title='VATSIM Facility Watcher Settings',
-                         form=form)
+                         form=form,
+                         nav_context=nav_context)
 
 @auth_bp.route('/settings/training_session_monitor', methods=['GET', 'POST'])
 @login_required
@@ -427,6 +478,13 @@ def training_session_settings():
         'available_ratings': get_available_rating_patterns()
     }
     
+    nav_context = {
+        'icon': '🎓',
+        'brand_name': 'OAK ARTCC Training Monitor',
+        'site_name': 'OAK ARTCC Training Monitor'
+    }
+    context['nav_context'] = nav_context
+    
     return render_template('auth/training_session_settings.html', **context)
 
 @auth_bp.route('/verify-email/<token>')
@@ -485,7 +543,12 @@ def verify_email(token):
 def resend_verification():
     """Resend verification email"""
     if request.method == 'GET':
-        return render_template('auth/resend_verification.html', title='Resend Verification')
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev',
+            'site_name': 'leftos.dev'
+        }
+        return render_template('auth/resend_verification.html', title='Resend Verification', nav_context=nav_context)
     
     # POST request
     email = request.form.get('email', '').strip().lower()
@@ -493,7 +556,12 @@ def resend_verification():
     
     if not email:
         flash('Please enter your email address.')
-        return render_template('auth/resend_verification.html', title='Resend Verification')
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev',
+            'site_name': 'leftos.dev'
+        }
+        return render_template('auth/resend_verification.html', title='Resend Verification', nav_context=nav_context)
     
     try:
         user = User.query.filter_by(email=email).first()
@@ -527,7 +595,12 @@ def resend_verification():
         logger.error(f"Error resending verification email: {str(e)}", exc_info=True)
         db.session.rollback()
         flash('An error occurred. Please try again.')
-        return render_template('auth/resend_verification.html', title='Resend Verification')
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev',
+            'site_name': 'leftos.dev'
+        }
+        return render_template('auth/resend_verification.html', title='Resend Verification', nav_context=nav_context)
 
 @auth_bp.route('/reset-password', methods=['GET', 'POST'])
 def reset_password_request():
@@ -542,14 +615,24 @@ def reset_password_request():
     
     if request.method == 'GET':
         logger.info("Serving password reset request form")
-        return render_template('auth/reset_password_request.html', title='Reset Password', form=form)
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev',
+            'site_name': 'leftos.dev'
+        }
+        return render_template('auth/reset_password_request.html', title='Reset Password', form=form, nav_context=nav_context)
     
     # POST request - process password reset request
     logger.info("Processing password reset request form submission")
     
     if not form.validate_on_submit():
         logger.warning(f"Password reset request form validation failed. Errors: {form.errors}")
-        return render_template('auth/reset_password_request.html', title='Reset Password', form=form)
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev',
+            'site_name': 'leftos.dev'
+        }
+        return render_template('auth/reset_password_request.html', title='Reset Password', form=form, nav_context=nav_context)
     
     email = form.email.data
     logger.info(f"Password reset request for email: {email}")
@@ -582,7 +665,12 @@ def reset_password_request():
         logger.error(f"Error processing password reset request for {email}: {str(e)}", exc_info=True)
         db.session.rollback()
         flash('An error occurred. Please try again.')
-        return render_template('auth/reset_password_request.html', title='Reset Password', form=form)
+        nav_context = {
+            'icon': '🏢',
+            'brand_name': 'leftos.dev',
+            'site_name': 'leftos.dev'
+        }
+        return render_template('auth/reset_password_request.html', title='Reset Password', form=form, nav_context=nav_context)
 
 @auth_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password_confirm(token):
@@ -618,16 +706,26 @@ def reset_password_confirm(token):
         
         if request.method == 'GET':
             logger.info(f"Serving password reset form for user: {user.email}")
+            nav_context = {
+                'icon': '🏢',
+                'brand_name': 'leftos.dev',
+                'site_name': 'leftos.dev'
+            }
             return render_template('auth/reset_password_confirm.html',
-                                 title='Reset Password', form=form, token=token)
+                                 title='Reset Password', form=form, token=token, nav_context=nav_context)
         
         # POST request - process password reset
         logger.info(f"Processing password reset confirmation for user: {user.email}")
         
         if not form.validate_on_submit():
             logger.warning(f"Password reset form validation failed. Errors: {form.errors}")
+            nav_context = {
+                'icon': '🏢',
+                'brand_name': 'leftos.dev',
+                'site_name': 'leftos.dev'
+            }
             return render_template('auth/reset_password_confirm.html',
-                                 title='Reset Password', form=form, token=token)
+                                 title='Reset Password', form=form, token=token, nav_context=nav_context)
         
         # Reset the password
         if user.reset_password(token, form.password.data):
