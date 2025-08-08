@@ -140,18 +140,40 @@ def create_app():
     @rate_limit(max_requests=30, window_minutes=5)  # More lenient for homepage
     def index():
         """Serve the homepage"""
-        return render_template('index.html')
+        # Check app access for authenticated users
+        has_facility_watcher_access = False
+        has_training_monitor_access = False
+        
+        if current_user.is_authenticated:
+            has_facility_watcher_access = current_user.has_app_access('facility_watcher')
+            has_training_monitor_access = current_user.has_app_access('training_monitor')
+        else:
+            # For non-authenticated users, show apps based on default access rules
+            # This allows them to see what's available but they'll need to login to access
+            has_facility_watcher_access = True  # Default is available
+            has_training_monitor_access = False  # Default is unavailable
+        
+        return render_template('index.html',
+                             has_facility_watcher_access=has_facility_watcher_access,
+                             has_training_monitor_access=has_training_monitor_access)
 
     @app.route('/oak-tower-status')
     @rate_limit(max_requests=20, window_minutes=5)
     def oak_tower_status():
         """Serve the oak tower status page"""
+        # Check if user has access to facility watcher
+        if current_user.is_authenticated and not current_user.has_app_access('facility_watcher'):
+            abort(403)
         return render_template('oak-tower-status.html')
 
     @app.route('/training-session-status')
     @rate_limit(max_requests=20, window_minutes=5)
     def training_session_status():
         """Serve the training session status page"""
+        # Check if user has access to training monitor
+        if current_user.is_authenticated and not current_user.has_app_access('training_monitor'):
+            abort(403)
+        
         # Default values for non-authenticated users
         notifications_enabled = False
         pushover_configured = False
@@ -284,6 +306,22 @@ def configure_logging(app, log_config):
 
 app = create_app()
 
+
+@app.errorhandler(403)
+def access_denied(error):
+    """Handle 403 access denied errors"""
+    app.logger.warning(f"403 Access Denied - Path: {request.path}, Method: {request.method}, IP: {request.remote_addr}, User: {current_user.email if current_user.is_authenticated else 'Anonymous'}")
+    
+    # Check if this is an AJAX/API request
+    if request.path.startswith('/api/') or request.headers.get('Content-Type') == 'application/json':
+        return jsonify({
+            "error": "Access denied",
+            "message": "You do not have permission to access this resource",
+            "timestamp": datetime.now().isoformat()
+        }), 403
+    
+    # For regular page requests, render the access denied template
+    return render_template('error/403.html'), 403
 
 @app.errorhandler(404)
 def not_found(error):

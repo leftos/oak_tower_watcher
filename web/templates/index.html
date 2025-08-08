@@ -34,6 +34,7 @@
 
         <main>
             <div class="services-grid">
+                {% if has_facility_watcher_access %}
                 <div class="service-card">
                     <div class="service-icon">🏗️</div>
                     <h2>VATSIM Facility Watcher</h2>
@@ -52,7 +53,9 @@
                         {% endif %}
                     </div>
                 </div>
+                {% endif %}
 
+                {% if has_training_monitor_access %}
                 <div class="service-card">
                     <div class="service-icon">🎓</div>
                     <h2>OAK ARTCC Training Session Monitor</h2>
@@ -71,6 +74,23 @@
                         {% endif %}
                     </div>
                 </div>
+                {% endif %}
+
+                {% if not has_facility_watcher_access and not has_training_monitor_access %}
+                <div class="service-card" style="text-align: center; padding: 3rem;">
+                    <div class="service-icon">🔒</div>
+                    <h2>No Services Available</h2>
+                    {% if current_user.is_authenticated %}
+                        <p>You don't currently have access to any services. Please contact an administrator to request access to:</p>
+                        <div style="margin: 2rem 0;">
+                            <p><strong>🏗️ VATSIM Facility Watcher</strong> - Real-time monitoring of VATSIM network facilities</p>
+                            <p><strong>🎓 OAK ARTCC Training Session Monitor</strong> - Monitor new training sessions</p>
+                        </div>
+                    {% else %}
+                        <p>Please <a href="{{ url_for('auth.login') }}">log in</a> or <a href="{{ url_for('auth.register') }}">create an account</a> to access available services.</p>
+                    {% endif %}
+                </div>
+                {% endif %}
 
             </div>
         </main>
