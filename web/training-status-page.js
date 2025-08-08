@@ -167,6 +167,10 @@ class TrainingStatusPage {
             if (isToday) dateLabel += ' (Today)';
             else if (isTomorrow) dateLabel += ' (Tomorrow)';
             
+            // Format names from "Last, First" to "First Last"
+            const studentDisplayName = this.formatNameWithRating(session.student_name, session.student_rating);
+            const instructorDisplayName = this.formatName(session.instructor_name);
+            
             return `
                 <div class="controller-item session-item">
                     <div class="session-info">
@@ -176,10 +180,9 @@ class TrainingStatusPage {
                         </div>
                         <div class="session-details">
                             <div class="session-student">
-                                <strong>${session.student_name}</strong>
-                                ${session.student_rating ? `<span class="student-rating">(${session.student_rating})</span>` : ''}
+                                <strong>${studentDisplayName}</strong>
                             </div>
-                            <div class="session-instructor">Instructor: ${session.instructor_name}</div>
+                            <div class="session-instructor">Mentor: ${instructorDisplayName}</div>
                             <div class="session-module">${session.module_name}</div>
                             <div class="session-time">🕐 ${session.session_time}</div>
                         </div>
@@ -269,7 +272,7 @@ class TrainingStatusPage {
         if (monitoringStatus) {
             const isRunning = serviceInfo.running;
             monitoringStatus.textContent = isRunning ? 'Active' : 'Stopped';
-            monitoringStatus.className = `stat-value ${isRunning ? 'status-online' : 'status-offline'}`;
+            monitoringStatus.className = 'stat-value';
         }
         
         // Check interval
@@ -285,10 +288,10 @@ class TrainingStatusPage {
             const userInfo = data.user_info || {};
             if (!userInfo.session_key_configured) {
                 sessionKeyStatus.textContent = 'Not configured';
-                sessionKeyStatus.className = 'stat-value status-warning';
+                sessionKeyStatus.className = 'stat-value';
             } else {
                 sessionKeyStatus.textContent = 'Configured';
-                sessionKeyStatus.className = 'stat-value status-online';
+                sessionKeyStatus.className = 'stat-value';
             }
         }
     }
@@ -416,6 +419,53 @@ class TrainingStatusPage {
     
     formatTime(date) {
         return date.toLocaleString();
+    }
+    
+    formatName(name) {
+        // Handle names in format "Last, First Rating" or "Last, First"
+        if (!name) return '';
+        
+        // Known rating suffixes that might be embedded in names
+        const ratingSuffixes = ['S1', 'S2', 'S3', 'C1', 'C2', 'C3', 'I1', 'I2', 'I3', 'SUP', 'OBS'];
+        
+        let workingName = name.trim();
+        let extractedRating = null;
+        
+        // Check if name ends with a known rating
+        for (const rating of ratingSuffixes) {
+            if (workingName.endsWith(' ' + rating)) {
+                extractedRating = rating;
+                workingName = workingName.substring(0, workingName.length - rating.length - 1).trim();
+                break;
+            }
+        }
+        
+        // Now parse "Last, First" format
+        if (workingName.includes(',')) {
+            const parts = workingName.split(',');
+            if (parts.length === 2) {
+                const lastName = parts[0].trim();
+                const firstName = parts[1].trim();
+                const formattedName = `${firstName} ${lastName}`;
+                return extractedRating ? `${formattedName} (${extractedRating})` : formattedName;
+            }
+        }
+        
+        // If no comma, return as-is but still add rating if found
+        return extractedRating ? `${workingName} (${extractedRating})` : workingName;
+    }
+    
+    formatNameWithRating(name, rating) {
+        // For training sessions, the rating might already be embedded in the name
+        // So we primarily use the name parsing, but fall back to separate rating if provided
+        const formattedName = this.formatName(name);
+        
+        // If no rating was extracted from the name and we have a separate rating, add it
+        if (!formattedName.includes('(') && rating) {
+            return `${formattedName} (${rating})`;
+        }
+        
+        return formattedName;
     }
     
     cleanup() {
