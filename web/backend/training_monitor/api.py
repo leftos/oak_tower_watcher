@@ -12,7 +12,7 @@ from typing import Dict, List, Any, Optional
 from ..security import email_verification_required
 from .models import (
     TrainingSessionSettings, TrainingMonitoredRating, TrainingSessionCache,
-    TrainingSessionNotificationLog, get_available_rating_patterns
+    GlobalTrainingSessionCache, TrainingSessionNotificationLog, get_available_rating_patterns
 )
 from .service import training_monitoring_service
 from .scraper import TrainingSessionScraper
@@ -223,9 +223,16 @@ def update_training_settings():
             old_ratings = settings.get_monitored_ratings()
             settings.set_monitored_ratings(monitored_ratings)
             
-            # Log if ratings changed for immediate filtering effect
+            # Log if ratings changed and trigger immediate re-filtering
             if set(old_ratings) != set(monitored_ratings):
                 logger.info(f"Monitored ratings changed for user {current_user.email}: {old_ratings} -> {monitored_ratings}")
+                
+                # Trigger re-filtering from global cache since ratings changed
+                try:
+                    training_monitoring_service.process_user_from_global_cache(settings)
+                    logger.debug(f"Re-filtered training sessions for user {current_user.email} after rating change")
+                except Exception as refilter_error:
+                    logger.warning(f"Could not re-filter sessions after rating change for user {current_user.email}: {refilter_error}")
         
         # Save settings
         db.session.commit()
@@ -271,7 +278,7 @@ def test_session_key():
         
         logger.info(f"Testing PHP session key for user: {current_user.email}")
         
-        # Test the session key
+        # Test the session key (this validates user authorization only)
         scraper = TrainingSessionScraper()
         validation_result = scraper.validate_session_key(session_key)
         
@@ -403,8 +410,8 @@ def refresh_sessions():
                 'timestamp': datetime.utcnow().isoformat()
             }), 400
         
-        # Manually process this user's training sessions
-        result = training_monitoring_service.process_user_training_sessions(settings)
+        # Process user by filtering from global cache (more efficient)
+        result = training_monitoring_service.process_user_from_global_cache(settings)
         
         if result['success']:
             return jsonify({

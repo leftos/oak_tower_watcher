@@ -136,7 +136,7 @@
 
                     <div class="info-card">
                         <h3>ℹ️ About</h3>
-                        <p>This service monitors OAK ARTCC training sessions and sends notifications when new sessions matching your selected ratings are scheduled. Sessions are checked hourly and notifications are sent via Pushover when new matches are found.</p>
+                        <p>This service monitors OAK ARTCC training sessions and sends notifications when new sessions matching your selected ratings are scheduled. Sessions are checked hourly using a service-level session key for reliable data scraping. Your personal session key validates your authorization to access this data. Notifications are sent via Pushover when new matches are found.</p>
                     </div>
                 </div>
             </section>
@@ -162,10 +162,13 @@
                     <strong>Getting Started:</strong><br>
                     To receive notifications, you'll need to:
                     <ol>
-                        <li>Configure your PHP session key from oakartcc.org</li>
+                        <li>Configure your PHP session key from oakartcc.org (this validates your authorization)</li>
                         <li>Select which ratings you want to monitor</li>
                         <li>Ensure you have Pushover configured in your dashboard</li>
                     </ol>
+                    <br>
+                    <strong>How it works:</strong><br>
+                    The service uses a secure service-level session key for reliable data scraping, while your personal session key validates that you're authorized to access OAK ARTCC training information.
                 </div>
                 
                 <p id="authMessage">

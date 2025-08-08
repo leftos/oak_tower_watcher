@@ -19,7 +19,7 @@ from shared.base_monitoring_service import BaseMonitoringService
 from shared.pushover_service import PushoverService
 from .scraper import TrainingSessionScraper
 from .models import (
-    TrainingSessionSettings, TrainingSessionCache, 
+    TrainingSessionSettings, TrainingSessionCache, GlobalTrainingSessionCache,
     TrainingSessionNotificationLog, get_available_rating_patterns
 )
 from ..models import db, User
@@ -92,15 +92,32 @@ class TrainingMonitoringService(BaseMonitoringService):
     
     def check_all_users_training_sessions(self) -> Dict[str, Any]:
         """
-        Check training sessions for all users with configured settings
+        Check training sessions using centralized scraping approach:
+        1. Scrape all sessions once using service key
+        2. Store in global cache
+        3. For each user, filter global cache by their monitored ratings
+        4. Compare with their previous filtered cache and send notifications
         
         Returns:
             Dict with overall check results and statistics
         """
         try:
-            logger.info("Starting training session check for all users")
+            logger.info("Starting centralized training session check")
             
-            # Get all users with training session settings
+            # Step 1: Perform global scraping using service session key
+            global_scrape_result = self.perform_global_training_scrape()
+            
+            if not global_scrape_result['success']:
+                logger.error(f"Global training scrape failed: {global_scrape_result['error']}")
+                return {
+                    'success': False,
+                    'error': f"Global scrape failed: {global_scrape_result['error']}",
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'total_users': 0,
+                    'total_notifications_sent': 0
+                }
+            
+            # Step 2: Get all users with training session settings
             try:
                 users_settings = TrainingSessionSettings.query.join(User).filter(
                     TrainingSessionSettings.notifications_enabled == True,
@@ -123,21 +140,22 @@ class TrainingMonitoringService(BaseMonitoringService):
                 logger.info("No users found with training session monitoring configured")
                 return {
                     'success': True,
-                    'message': 'No users configured for training session monitoring',
+                    'message': 'No users configured for training session monitoring - global scrape completed',
                     'timestamp': datetime.utcnow().isoformat(),
                     'total_users': 0,
-                    'total_notifications_sent': 0
+                    'total_notifications_sent': 0,
+                    'total_sessions_scraped': global_scrape_result.get('total_sessions', 0)
                 }
             
             logger.info(f"Found {len(users_settings)} users with training session monitoring enabled")
             
-            # Process each user's training session monitoring
+            # Step 3: Process each user by filtering global cache
             total_notifications_sent = 0
             user_results = []
             
             for user_settings in users_settings:
                 try:
-                    user_result = self.process_user_training_sessions(user_settings)
+                    user_result = self.process_user_from_global_cache(user_settings)
                     user_results.append(user_result)
                     
                     if user_result.get('notifications_sent', 0) > 0:
@@ -152,7 +170,7 @@ class TrainingMonitoringService(BaseMonitoringService):
                         'notifications_sent': 0
                     })
             
-            logger.info(f"Training session check completed: {len(users_settings)} users processed, {total_notifications_sent} notifications sent")
+            logger.info(f"Training session check completed: {global_scrape_result.get('total_sessions', 0)} sessions scraped, {len(users_settings)} users processed, {total_notifications_sent} notifications sent")
             
             return {
                 'success': True,
@@ -160,6 +178,7 @@ class TrainingMonitoringService(BaseMonitoringService):
                 'timestamp': datetime.utcnow().isoformat(),
                 'total_users': len(users_settings),
                 'total_notifications_sent': total_notifications_sent,
+                'total_sessions_scraped': global_scrape_result.get('total_sessions', 0),
                 'user_results': user_results
             }
             
@@ -173,6 +192,207 @@ class TrainingMonitoringService(BaseMonitoringService):
                 'total_notifications_sent': 0
             }
     
+    def perform_global_training_scrape(self) -> Dict[str, Any]:
+        """
+        Perform global scraping of training sessions using service session key
+        Store results in global cache for all users to filter from
+        
+        Returns:
+            Dict with scrape results
+        """
+        try:
+            logger.info("Starting global training session scrape")
+            
+            # Check if service has a session key configured
+            if not self.scraper.has_service_session_key():
+                logger.error("No service-level PHP session key configured")
+                return {
+                    'success': False,
+                    'error': 'No service-level PHP session key configured',
+                    'total_sessions': 0
+                }
+            
+            # Get or create global cache entry
+            global_cache = GlobalTrainingSessionCache.query.first()
+            if not global_cache:
+                global_cache = GlobalTrainingSessionCache()
+                db.session.add(global_cache)
+            
+            # Check if cache is still fresh
+            if not global_cache.is_cache_stale():
+                logger.debug("Global cache is still fresh, skipping scrape")
+                sessions = global_cache.get_all_sessions()
+                return {
+                    'success': True,
+                    'message': 'Using fresh global cache',
+                    'total_sessions': len(sessions),
+                    'cache_age_minutes': (datetime.utcnow() - global_cache.last_scraped_at).total_seconds() / 60
+                }
+            
+            # Perform scraping using service key
+            scrape_result = self.scraper.scrape_training_sessions(
+                user_session_key=None,
+                use_service_key=True
+            )
+            
+            if scrape_result['success']:
+                # Store in global cache
+                sessions = scrape_result['sessions']
+                global_cache.set_sessions(sessions, session_key_type='service')
+                db.session.commit()
+                
+                logger.info(f"Global scrape successful: {len(sessions)} sessions cached")
+                
+                return {
+                    'success': True,
+                    'message': f'Successfully scraped {len(sessions)} training sessions',
+                    'total_sessions': len(sessions)
+                }
+            else:
+                # Store error in global cache
+                global_cache.set_scrape_error(scrape_result['error'], session_key_type='service')
+                db.session.commit()
+                
+                logger.error(f"Global scrape failed: {scrape_result['error']}")
+                
+                return {
+                    'success': False,
+                    'error': scrape_result['error'],
+                    'total_sessions': 0
+                }
+                
+        except Exception as e:
+            logger.error(f"Error in global training scrape: {e}", exc_info=True)
+            return {
+                'success': False,
+                'error': str(e),
+                'total_sessions': 0
+            }
+    
+    def process_user_from_global_cache(self, user_settings: TrainingSessionSettings) -> Dict[str, Any]:
+        """
+        Process a user by filtering global cache based on their monitored ratings
+        Compare with their previous filtered cache and send notifications for new sessions
+        
+        Args:
+            user_settings: User's training session settings
+            
+        Returns:
+            Dict with user processing results
+        """
+        try:
+            user_id = user_settings.user_id
+            logger.debug(f"Processing user {user_id} from global cache")
+            
+            # Validate user session key periodically (for authorization)
+            if user_settings.is_session_key_expired():
+                logger.debug(f"Validating user session key for authorization (user {user_id})")
+                validation_result = self.scraper.validate_session_key(user_settings.php_session_key)
+                
+                if validation_result['valid']:
+                    user_settings.mark_session_key_validated()
+                    logger.debug(f"User session key validated for user {user_id}")
+                else:
+                    # Send session key expiration notification
+                    self.send_session_key_expired_notification(user_settings, validation_result['message'])
+                    
+                    return {
+                        'user_id': user_id,
+                        'success': False,
+                        'error': 'User session key expired or invalid - not authorized',
+                        'notifications_sent': 1  # Expiration notification
+                    }
+            
+            # Get user's monitored ratings
+            monitored_ratings = user_settings.get_monitored_ratings()
+            
+            if not monitored_ratings:
+                logger.debug(f"No monitored ratings configured for user {user_id}")
+                return {
+                    'user_id': user_id,
+                    'success': True,
+                    'message': 'No monitored ratings configured',
+                    'notifications_sent': 0
+                }
+            
+            # Get global cache
+            global_cache = GlobalTrainingSessionCache.query.first()
+            
+            if not global_cache or not global_cache.scrape_successful:
+                logger.warning(f"No valid global cache available for user {user_id}")
+                return {
+                    'user_id': user_id,
+                    'success': False,
+                    'error': 'No valid global training data available',
+                    'notifications_sent': 0
+                }
+            
+            # Filter global cache by user's monitored ratings
+            current_filtered_sessions = global_cache.filter_sessions_by_ratings(monitored_ratings)
+            
+            # Get user's previous filtered cache for comparison
+            previous_filtered_sessions = self.get_user_cached_sessions(user_settings, monitored_ratings)
+            
+            # Detect new sessions
+            new_sessions = self.scraper.detect_new_sessions(current_filtered_sessions, previous_filtered_sessions)
+            
+            # Update user's individual cache with current filtered data
+            self.update_user_cache_from_global(user_settings, current_filtered_sessions)
+            
+            # Send notifications for new sessions
+            notifications_sent = 0
+            for session in new_sessions:
+                try:
+                    if self.send_new_session_notification(user_settings, session):
+                        notifications_sent += 1
+                except Exception as notification_error:
+                    logger.error(f"Error sending notification for user {user_id}: {notification_error}")
+            
+            logger.debug(f"User {user_id}: {len(current_filtered_sessions)} filtered sessions, {len(new_sessions)} new, {notifications_sent} notifications sent")
+            
+            return {
+                'user_id': user_id,
+                'success': True,
+                'filtered_sessions': len(current_filtered_sessions),
+                'new_sessions': len(new_sessions),
+                'notifications_sent': notifications_sent
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing user {user_settings.user_id} from global cache: {e}", exc_info=True)
+            return {
+                'user_id': user_settings.user_id,
+                'success': False,
+                'error': str(e),
+                'notifications_sent': 0
+            }
+    
+    def update_user_cache_from_global(self, user_settings: TrainingSessionSettings, filtered_sessions: List[Dict[str, Any]]):
+        """
+        Update user's individual cache with their filtered sessions from global cache
+        
+        Args:
+            user_settings: User's training session settings
+            filtered_sessions: Sessions already filtered for this user's monitored ratings
+        """
+        try:
+            cache = TrainingSessionCache.query.filter_by(settings_id=user_settings.id).first()
+            
+            if not cache:
+                cache = TrainingSessionCache()
+                cache.settings_id = user_settings.id
+                db.session.add(cache)
+            
+            # Store the filtered sessions for this user
+            cache.set_sessions(filtered_sessions)
+            db.session.commit()
+            
+            logger.debug(f"Updated user cache for user {user_settings.user_id} with {len(filtered_sessions)} filtered sessions")
+            
+        except Exception as e:
+            logger.error(f"Error updating user cache from global for user {user_settings.user_id}: {e}")
+            db.session.rollback()
+
     def process_user_training_sessions(self, user_settings: TrainingSessionSettings) -> Dict[str, Any]:
         """
         Process training session monitoring for a specific user
@@ -187,9 +407,10 @@ class TrainingMonitoringService(BaseMonitoringService):
             user_id = user_settings.user_id
             logger.debug(f"Processing training sessions for user {user_id}")
             
-            # Validate session key if needed (weekly check)
+            # Validate user session key if needed (weekly check)
+            # This ensures the user is still authorized to access OAK ARTCC training pages
             if user_settings.is_session_key_expired():
-                logger.info(f"Validating expired session key for user {user_id}")
+                logger.info(f"Validating expired user session key for user {user_id}")
                 validation_result = self.scraper.validate_session_key(user_settings.php_session_key)
                 
                 if validation_result['valid']:
@@ -218,8 +439,13 @@ class TrainingMonitoringService(BaseMonitoringService):
                     'notifications_sent': 0
                 }
             
-            # Scrape training sessions
-            scrape_result = self.scraper.scrape_training_sessions(user_settings.php_session_key)
+            # Scrape training sessions using service-level key
+            # The user's session key was validated above to ensure authorization
+            # The service key is used for actual data scraping for consistency and reliability
+            scrape_result = self.scraper.scrape_training_sessions(
+                user_session_key=user_settings.php_session_key,
+                use_service_key=True
+            )
             
             if not scrape_result['success']:
                 logger.error(f"Failed to scrape training sessions for user {user_id}: {scrape_result['error']}")

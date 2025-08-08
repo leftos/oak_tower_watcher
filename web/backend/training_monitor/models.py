@@ -207,6 +207,104 @@ class TrainingSessionCache(db.Model):
         return f'<TrainingSessionCache ID={self.id} settings_id={self.settings_id} successful={self.fetch_successful}>'
 
 
+class GlobalTrainingSessionCache(db.Model):
+    """Global cache for all training sessions (scraped once per check cycle)"""
+    __tablename__ = 'global_training_session_cache'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Global cached session data (JSON)
+    cached_sessions = db.Column(db.Text)  # JSON string of all training sessions
+    last_scraped_at = db.Column(db.DateTime, nullable=False)
+    scrape_successful = db.Column(db.Boolean, default=True)
+    error_message = db.Column(db.Text)  # Store error if scrape failed
+    session_key_used = db.Column(db.String(50))  # Track which key was used (for debugging)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def get_all_sessions(self):
+        """Get all parsed training sessions from global cache"""
+        try:
+            if not self.cached_sessions:
+                return []
+            
+            return json.loads(self.cached_sessions)
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"Error parsing global cached sessions: {str(e)}")
+            return []
+    
+    def set_sessions(self, sessions, session_key_type='service'):
+        """Set training sessions in global cache"""
+        try:
+            self.cached_sessions = json.dumps(sessions, ensure_ascii=False)
+            self.last_scraped_at = datetime.utcnow()
+            self.scrape_successful = True
+            self.error_message = None
+            self.session_key_used = session_key_type
+            logger.info(f"Global cache updated with {len(sessions)} training sessions using {session_key_type} key")
+        except Exception as e:
+            logger.error(f"Error setting global cached sessions: {str(e)}", exc_info=True)
+            raise
+    
+    def set_scrape_error(self, error_message, session_key_type='service'):
+        """Set error state for failed global scrape"""
+        try:
+            self.last_scraped_at = datetime.utcnow()
+            self.scrape_successful = False
+            self.error_message = error_message
+            self.session_key_used = session_key_type
+            logger.warning(f"Global cache scrape failed using {session_key_type} key: {error_message}")
+        except Exception as e:
+            logger.error(f"Error setting global cache scrape error: {str(e)}", exc_info=True)
+            raise
+    
+    def is_cache_stale(self, max_age_hours=1):
+        """Check if global cache is stale and needs refresh"""
+        if not self.last_scraped_at:
+            return True
+        
+        threshold = datetime.utcnow() - timedelta(hours=max_age_hours)
+        return self.last_scraped_at < threshold
+    
+    def filter_sessions_by_ratings(self, rating_patterns):
+        """
+        Filter sessions from global cache by specific rating patterns
+        
+        Args:
+            rating_patterns: List of rating patterns to filter by
+            
+        Returns:
+            Filtered list of sessions
+        """
+        if not self.cached_sessions or not self.scrape_successful:
+            return []
+        
+        try:
+            all_sessions = json.loads(self.cached_sessions)
+            
+            if not rating_patterns:
+                return []
+            
+            # Filter sessions that match any of the rating patterns
+            filtered_sessions = []
+            for session in all_sessions:
+                session_rating = session.get('rating_pattern', '')
+                if session_rating and session_rating in rating_patterns:
+                    filtered_sessions.append(session)
+            
+            logger.debug(f"Filtered {len(filtered_sessions)} sessions from {len(all_sessions)} total sessions")
+            return filtered_sessions
+            
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"Error parsing global cached sessions for filtering: {e}")
+            return []
+    
+    def __repr__(self):
+        return f'<GlobalTrainingSessionCache ID={self.id} successful={self.scrape_successful} last_scraped={self.last_scraped_at}>'
+
+
 class TrainingSessionNotificationLog(db.Model):
     """Log of sent notifications to prevent duplicates"""
     __tablename__ = 'training_session_notification_log'
@@ -256,10 +354,10 @@ def get_available_rating_patterns():
 
 
 def create_training_tables():
-    """Create training session monitoring tables"""
+    """Create training session monitoring tables including global cache"""
     try:
         db.create_all()
-        logger.info("Training session monitoring database tables created successfully")
+        logger.info("Training session monitoring database tables created successfully (including global cache)")
     except Exception as e:
         logger.error(f"Error creating training session monitoring tables: {e}")
         raise

@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional
 import hashlib
 import re
+import os
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -31,6 +32,31 @@ class TrainingSessionScraper:
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
         })
+        
+        # Get service-level PHP session key from environment
+        self.service_session_key = os.getenv('OAK_SERVICE_PHP_SESSION_KEY')
+        if self.service_session_key:
+            logger.debug("Service-level PHP session key loaded from environment")
+        else:
+            logger.warning("No service-level PHP session key found in environment variables - will fall back to user keys")
+    
+    def get_service_session_key(self) -> Optional[str]:
+        """
+        Get the service-level PHP session key from environment
+        
+        Returns:
+            Service session key if available, None otherwise
+        """
+        return self.service_session_key
+    
+    def has_service_session_key(self) -> bool:
+        """
+        Check if service-level session key is configured
+        
+        Returns:
+            True if service session key is available
+        """
+        return bool(self.service_session_key)
     
     def validate_session_key(self, php_session_key: str) -> Dict[str, Any]:
         """
@@ -122,21 +148,40 @@ class TrainingSessionScraper:
                 'timestamp': datetime.utcnow().isoformat()
             }
     
-    def scrape_training_sessions(self, php_session_key: str) -> Dict[str, Any]:
+    def scrape_training_sessions(self, user_session_key: Optional[str] = None, use_service_key: bool = True) -> Dict[str, Any]:
         """
         Scrape training sessions from OAK ARTCC website
         
         Args:
-            php_session_key: PHP session ID for oakartcc.org
+            user_session_key: User's PHP session ID for oakartcc.org (optional, used for validation only)
+            use_service_key: Whether to use service-level session key for actual scraping (default: True)
             
         Returns:
             Dict containing sessions data and metadata
         """
         try:
-            logger.debug(f"Scraping training sessions with session key: {php_session_key[:8]}...")
+            # Determine which session key to use for scraping
+            scraping_key = None
+            
+            if use_service_key and self.service_session_key:
+                scraping_key = self.service_session_key
+                logger.debug("Using service-level PHP session key for scraping")
+            elif user_session_key:
+                scraping_key = user_session_key
+                logger.debug(f"Using user PHP session key for scraping: {user_session_key[:8]}...")
+            else:
+                logger.error("No valid session key available for scraping")
+                return {
+                    'success': False,
+                    'error': 'No valid session key available for scraping',
+                    'sessions': [],
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+            
+            logger.debug(f"Scraping training sessions with session key: {scraping_key[:8]}...")
             
             # Set the PHP session cookie
-            self.session.cookies.set('PHPSESSID', php_session_key, domain='oakartcc.org')
+            self.session.cookies.set('PHPSESSID', scraping_key, domain='oakartcc.org')
             
             # Fetch the training page
             response = self.session.get(self.base_url, timeout=30)
