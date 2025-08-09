@@ -30,7 +30,7 @@ fi
 log "Migrations are handled by init container - skipping here"
 
 # Set default values for Gunicorn if not provided
-export GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
+export GUNICORN_WORKERS=${GUNICORN_WORKERS:-1}
 export GUNICORN_BIND=${GUNICORN_BIND:-0.0.0.0:8080}
 export GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-120}
 
