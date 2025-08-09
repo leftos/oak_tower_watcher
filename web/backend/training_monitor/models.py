@@ -335,17 +335,9 @@ class TrainingSessionNotificationLog(db.Model):
 # Available rating patterns (predefined list that admin can expand)
 AVAILABLE_RATING_PATTERNS = [
     'S1-OAK',
-    'S2-OAK', 
-    'S3-OAK',
-    'C1-OAK',
+    'S2-OAK',
     'S1-SFO',
     'S2-SFO',
-    'S3-SFO',
-    'C1-SFO',
-    'S1-SCT',
-    'S2-SCT',
-    'S3-SCT',
-    'C1-SCT',
 ]
 
 def get_available_rating_patterns():
