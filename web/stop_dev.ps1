@@ -24,7 +24,7 @@ try {
 
 # Stop and remove containers, networks
 Write-Host "Stopping Docker containers..." -ForegroundColor Blue
-docker compose -f docker-compose.yml -f docker-compose.dev.win.yml down
+docker compose -f docker-compose.dev.win.yml down
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""

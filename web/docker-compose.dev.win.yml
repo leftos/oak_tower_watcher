@@ -56,6 +56,9 @@ services:
       - FLASK_DEBUG=1
       - DATABASE_URL=sqlite:////app/web/per_env/dev/data/users.db
     
+    env_file:
+      - ../env/.env
+    
     depends_on:
       web-migration:
         condition: service_completed_successfully
@@ -90,3 +93,7 @@ services:
   certbot:
     profiles:
       - production
+
+networks:
+  app-network:
+    driver: bridge

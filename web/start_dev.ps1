@@ -48,7 +48,7 @@ Write-Host ""
 
 # Build and start the containers
 Write-Host "Building and starting Docker containers..." -ForegroundColor Blue
-docker compose -f docker-compose.yml -f docker-compose.dev.win.yml up --build -d
+docker compose -f docker-compose.dev.win.yml up --build -d
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
